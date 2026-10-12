@@ -12,6 +12,16 @@ npm run check:all
 
 That runs `npm run validate` and `npm test`. Both must pass.
 
+To certify an item (`review` → `ready`) the executable gate must exit 0:
+
+```bash
+npm run gate:qa <PLAY-NNN>                   # certification; exit 0 means eligible
+node scripts/gate-qa.mjs <PLAY-NNN> --no-run # inspection only; exits 2, never certifies
+node scripts/gate-qa.mjs unblock <PLAY-NNN>  # T_unblock guard for a blocked item
+```
+
+Exit codes: `0` certified · `1` failed · `2` usage or inspection-only. A pyramid where **no** step executed fails the gate: certification on an unexecuted gate is the failure this runner exists to prevent.
+
 ## Architecture you need to know
 
 The repo has two layers, and mixing them is the most common mistake:
@@ -49,7 +59,7 @@ Separately, `npm run gate:qa <PLAY-NNN>` is the executable gate for the `review`
 
 ## A test that passes for the wrong reason is a defect
 
-`npm test` proves 46 cases are green. It does **not** prove those 46 cases would fail if the thing they claim to protect broke. Both are different claims, and only one of them gets tested by default.
+`npm test` proves the suite is green. It does **not** prove that those cases would fail if the thing they claim to protect broke. Both are different claims, and only one of them gets tested by default.
 
 > This rule exists because the defect reached production **twice**. `UX-010` shipped with a single labelled fixture — `<button><span>Guardar</span></button>`. It had no icon, so `needsContent Icon` filtered it out before `unlessVisibleText` ever evaluated. The test asserted the capability without ever exercising it. The conclusion "it works" was defensible for the case measured and false for the case that mattered.
 
@@ -65,6 +75,10 @@ The check is concrete and takes two minutes:
 2. Run `npm test`.
 3. **Observe a failure.** No failure means the test does not cover the capability.
 4. Re-apply the fix. Confirm green.
+
+**Revert the whole fix, not half of it.** A partial revert can leave the behaviour intact and prove nothing. If reverting one protection does not drop a test, the test may be covering the other one — revert both and check that the case actually fails.
+
+> A test whose assertion cannot fail under any input is decoration. `assert.equal(new Set(mapKeys).size, mapKeys.length)` can never fail: `Map` keys are unique by construction. Assert the detector directly against a purpose-built fixture instead.
 
 A test whose failure you cannot provoke is decoration. Treat "I can't make this one fail" as a finding about the test, not about the code.
 

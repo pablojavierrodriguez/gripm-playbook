@@ -107,6 +107,23 @@ Transitions, actors and guards are specified in [STATE_MACHINE.md](STATE_MACHINE
 - **Output:** Once verified, moves the item to `status: ready`. On failure, records actionable findings and moves it back to `doing` (transition T3).
 - **`ready` is the formal delivery of development**: the item is validated and immediately eligible for packaging and deployment. A certified item is frozen: any post-QA code change invalidates the certification and requires a return to `doing`.
 
+#### The gate is executable, not a promise
+
+> **Prose is not a gate.** An agent asked to "act as the QA Auditor" can perform the role in the same turn that it wrote the code, tick the ACs by inertia, and promote the item on discourse alone. This playbook ships the gate as a program so that T2 is satisfied by **exit code 0**, not by an assertion.
+
+```bash
+npm run gate:qa PLAY-042                    # full gate
+node scripts/gate-qa.mjs PLAY-042 --no-run  # inspection only; exits 2, never certifies
+```
+
+The runner rejects, mechanically: an item not in `review`; any unchecked acceptance criterion; a `blocked_reason` that is missing, empty or whitespace on a `blocked` item (and a stray `blocked_reason` on an item that is not blocked); and any declared dependency that is missing from disk or not in `done`. It then runs the pyramid, and a step that cannot execute is reported `SKIPPED` — **a pyramid where nothing ran fails the gate rather than passing it**, because certification on an unexecuted gate is the exact theatre this runner exists to prevent.
+
+Running the gate is not the verdict: the QA Auditor still issues it. The runner is the evidence, not the judge.
+
+#### `blocked`: registering an impediment
+
+A task that cannot proceed is moved to `status: blocked` with a **non-empty `blocked_reason`** in its frontmatter, rather than being left to rot in `doing` where it inflates WIP and nobody remembers why it stopped. It returns to `doing` or `draft` only when the impediment is resolved or its blocking dependencies reach `done` or are explicitly unlinked. The invariant is enforced by the runner, not by discipline.
+
 ### Phase 5: Release Management & Prod Implementation (`ready` ➔ `done`)
 - **Packaging by Delivered Value:** Release Management (PO + Scrum/Delivery Lead) groups available items in `ready` based on value delivered.
 - **Decoupled Sprints & Releases:** Sprints and releases have no 1:1 coupling. Releases are created based on delivered value with any available `ready` items (historical or from the active sprint), with or without an active sprint.

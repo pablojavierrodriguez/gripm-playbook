@@ -63,3 +63,43 @@ En el flujo actual de entrega (`STATE_MACHINE.md`), cuando una tarea en desarrol
 
 <!-- SECTION:NOTES:BEGIN -->
 <!-- SECTION:NOTES:END -->
+
+## QA Round 1 - REJECTED
+
+Mismos tres blockers compartidos con PLAY-015 (D1 piramide vacia, D2 gate de dependencias anulable, D3 `--no-run` certificando). Los tres afectaban directamente a este item: D2 era el mecanismo que hacia exigible el gate de dependencias del AC #3.
+
+- AC #2 reforzado: `blocked_reason` en whitespace ahora se rechaza.
+- AC #3 verificado adversarialmente por el QA con fixtures reales (dependencia en `review` y en `ideas`: ambas rechazadas; control con dependencia en `done`: aceptado).
+- AC #5 half-false: nombraba `TEAM_PLAYBOOK.md`, que no documentaba el estado blocked. Corregido.
+
+Co-autorizacion: `gate:qa PLAY-016` sale con 0 tras las correcciones.
+
+
+## QA Round 2 - REJECTED, luego corregido
+
+Defectos compartidos con PLAY-015. **N3 era directamente un AC de este item**: la falsificacion de identidad de tareas hacia que el gate de dependencias del AC #3 fuera evadible. **N4 era el AC #4 de este item, marcado `[x]` sin implementacion** — la regla T_unblock existia solo como prosa en STATE_MACHINE.md.
+
+- AC #2: `blocked_reason` en whitespace rechazado.
+- AC #3: gate de dependencias ya no evadible por duplicados, anidamiento, mayusculas/espacios, ni ids colisionados.
+- AC #4: regla de desbloqueo implementada en `inspectTask` con tests propios.
+- AC #5: la edicion de `TEAM_PLAYBOOK.md` que el AC nombraba ahora existe de verdad.
+
+Co-autorizacion: `gate:qa PLAY-016` sale con 0.
+
+## QA Round 3 - corregido
+
+- **R3-3 (AC #4)**: el guard de T_unblock existia pero no podia impedir nada, porque el gate T2 solo inspecciona items en `review` y un item `blocked` siempre falla el chequeo de status antes. Ahora tiene entrada propia: `node scripts/gate-qa.mjs unblock <id>` evalua la transicion `blocked -> doing` y devuelve exit 1 si una dependencia sigue sin resolver. El guard deja de ser decorativo.
+- **R3-1**: la falsificacion de identidad de tareas (N3) estaba detectada pero no aplicada; un item podia certificar contra una dependencia fabricada. Cerrado con enforcement probada.
+- **R3-2**: un item sin id no puede certificarse.
+- Typo en la nota de ronda 1 corregido (`AC #5Half-false`).
+
+Co-autorizacion: `gate:qa PLAY-016` sale con 0.
+
+## QA Round 4 - AC #4 cerrado
+
+- **S2 (fail-open del unblock)**: una dependencia inexistente permitia desbloquear. Era una contradiccion directa del texto de este AC. Corregida: ahora se rechaza y se indica que hay que resolverla o sacarla del array explicitamente.
+- **S1**: `unblockMain` -la entrada que da teeth a este AC- tenia cero cobertura. Siete tests CLI: rechazo por dependencia sin resolver, por dependencia inexistente, por colision de id; permitido cuando la dependencia esta `done`; no-aplica cuando el item no esta `blocked`; y los dos caminos de error (sin target, task inexistente).
+- **S4**: `id: "   "` certificaba. Lleva el mismo `.trim()` que ya recibe `blocked_reason`.
+- **S5**: el comando `unblock` no aparecia en ningun doc operable. Documentado en `SKILL.md`, `STATE_MACHINE.md` y `CONTRIBUTING.md`.
+
+PLAY-015 quedo certificada en esta ronda. Este item quedo pendiente solo por los findings de `unblockMain`, ya corregidos y cubiertos.

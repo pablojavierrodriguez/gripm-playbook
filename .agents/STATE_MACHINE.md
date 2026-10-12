@@ -62,7 +62,7 @@ Un ítem no refinado permanece en `draft` (o `ideas` si es discovery) en el back
 | T5 | `doing` → `draft` | PO | Timebox del sprint expirado, o depriorizado explícitamente. |
 | T_block | `draft` → `blocked` | PO / Dev | Impedimento externo identificado. `blocked_reason` obligatorio. |
 | T_block | `doing` → `blocked` | PO / Dev | Impedimento externo identificado. `blocked_reason` obligatorio. |
-| T_unblock | `blocked` → `doing` / `draft` | PO / Dev | El impedimento fue resuelto **o** sus `dependencies:` bloqueantes quedaron en `done` o fueron desvinculadas del array. |
+| T_unblock | `blocked` → `doing` / `draft` | PO / Dev | El impedimento fue resuelto **o** sus `dependencies:` quedaron en `done` o fueron **desvinculadas del array**. Una dependencia que no existe en disco no está desvinculada: sigue declarada. Verificable con `node scripts/gate-qa.mjs unblock <id>`. |
 
 ---
 
