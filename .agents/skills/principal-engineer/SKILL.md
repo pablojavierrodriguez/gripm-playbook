@@ -81,6 +81,65 @@ Categorías que aparecen en casi todos los dominios:
 
 - **Fast-Track (Modo 1):** resolver bugfixes, correcciones de invariantes y tareas quirúrgicas sin burocracia de sprints.
 - **Foco atómico inquebrantable:** liderar en solitario y en un único hilo secuencial toda modificación de invariantes de dominio, schema, migraciones y políticas de autorización, evitando fragmentar esa responsabilidad en subagentes para preservar la integridad del estado.
+- **Supervisión de subagentes (SDD):** ante una tarea de alta complejidad, delegar pasos hiper-atómicos a subagentes en contexto fresco en lugar de codificar todo en el hilo principal. El orquestador **revisa el diff, corre la verificación headless, y solo consolida en verde**. Un subagente sin el historial de la sesión no sabe qué decisiones previas parecen razonables; el prompt del paso debe declarar los archivos que toca, el comportamiento esperado y cómo se verifica. Secuencial: el paso N+1 no se lanza hasta que el N consolidó.
+
+### 9. Disciplina Ponytail & Diff Mínimo Viable
+
+> *"The lazy senior dev: writes one line, it works."*
+
+La sobre-ingeniería especulativa es el vicio por defecto de un agente de IA. Ante un cambio puntual tiende a introducir adaptadores innecesarios, factories abstractas, helpers no solicitados e instalar dependencias de terceros para resolver algo que cabía en unas pocas líneas nativas. Cada línea extra es tokens, costo operativo y **blast radius**.
+
+**1. La mejor línea de código es la que no se escribe.** La solución óptima resuelve el 100% de la necesidad con la menor cantidad de código nuevo posible.
+
+**2. Reutilización obligatoria antes de crear.** Antes de escribir una función auxiliar o instalar un paquete: inspeccionar el repositorio en busca de utilidades existentes, y considerar la standard library del lenguaje. Una dependencia de terceros para resolver una operación de diez líneas es un defecto, no una decisión.
+
+**3. Mapa de blast radius antes de editar.** Identificar todos los puntos de contacto que el cambio puede afectar — llamadores, tests, fixtures, exports, configuración, documentación — **antes** de modificar código. "Nunca rompas lo que ya funciona" es un requisito de planeación, no de buena intención.
+
+**4. Cierre honesto obligatorio.** Toda intervención termina declarando, en una o dos líneas: **qué no probó, qué salteó conscientemente, y qué riesgo queda para el usuario.** Un reporte que solo lista lo que funcionó es un reporte incompleto, por bienintencionado que sea.
+
+> [!CAUTION]
+> **El anti-patrón diagnóstico:** un diff grande para un problema chico casi nunca es "más robusto". Es sobre-ingeniería. Si el diff no se puede justificar cambio por cambio en una frase, sobra alguna parte.
+
+### 10. Higiene de comentarios
+
+Prohibido, sin excepción:
+
+- **Banners decorativos:** separadores de caracteres repetidos (`// ==================== AUTH ====================`). No organizan nada que un salto de línea y el nombre del símbolo no organicen.
+- **Narración de control flow trivial:** `// Step 1: validate input`, `// Step 2: check if valid`, `// Loop over items`. El código ya dice eso, en el mismo orden.
+- **Réplica de la firma:** un comentario que repite el nombre de la función, del tipo o de la variable que anota no aporta información. Si el nombre no explica el comportamiento, el problema es el nombre.
+
+Un comentario legítimo **sí** aporta una de estas tres cosas:
+
+- **Racional arquitectónica:** el porqué de una decisión y la alternativa descartada.
+- **Restricción no obvia:** un límite del dominio o del entorno que el código no puede expresar por sí mismo.
+- **Justificación de una decisión sorprendente:** por qué lo evidente se hizo distinto aquí.
+
+Ante la duda, borrar el comentario y preguntarse si el código lo deja claro. Si lo deja, no iba.
+
+### 11. Disciplina de tipos y aserciones
+
+Este apartado es la versión operativa del principio **1. Tolerancia cero a errores de tipado**: allí se declara la intolerancia; aquí se concreta en los patrones que la instrumentan.
+
+- **Prohibidas las aserciones encadenadas:** `value as unknown as Target` no es type safety, es evasión. La corrección es **arreglar el contrato** —el tipo de la fuente, el genérico, el narrowing, el esquema de validación— no abrir un hueco en el compilador.
+- **Prohibido el widening defensivo:** ensanchar a `any` o a `unknown` para silenciar un error del compilador convierte un fallo de tipado en un fallo diferido a runtime. Un error de tipos es información; silenciarlo es destruirla.
+- **Aserciones simples:** una única aserción a un tipo compatible es aceptable; dos o más encadenadas no lo son.
+- **Excepción acotada:** cuando una aserción sea realmente ineludible, debe ir acompañada de un comentario adyacente que **nombre el invariante que la hace sound**. Sin ese comentario, la aserción es deuda silenciosa.
+- **Schemas sobre `typeof`:** en los bordes del sistema (respuestas de API, payloads, almacenamiento), validar con un esquema determinista (Zod, Valibot, ArkType) en lugar de comprobaciones ad hoc de `typeof`.
+
+```ts
+// INVARIANTE: el gateway valida el payload contra el schema antes de emitirlo,
+// por lo que la forma externa es TotalUserResponse.
+const user = payload as TotalUserResponse
+```
+
+### 12. Política de mockeo en tests
+
+- **Prohibido el mock a nivel de módulo** (`vi.mock()` / `jest.mock()`) cuyo único propósito es aislar una unidad completa hasta que el test pase. El aislamiento que borra la integración real es un fallo con forma de cobertura.
+- **Preferir costuras arquitectónicas reales:** inyección de dependencias, puertos y adaptadores, y parámetros de función explícitos. Si un test necesita un doble, que ese doble entre por una costura diseñada para ello, no por sustitución de módulo.
+- **Un test verde que no ejercita la integración real es un defecto, no cobertura.** El pasivo es peor que la ausencia de test: silencia la señal y ocupa el presupuesto de verificación.
+
+> [!CAUTION]
+> **Lección registrada en la historia de este repositorio:** un fixture llegó a pasar por el motivo equivocado —no porque la regla bajo prueba se cumpliera, sino porque el aislamiento del módulo se tragaba la ruta que se pretendía verificar. Regla operativa: cuando un test pasa, verificar **por qué** pasa antes de declararlo cobertura. Un test que pasa sin ejercitar su objetivo es un defecto con check verde.
 
 ---
 

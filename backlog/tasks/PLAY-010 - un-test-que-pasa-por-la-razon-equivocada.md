@@ -1,7 +1,7 @@
 ---
 id: PLAY-010
 title: "Enviar una firma nueva exige un test que falle sin el fix"
-status: ideas
+status: review
 created_date: '2026-10-06'
 updated_date: '2026-10-06'
 labels:
@@ -34,11 +34,11 @@ La regla que sale de acá: **un caso de regresión para una capacidad nueva tien
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] Cada capacidad nueva del motor trae un test que falla al revertirla
-- [ ] La guía de contribución dice cómo verificar esa condición
-- [ ] El fixture de `UX-010` cubre las cinco formas etiquetadas y las dos sin nombre
-- [ ] La aserción cuenta las líneas que sí pueden reportarse, en vez de comprobar ausencias
-- [ ] Un test que pasa por una razón distinta a la que dice probar se considera defecto
+- [x] Cada capacidad nueva del motor trae un test que falla al revertirla
+- [x] La guía de contribución dice cómo verificar esa condición
+- [x] El fixture de `UX-010` cubre las cinco formas etiquetadas y las dos sin nombre
+- [x] La aserción cuenta las líneas que sí pueden reportarse, en vez de comprobar ausencias
+- [x] Un test que pasa por una razón distinta a la que dice probar se considera defecto
 <!-- AC:END -->
 
 ## Implementation Notes

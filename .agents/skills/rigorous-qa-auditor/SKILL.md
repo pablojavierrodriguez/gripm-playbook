@@ -39,6 +39,29 @@ Cubre 13 firmas estáticas: bloqueo de coma decimal, atajos de teclado en tácti
 
 Si el proyecto no tiene el script (framework no instalado), auditar a mano las firmas de la skill `code-level-ux-auditor`.
 
+### Compuerta ejecutable — `npm run gate:qa`
+
+> [!CAUTION]
+> **La prosa no es una compuerta.** Un único agente al que se le pide "actuá como QA Auditor" puede simular el rol en el mismo turno en que escribe el código, tildar las ACs por inercia y promover el ítem a `ready` sin haber corrido nada. Por eso T2 no se cumple declarando: se cumple con **exit code 0**.
+
+```bash
+npm run gate:qa PLAY-042          # compuerta completa
+node scripts/gate-qa.mjs PLAY-042 --no-run   # solo inspección de la tarea
+```
+
+El runner verifica mecánicamente:
+
+1. La tarea existe en `backlog/tasks/` y su frontmatter es legible.
+2. **Todos** sus ACs están marcadas `- [x]`. Nombra las que faltan.
+3. `status: review`. Nada más se puede certificar.
+4. `blocked_reason` coherente: obligatorio si `status: blocked`, inválido en cualquier otro status.
+5. **Toda** tarea en `dependencies:` existe en disco y está en `done`.
+6. Los pasos de la Pirámida corrieron de verdad y dieron exit code 0.
+
+Un paso que no puede ejecutarse se reporta `SKIPPED` y **nunca cuenta como aprobado**. Si el proyecto no define un script para un paso, ese paso no está verificado y el ítem no puede promoverse sobre la base de una suposición.
+
+> Invocar el runner **no** certifica: la transición sigue requiriendo el veredicto del QA Auditor en la `[QA MATRIX]`. El runner es la evidencia, no el juez.
+
 ### Paso 6 — Navegador (condicional)
 
 - Consola sin errores ni warnings.

@@ -78,6 +78,56 @@ Todo componente interactivo define **todos** estos estados, explícitamente:
 
 ---
 
+## 7. El playbook es un filtro, no una guía de estilo
+
+Esta skill **no prescribe** colores, tipografías, radios ni valores concretos. El proyecto es dueño de su sistema visual; el playbook define el criterio con el que se juzga.
+
+Lo que sí define es un filtro. Ante **toda** decisión visual —una técnica que ya está en el repo, una que propone el stack de diseño, una que "se ve moderna"— se aplica el **Purpose Test**:
+
+> **¿Qué propósito de jerarquía, legibilidad o accesibilidad cumple esta técnica?**
+
+- Si la respuesta nombra un propósito verificable (distinguir el elemento primario del secundario, sostener el contraste mínimo, marcar el elemento con foco), la técnica se queda y se documenta su función.
+- Si la respuesta es decorativa, o "se ve moderno", o no se puede responder, la técnica **se retira**. No se degrada, no se matiza: se quita.
+
+El test **quita decisiones; no agrega reglas**. Su resultado por defecto es una interfaz más sobria. Agregar una excepción exige una firma nueva en el catálogo (`UX-NNN`) declarada en ambos lados, o un capítulo nuevo con su justificación: nunca un atajo de "es cuestión de gusto".
+
+Cuando el propósito de una técnica no es obvio, preferí la versión sin ella: el mismo resultado con menos superficie visual es mejor resultado.
+
+---
+
+## 8. Catálogo de clichés por defecto
+
+Estos defaults se rechazan **a primera vista** salvo que el diseño demuestre el propósito que los justifica. No son valores prohibidos: son defaults que hay que **justificar**.
+
+| Default | Por qué se rechaza | Pregunta antes de conservarlo |
+| :--- | :--- | :--- |
+| Fondo oscuro con orbes de gradiente radial azul-púrpura o cian | Es la firma visual del output genérico; no jerarquiza nada y compite con el texto que corona | ¿El gradiente separa superficies o solo decora? Si no separa, es ruido |
+| Glassmorphism en cards, barra de navegación y modales **en simultáneo** | El desenfoque repetido en tres planos apila translucidez donde se necesita opacidad: el texto pierde contraste y la profundidad se vuelve ilegible | ¿En qué superficie hace falta translucidez, y cuál está por debajo? Un único plano translúcido, y el resto opaco |
+| `border-radius` uniforme de tipo píldora en **todo** elemento | La cápsula comunica continuidad de forma; aplicada universalmente borra el contraste entre tipos de superficie (contenedor, control, chip, avatar) | ¿El radio está distinguiendo superficies o es un valor global por omisión? |
+| Sombras sobredimensionadas en todas las capas | Cuando todo flota, nada destaca: la jerarquía se aplana y el usuario no sabe dónde tocar primero | ¿Qué capa debe estar por delante? Solo esa lleva sombra |
+
+La prueba de conjunto: **si dos pantallas distintas del producto se ven igual, algo no está comunicando.** Un producto se reconoce por la que se parece a su categoría, no por la que se parece al resto.
+
+---
+
+## 9. Veracidad del copy
+
+En componentes, copy y mockups, el contenido cumple la misma ley: **lo que se afirma es verdad o no se afirma.**
+
+- **Prohibido** inventar estadísticas, métricas o porcentajes de ejemplo ("+10.000% ROI", "500.000 equipos confían en esto") en pantallas que se presentan como producto real.
+- **Prohibido** fabricar testimonios, logos de cliente, avatars, nombres propios ni citas.
+- **Prohibido** la afirmación hiperbólica o el titular sin sustancia ("desbloquea el poder de los workflows de nueva generación"). Si el titular puede pegarse a cualquier producto del sector, no dice nada.
+- **Prohibido** el relleno de layout: nunca completar una tarjeta, un gráfico o un badge con un número fabricado para que la maqueta se vea poblada.
+
+Si no hay dato real, el camino es uno de dos, y ambos son válidos:
+
+1. Mostrar el **estado cero** real (sección 1) —sereno, con el siguiente paso— cuando el cero es un dato verdadero.
+2. **Omitir** la afirmación y dejar que la superficie respire.
+
+El placeholder de maquetado se marca como tal (`Lorem`, `—`, `0`) para que nadie lo confunda con un dato de producción. Un mockup que parece real y no lo es es un bug de contenido, no un atajo.
+
+---
+
 ## Entregables
 
 Especificación en la sección `[DESIGN SPEC]` de la sprint spec:
@@ -87,3 +137,5 @@ Especificación en la sección `[DESIGN SPEC]` de la sprint spec:
 - Micro-interacciones y feedback sensorial especificados.
 - Los 7 estados de la sección 6 resueltos, con nombre de token donde aplique.
 - Tokens como **variables semánticas**, nunca hex hardcodeado en el componente.
+- Veredicto del **Purpose Test** (sección 7) para cada técnica no obvia: el propósito que la justifica, o constancia de que se retiró.
+- Constancia de que el copy cumple la **veracidad** (sección 9): todo dato mostrado proviene de una fuente real, o la afirmación se omitió.

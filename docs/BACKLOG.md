@@ -4,7 +4,7 @@
 > Los ítems de **este** repo viven en **`backlog/tasks/`**, en formato [Backlog.md](https://github.com/MrLesk/Backlog.md), el mismo estándar que usan `gripm` y `dev-board`. `backlog/` no se instala: si adoptás el playbook en tu proyecto, este archivo es la guía y vos creás tu propio `backlog/tasks/`.
 >
 > **Vocabulary de estados:** ver [`.agents/STATE_MACHINE.md`](../.agents/STATE_MACHINE.md).
-> **Status válidos:** `ideas` | `draft` | `doing` | `review` | `ready` | `done` | `dismissed`
+> **Status válidos:** `ideas` | `draft` | `blocked` | `doing` | `review` | `ready` | `done` | `dismissed`
 > **El backlog no es un status.** Un ítem sin status es un ítem que aún no entró al flujo. Para recibir `doing` tiene que haber pasado el **refinement gate (R1)**.
 
 ---
@@ -42,8 +42,9 @@ El status vive en el campo `status:` del frontmatter y **nunca** en el changelog
 | Aparece un problema | Issue o ítem nuevo, `status: ideas` | cualquiera |
 | Pasa el **gate R1** | `status: draft` + ACs medibles | PM Orchestrator |
 | `doing` | frontmatter | Principal Engineer |
+| Se frena | `status: blocked` + `blocked_reason` | PO / Dev |
 | `review` | frontmatter | Principal Engineer |
-| `ready` | frontmatter | **Solo QA Auditor** (T2) |
+| `ready` | frontmatter + `gate:qa` en verde | **Solo QA Auditor** (T2) |
 | `done` | frontmatter + issue cerrado | Release Management, tras deploy real |
 | Entra en un release | `CHANGELOG.md`, bajo su ID | Release Management |
 
@@ -55,8 +56,34 @@ Los IDs son estables, monotónicos y nunca se reutilizan. El prefijo de este rep
 
 - **ID:** `PLAY-NNN`. Estable, monotónico, nunca reutilizado. Es lo que aparece en el changelog.
 - **Refined:** flag `yes (fecha)` / `no — falta: <qué>`. Es el **gate R1**, no un status.
-- **Status:** `ideas`, `draft`, `doing`, `review`, `ready`, `done`, `dismissed`.
+- **Status:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`.
 - **Prioridad:** `high` · `medium` · `low`.
+- **`blocked_reason`:** obligatorio y no vacío **únicamente** cuando `status: blocked`. Fuera de ese status, el campo es un error de validación.
+
+---
+
+## 4.b Estado `blocked`: registrar el impedimento
+
+`blocked` existe para que una tarea frenada no mienta. Sin él, el ítem queda en `doing` indefinidamente: el WIP del sprint está inflado y nadie recuerda por qué se paró.
+
+```markdown
+---
+id: PLAY-NNN
+status: blocked
+blocked_reason: "Bloqueada: el contrato de idempotencia de la API de pagos no está definido"
+dependencies:
+  - PLAY-012
+---
+```
+
+Reglas:
+
+1. `blocked_reason` es **obligatorio** y no vacío. Un bloqueo sin motivo escrito es una tarea abandonada, no una tarea bloqueada.
+2. Solo se asigna con `blocked_reason`; el campo es inválido en cualquier otro status.
+3. Volver a `doing` o `draft` requiere que el impedimento se haya resuelto **o** que sus `dependencies:` bloqueantes estén en `done` o hayan sido desvinculadas explícitamente del array.
+4. El desbloqueo no borra el `blocked_reason`: queda el registro histórico del impedimento.
+
+> Un ítem no entra a `doing` ni se certifica en `ready` mientras alguna de sus `dependencies:` no esté en `done`. El gate runner (`npm run gate:qa <ID>`) rechaza la certificación mecánicamente.
 
 ---
 
@@ -69,6 +96,8 @@ Los IDs son estables, monotónicos y nunca se reutilizan. El prefijo de este rep
 5. Los ítems no completados en el timebox vuelven al pool conservando su refinamiento.
 6. Todo tech debt detectado en QA o retrospectiva genera un ítem nuevo.
 7. **Nada se anota en el changelog hasta que se publica.** Un ítem sin archivo en `backlog/tasks/` está perdido.
+8. `status: blocked` sin `blocked_reason` no vacío es un ítem inválido.
+9. Un ítem no entra a `doing` ni se certifica en `ready` con una `dependencies:` sin resolver en `done`.
 
 ---
 
@@ -85,6 +114,7 @@ labels: ["area"]
 dependencies: [PLAY-002]
 priority: medium
 type: feature
+blocked_reason: "Solo si status: blocked; obligatorio en ese caso"
 ---
 
 ## Description

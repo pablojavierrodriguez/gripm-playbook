@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const CANONICAL_STATUSES = ['doing', 'review', 'ready', 'done'];
+const CANONICAL_STATUSES = ['blocked', 'doing', 'review', 'ready', 'done'];
 const FORBIDDEN_IN_CORE = [
   'YourApp',
   'admin-portal',

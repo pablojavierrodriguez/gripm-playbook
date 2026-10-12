@@ -163,4 +163,8 @@ Importar el módulo **no** corre una auditoría; solo ejecutarlo como binario lo
 - [ ] ¿Las fechas con nombres de mes/día llevan locale explícito?
 - [ ] ¿Los montos y columnas numéricas usan `tabular-nums`?
 - [ ] ¿Todo botón de icono tiene nombre accesible?
+- [ ] ¿La revisión manual detecta sobrecarga decorativa —gradientes y orbes de fondo, `backdrop-blur` apilado en varias superficies, sombras uniformemente grandes— que degrade el contraste del texto o aplane la jerarquía? Buscá el efecto acumulado sobre el texto y sobre los bordes de superficie, no la técnica aislada: el vicio aparece por repetición, y una técnica justificada en un plano se vuelve ruido en tres.
 - [ ] ¿`node scripts/audit-ux-code.cjs --strict` sale en verde?
+
+> [!NOTE]
+> La sobrecarga decorativa **no tiene firma mecánica**: el mismo `backdrop-blur` es correcto en un sheet y es slop en cinco. Es un ítem de revisión manual, no un finding del runner. Si algún día se vuelve declarable, su firma debe agregarse primero a `scripts/ux-rules.json` y recién después documentarse acá.

@@ -13,7 +13,12 @@
 
 1. **Plan before executing.** Present a clear plan before modifying code or architecture on any non-trivial task. Wait for confirmation.
 2. **Ask when genuinely ambiguous.** Do not guess. If there are multiple viable interpretations, clarify first.
+   - **Refinamiento por preguntas, no por asunción.** Un ítem entra a `doing` solo con sus ambigüedades resueltas explícitamente: casos borde, fallbacks, estados vacíos, tradeoffs y alcance negativo, con las respuestas registradas. La desalineación inicial no la detecta QA, porque QA valida contra ACs que nacieron de la premisa equivocada. Detalle en la skill `pm-orchestrator` § Grilling Session.
+   - **Glosario de dominio.** Si el proyecto mantiene un `DOMAIN.md`, consultarlo antes de nombrar un concepto del negocio: el término canónico reemplaza al párrafo y evita inventar vocabulario. Plantilla en [`docs/DOMAIN_TEMPLATE.md`](docs/DOMAIN_TEMPLATE.md). Es opt-in; ningún proyecto está obligado a tenerlo.
 3. **Simple solutions that scale.** Avoid over-engineering. The simplest solution that reliably solves the problem and can grow is the right one.
+   - **Diff mínimo viable.** La mejor línea de código es la que no se escribe. Antes de escribir un helper o instalar un paquete, inspeccionar lo que el repo ya tiene y considerar la standard library. Una dependencia de terceros para algo de diez líneas es un defecto.
+   - **Blast radius antes de editar.** Mapear llamadores, tests, fixtures, exports y config afectados *antes* de modificar código.
+   - **Cierre honesto.** Toda intervención declara en una o dos líneas qué no probó, qué salteó a propósito y qué riesgo queda. Detalle completo en la skill `principal-engineer` § Disciplina Ponytail.
 4. **Document important decisions.** Record architectural deviations, patterns, and new standards in documentation.
 5. **Never break what already works.** Understand full blast radius before refactoring.
 6. **Agile Delivery Flow (Backlog [draft] ➔ Dev [doing] ➔ QA [ready] ➔ Release Management ➔ Prod [done]):**
@@ -73,3 +78,18 @@
 Headline rule, for immediate effect:
 
 - **NEVER** execute a git commit or push without explicit verbal authorization from the user for **each** action. Words like *"looks good"*, *"ok"*, *"proceed"* mean **implement code only**.
+
+### Multi-Agent Parallelism
+
+> [!CAUTION]
+> **Prohibido `git checkout` en el working tree principal cuando otro agente está trabajando en el mismo repositorio.** El working tree y `.git/HEAD` son estado compartido a nivel de sistema de archivos: un `checkout` cambia la rama del otro agente en silencio, mientras escribe, y el siguiente `git commit` del otro aterriza en la rama equivocada.
+
+Cada agente o tarea paralela opera en su **worktree aislado**, sobre su propia rama. Receta y reglas de convivencia: [`.agents/rules/git-workflow.md`](.agents/rules/git-workflow.md) § Multi-Agent Parallelism.
+
+```bash
+git worktree add ../<repo>-<task> <branch>
+# ... trabajo aislado ...
+git worktree remove ../<repo>-<task>
+```
+
+> El aislamiento de working tree no aísla *líneas en conflicto*: dos agentes que editan el mismo archivo se mergearán igual. Para tareas que tocan los mismos documentos, secuencializar o dividir el alcance.

@@ -40,6 +40,26 @@ The team decides when to spawn sub-agents (e.g. browser subagents, background jo
 3. **Core Architectural Refactoring & Backlog Parsers:**
    - Backlog sync engines, parsers, and global context providers require end-to-end coherence.
 
+### 🔁 Subagent-Driven Development (SDD)
+
+Un único hilo ejecutando un plan extenso sufre **fatiga de contexto**: olvida instrucciones tempranas, mezcla estados, reintroduce regresiones en tests que pasaban y empieza a parchear improvisando. SDD es el antidote para tareas de alta complejidad.
+
+**1. Planes a prueba de contexto.** Desglosar el trabajo en pasos **hiper-atómicos e independientes**. Cada paso se redacta bajo Red-Green TDD con instrucciones explícitas y autocontenidas: un subagente sin historial debe poder ejecutarlo sin desviarse. El paso declara qué archivos toca, qué se espera que haga, y cómo se verifica.
+
+**2. Un subagente fresco por paso.** El orquestador **no** pica todo el código en el hilo principal. Despacha un subagente nuevo para el paso N, operando en un worktree aislado (ver § Workspace Isolation).
+
+**3. Supervisión y consolidación secuencial.** El orquestador revisa el diff producido, corre la verificación headless, y **solo cuando pasa en verde** consolida y dispara el paso N+1. Un subagente no se lanza en paralelo con el siguiente sobre el mismo trabajo.
+
+> [!CAUTION]
+> SDD es para **tareas de alta complejidad**. Para un bugfix puntual es sobre-ingeniería: el costo de coordinar el contexto no se recupera. Aplica el criterio Ponytail — la estructura existe para cuando el problema la amerita, no por defecto.
+
+### 🔒 Workspace Isolation for Concurrent Agents
+
+When two or more agents or sub-agents work on the same repository at the same time, **each one operates in its own git worktree on its own branch**, and nobody runs `git checkout` in the main working tree. `.git/HEAD` and the working tree are shared filesystem state: a cross-checkout silently switches the other agent's branch *while it is writing*, and its next commit lands on the wrong branch. Operational recipe and coexistence rules in [`.agents/rules/git-workflow.md`](rules/git-workflow.md) § Multi-Agent Parallelism.
+
+> [!CAUTION]
+> **A worktree isolates the working tree, not the content.** Two agents editing the same file still collide at merge time. Filesystem isolation is not an integration strategy: when several items touch the same documents (`AGENTS.md`, `TEAM_PLAYBOOK.md`, `STATE_MACHINE.md`, one shared `SKILL.md`), sequence them or split the scope per file *before* parallelizing.
+
 ---
 
 ## 🔄 The Agile Delivery Flow (The 5 Phases)

@@ -18,6 +18,7 @@
     "rules": "node scripts/audit-ux-code.cjs --list-rules",
     "validate": "node scripts/validate-repo.mjs",
     "test": "node --test tests/*.test.mjs",
+    "gate:qa": "node scripts/gate-qa.mjs",
     "check:all": "npm run validate && npm test"
   },
   "keywords": [
