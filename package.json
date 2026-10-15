@@ -1,6 +1,6 @@
 {
   "name": "@gripm/playbook",
-  "version": "2.2.2",
+  "version": "2.3.0",
   "description": "Autonomous multi-agent agile framework for modern software development with dynamic modes, decoupled releases, and sub-agent orchestration.",
   "type": "module",
   "main": "./scripts/sync-playbook.mjs",
@@ -19,6 +19,7 @@
     "validate": "node scripts/validate-repo.mjs",
     "test": "node --test tests/*.test.mjs",
     "gate:qa": "node scripts/gate-qa.mjs",
+    "gate:review": "node scripts/gate-review-items.mjs",
     "check:all": "npm run validate && npm test"
   },
   "keywords": [

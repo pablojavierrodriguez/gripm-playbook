@@ -1,9 +1,9 @@
 ---
 id: PLAY-010
 title: "Enviar una firma nueva exige un test que falle sin el fix"
-status: review
+status: ready
 created_date: '2026-10-06'
-updated_date: '2026-10-06'
+updated_date: '2026-10-15'
 labels:
   - "process"
   - "testing"
@@ -54,3 +54,20 @@ El fixture y la aserción ya están hechos en `PLAY-006`. Falta la guía de cont
 ## Note on process
 
 Este ítem es una mejora de proceso, no de código. Nació de un defecto que llegó a producción en dos releases.
+
+## QA Certification (T2) — APPROVED
+
+Audited and certified by Rigorous QA Auditor on 2026-10-15.
+- **Executable QA Gate**: `npm run gate:qa PLAY-010` -> Exit Code 0.
+- **Verification Pyramid**:
+  - Step 1: Repo consistency: PASSED (`npm run validate`)
+  - Step 2: Headless tests: PASSED (`npm test`, 128/128 tests passing)
+  - Step 3: Spec ↔ backlog consistency: PASSED (`npm run gate:review`)
+  - Step 4: Static UX audit: PASSED (`npm run audit:ux:strict`)
+- **Acceptance Criteria Verification**:
+  - [x] Cada capacidad nueva del motor trae un test que falla al revertirla (`CONTRIBUTING.md` § "The rule")
+  - [x] La guía de contribución dice cómo verificar esa condición (`CONTRIBUTING.md` § "How to verify it")
+  - [x] El fixture de `UX-010` cubre las cinco formas etiquetadas y las dos sin nombre (`tests/fixtures/react-app/src/components/IconOnly.tsx`)
+  - [x] La aserción cuenta las líneas que sí pueden reportarse, en vez de comprobar ausencias (`tests/audit-ux.test.mjs` L126-130)
+  - [x] Un test que pasa por una razón distinta a la que dice probar se considera defecto (`CONTRIBUTING.md` L60, `.agents/skills/principal-engineer/SKILL.md` L139)
+- **Verdict**: APPROVED → ready.

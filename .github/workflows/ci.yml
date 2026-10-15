@@ -29,5 +29,10 @@ jobs:
       - name: Auditor must not crash on a project without src/
         run: node scripts/audit-ux-code.cjs --format json
 
+      # A gate that only ever runs by hand is a gate that gets skipped. Every
+      # item in `review` must satisfy the executable gate on every push.
+      - name: Executable QA gate — every item in review
+        run: npm run gate:review
+
       - name: Package contents sanity check
         run: npm pack --dry-run

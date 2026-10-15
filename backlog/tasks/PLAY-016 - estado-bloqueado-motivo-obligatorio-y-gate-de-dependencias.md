@@ -1,9 +1,9 @@
 ---
 id: PLAY-016
 title: "Estado 'blocked' con motivo obligatorio y gate de resolución de dependencias"
-status: review
+status: ready
 created_date: '2026-10-12'
-updated_date: '2026-10-12'
+updated_date: '2026-10-15'
 labels:
   - "state-machine"
   - "governance"
@@ -103,3 +103,23 @@ Co-autorizacion: `gate:qa PLAY-016` sale con 0.
 - **S5**: el comando `unblock` no aparecia en ningun doc operable. Documentado en `SKILL.md`, `STATE_MACHINE.md` y `CONTRIBUTING.md`.
 
 PLAY-015 quedo certificada en esta ronda. Este item quedo pendiente solo por los findings de `unblockMain`, ya corregidos y cubiertos.
+
+## QA Round 5 - CERTIFIED (ready)
+
+- **Auditor:** Rigorous QA Auditor (`.agents/skills/rigorous-qa-auditor/SKILL.md`)
+- **Certification Date:** 2026-10-15
+- **Verification Pyramid Execution:**
+  - `npm run validate`: PASS (exit code 0)
+  - `npm test`: PASS (128 tests across 30 suites, 0 failures, exit code 0)
+  - `npm run gate:review`: PASS (exit code 0)
+  - `npm run audit:ux:strict`: PASS (exit code 0)
+  - Production build: SKIPPED (optional; not applicable to this documentation/CLI framework package)
+  - Gate runner execution (`npm run gate:qa PLAY-016`): PASS (exit code 0)
+- **AC Verification & Edge Cases:**
+  - AC #1: Canonical `blocked` status in `.agents/STATE_MACHINE.md` with explicit transitions (`T_block`, `T_unblock`) and guards. VERIFIED.
+  - AC #2: Invariant requiring non-empty `blocked_reason` in frontmatter of any `status: blocked` item (whitespace rejected). VERIFIED.
+  - AC #3: Dependency gate in runner (`scripts/gate-qa.mjs`) rejecting certification to `ready` if dependencies are not `done` or missing from disk. VERIFIED.
+  - AC #4: Rule and CLI command (`gate-qa.mjs unblock <id>`) preventing unblock (`blocked` ➔ `doing`/`draft`) when blocking dependencies are unresolved or missing from disk. VERIFIED.
+  - AC #5: Lifecycle and impediment documentation in `docs/BACKLOG.md` (§ 4.b) and `.agents/TEAM_PLAYBOOK.md` (§ Phase 4 / `blocked`). VERIFIED.
+  - AC #6: Automated test coverage in `tests/gate-qa.test.mjs` verifying blocked status invariants, unblock guards, CLI command, and dependency graph resolution. VERIFIED.
+- **Verdict:** `[ APPROVED → ready ]`

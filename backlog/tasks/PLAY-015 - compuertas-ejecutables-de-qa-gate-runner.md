@@ -1,9 +1,9 @@
 ---
 id: PLAY-015
 title: "Compuertas de certificación de QA ejecutables (gate runner) para erradicar la auto-certificación por simulación"
-status: review
+status: ready
 created_date: '2026-10-12'
-updated_date: '2026-10-12'
+updated_date: '2026-10-15'
 labels:
   - "qa"
   - "state-machine"
@@ -118,3 +118,21 @@ Correcciones de la ronda 4 (todas en el camino `unblock`, no en T2):
 - **S1 cobertura de `unblockMain`: cinco invariantes, ahora con test CLI cada uno.**
 
 La curva de defectos llego a su piso: las rondas 1-3 se rechazaron cada una por una certificacion falsa demostrable; la ronda 4 no produjo ninguna.
+
+## QA Round 5 - CERTIFIED (ready)
+
+- **Auditor:** Rigorous QA Auditor (`.agents/skills/rigorous-qa-auditor/SKILL.md`)
+- **Certification Date:** 2026-10-15
+- **Verification Pyramid Execution:**
+  - `npm run validate`: PASS (exit code 0)
+  - `npm test`: PASS (128 tests across 30 suites, 0 failures, exit code 0)
+  - `npm run gate:review`: PASS (exit code 0)
+  - `npm run audit:ux:strict`: PASS (exit code 0)
+  - Production build: SKIPPED (optional; not applicable to this documentation/CLI framework package)
+  - Gate runner execution (`npm run gate:qa PLAY-015`): PASS (exit code 0)
+- **AC Verification & Edge Cases:**
+  - AC #1: Gate runner headless implementation (`scripts/gate-qa.mjs`) verifying task completeness, frontmatter, and pyramid steps. VERIFIED.
+  - AC #2: Enforcement in `.agents/STATE_MACHINE.md` (Transition T2) requiring exit code 0 from gate runner. VERIFIED.
+  - AC #3: Enforcement in `.agents/TEAM_PLAYBOOK.md` and `.agents/skills/rigorous-qa-auditor/SKILL.md` banning self-certification via prose. VERIFIED.
+  - AC #4: Automated test suite coverage in `tests/gate-qa.test.mjs` (pyramid failures, missing scripts, unexecuted gates, collision detection & enforcement). VERIFIED.
+- **Verdict:** `[ APPROVED → ready ]`

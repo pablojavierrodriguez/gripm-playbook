@@ -1,9 +1,9 @@
 ---
 id: PLAY-018
 title: "Gate de refinamiento R1 interactivo (grill-me) y glosario ubicuo de dominio (DOMAIN.md) para especificaciones sin asunciones"
-status: review
+status: ready
 created_date: '2026-10-12'
-updated_date: '2026-10-12'
+updated_date: '2026-10-15'
 labels:
   - "pm-orchestrator"
   - "refinement"
@@ -52,3 +52,19 @@ Inspirado en las skills de ingeniería de `mattpocock/skills` (Total TypeScript)
 
 <!-- SECTION:NOTES:BEGIN -->
 <!-- SECTION:NOTES:END -->
+
+## QA Certification (T2) — APPROVED
+
+Audited and certified by Rigorous QA Auditor on 2026-10-15.
+- **Executable QA Gate**: `npm run gate:qa PLAY-018` -> Exit Code 0.
+- **Verification Pyramid**:
+  - Step 1: Repo consistency: PASSED (`npm run validate`)
+  - Step 2: Headless tests: PASSED (`npm test`, 128/128 tests passing)
+  - Step 3: Spec ↔ backlog consistency: PASSED (`npm run gate:review`)
+  - Step 4: Static UX audit: PASSED (`npm run audit:ux:strict`)
+- **Acceptance Criteria Verification**:
+  - [x] #1 Actualizar `.agents/skills/pm-orchestrator/SKILL.md` incorporando el protocolo de 'Grilling Session' interactiva para el Gate R1 (L38-57)
+  - [x] #2 Actualizar `.agents/STATE_MACHINE.md` (Sección 2: Refinement Gate R1) exigiendo resolución explícita de ambigüedades documentada antes de habilitar T0 (draft ➔ doing) (L33-52, L59)
+  - [x] #3 Documentar en docs/ y en el playbook la convención y plantilla canónica de `DOMAIN.md` (Glosario Ubicuo y arquitectura de términos) (`docs/DOMAIN_TEMPLATE.md`)
+  - [x] #4 Actualizar `AGENTS.md` instruyendo a los agentes a consultar el glosario de dominio para garantizar concisión y evitar explicaciones redundantes (L15-18)
+- **Verdict**: APPROVED → ready.

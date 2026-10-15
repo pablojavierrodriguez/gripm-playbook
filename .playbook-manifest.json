@@ -1,6 +1,6 @@
 {
   "$comment": "Canonical install manifest. Consumed by scripts/sync-playbook.mjs. Adding a file here makes it installable everywhere on the next sync, with no script change.",
-  "version": "2.2.2",
+  "version": "2.3.0",
   "core": [
     ".agents/TEAM_PLAYBOOK.md",
     ".agents/STATE_MACHINE.md",
@@ -12,8 +12,10 @@
     ".agents/skills/rigorous-qa-auditor/SKILL.md",
     ".agents/skills/code-level-ux-auditor/SKILL.md",
     "scripts/audit-ux-code.cjs",
+    "scripts/gate-qa.mjs",
     "scripts/ux-rules.json",
-    "docs/sprints/SPRINT_SPEC_TEMPLATE.md"
+    "docs/sprints/SPRINT_SPEC_TEMPLATE.md",
+    "docs/DOMAIN_TEMPLATE.md"
   ],
   "coreSkills": [
     "pm-orchestrator",

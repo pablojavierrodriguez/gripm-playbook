@@ -41,19 +41,23 @@ Cuando dos o más agentes operan en simultáneo sobre el mismo repositorio, **ca
 ### Receta
 
 ```bash
-# crear el worktree aislado para la tarea
-git worktree add ../<repo>-<task> <branch>
+# crear el worktree aislado y su rama en un solo comando
+git worktree add -b <branch> ../<repo>-<task>
 
 # trabajar ahí dentro
 cd ../<repo>-<task>
 # ... la tarea completa, con su propia rama y su propio working tree
 
-# consolidar los cambios antes de retirar el worktree
-git checkout dev && git merge <branch>
-
-# limpiar al concluir
+# consolidar los cambios ANTES de retirar el worktree
+# (desde el worktree principal, con la integración en curso)
+git fetch . <branch>:dev          # integra en dev sin cambiar de rama
 git worktree remove ../<repo>-<task>
 ```
+
+> [!CAUTION]
+> **`-b` no es opcional.** `git worktree add ../<repo>-<task> <branch>` falla con `fatal: invalid reference` si la rama todavía no existe, y crearla exige `git checkout -b` en el working tree principal — la operación exacta que esta regla prohíbe. La receta de aislamiento no se puede seguir sin violar la regla que sirve.
+>
+> La consolidación usa `git fetch . <branch>:dev` **precisamente para no hacer `git checkout`**: `git checkout dev && git merge <branch>` contradice la prohibición de cambiar de rama en el worktree principal.
 
 Auditoría y limpieza:
 

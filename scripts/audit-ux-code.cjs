@@ -457,13 +457,25 @@ function findTagEnd(text, from) {
   return -1;
 }
 
+/** Stands in for a label expression that survived `stripExpressions`. */
+const EXPRESSION_LABEL = 'label';
+
 /**
  * Removes `{...}` expression containers, respecting nesting and quotes.
  *
  * A JSX expression renders whatever it evaluates to, not its own source, so the
- * source cannot be read as visible text.
+ * source cannot be read as visible text — with one exception, `keep`. An
+ * expression sitting in the CHILD LIST that is itself a label does render text:
+ * `{t('header.newItem')}` is the whole reason an internationalized control used
+ * to be indistinguishable from an icon-only one.
+ *
+ * LOCATION is the entire distinction, never "stop stripping". Attributes never
+ * reach this function (they live in the opening tag, which the child-region
+ * segments skip), so `onClick={() => go()}` is still discarded — and
+ * `isTextExpression` rejects any arrow outright, so a handler that somehow landed
+ * in a child position could not become a label either.
  */
-function stripExpressions(source) {
+function stripExpressions(source, keep = () => false) {
   let out = '';
   let i = 0;
 
@@ -482,18 +494,26 @@ function stripExpressions(source) {
     }
 
     if (ch === '{') {
+      const start = i;
       let depth = 0;
+      let closed = -1;
       while (i < source.length) {
         if (source[i] === '{') depth += 1;
         else if (source[i] === '}') {
           depth -= 1;
           if (depth === 0) {
             i += 1;
+            closed = i;
             break;
           }
         }
         i += 1;
       }
+
+      // An unterminated `{` is unbalanced markup, not an expression. It is
+      // dropped either way; `keep` simply gets no chance to vouch for it.
+      const inner = closed === -1 ? source.slice(start + 1) : source.slice(start + 1, closed - 1);
+      if (keep(inner)) out += EXPRESSION_LABEL;
       continue;
     }
 
@@ -502,6 +522,61 @@ function stripExpressions(source) {
   }
 
   return out;
+}
+
+/**
+ * Whether a child-position expression is itself a visible label.
+ *
+ * A call or a literal renders text — `t('common.delete')`, `i18n.t('x')` and
+ * `` `Saved ${n}` `` are the everyday spelling of a localized label. Anything
+ * that builds a subtree (`{cond && <X />}`, `{items.map(...)}`) renders
+ * elements, not text, and whatever text it eventually shows belongs to that
+ * subtree, which is parsed and weighted on its own.
+ *
+ * Quoted arguments are blanked before the verdict so a key cannot decide it:
+ * `t('is it?')` is a label, `cond && label` is not. `=>` is rejected outright —
+ * an arrow is code, never a name.
+ */
+function isTextExpression(inner) {
+  const code = inner.trim().replace(/\?\./g, '.');
+  if (!code) return false;
+
+  let bare = '';
+  let i = 0;
+  while (i < code.length) {
+    const ch = code[i];
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const quote = ch;
+      i += 1;
+      while (i < code.length && code[i] !== quote) i += code[i] === '\\' ? 2 : 1;
+      i += 1;
+      bare += quote + quote;
+      continue;
+    }
+    bare += ch;
+    i += 1;
+  }
+
+  if (/=>|[&|]|\?/.test(bare)) return false;
+  if (/^[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*\s*\(.*\)$/s.test(bare)) return true;
+  if (/^(?:''|""|``)$/.test(bare)) return true;
+  return /^(?:\d[\d_]*(?:\.\d+)?|true|false)$/.test(bare);
+}
+
+/**
+ * Characters that can only precede a child element from inside an expression.
+ *
+ * `{cond && <span>Guardar</span>}` is not a label. When the condition is false
+ * the control renders no name at all, and deciding which branch is live is the
+ * author's call, not the detector's — counting that subtree upwards would
+ * silence a finding for a control whose accessible name is not guaranteed.
+ */
+const CONDITIONAL_PREFIX = /[&|?:(]/;
+
+function isConditionalChild(child, text) {
+  let i = child.at - 1;
+  while (i >= 0 && /\s/.test(text[i])) i -= 1;
+  return i >= 0 && CONDITIONAL_PREFIX.test(text[i]);
 }
 
 /**
@@ -653,8 +728,10 @@ function buildUnits(lines) {
   // leak and point at the wrapper instead of the element rendering the value.
   // Renderable text, bottom-up: an element's own text plus the text its
   // descendants render. Attributes are excluded by construction (they live in
-  // the opening tag, which the segments skip) and `{...}` expressions are
-  // dropped because they render nothing on their own.
+  // the opening tag, which the segments skip). A `{...}` expression in the child
+  // list counts only when it is itself a label (`{t('x')}`); a subtree built by
+  // one (`{cond && <span/>}`) is never pulled upwards, because neither it nor
+  // the condition that guards it guarantees a name.
   //
   // Descendant text has to be included. A control labelled `<Icon /><span>
   // Guardar</span>` shows "Guardar" to the user, so counting only the element's
@@ -673,13 +750,13 @@ function buildUnits(lines) {
     frame.unit.ownContent =
       text.slice(frame.at, frame.tagEnd + 1) + segments.join('') + text.slice(frame.closeAt, frame.spanEnd + 1);
 
-    frame.unit.textContent = stripExpressions(segments.join(''));
+    frame.unit.textContent = stripExpressions(segments.join(''), isTextExpression);
   }
 
   for (const frame of allFrames.slice().reverse()) {
     if (!frame.children.length) continue;
     frame.unit.textContent = frame.children.reduce(
-      (sum, child) => sum + child.unit.textContent,
+      (sum, child) => sum + (isConditionalChild(child, text) ? '' : child.unit.textContent),
       frame.unit.textContent,
     );
   }
@@ -789,7 +866,13 @@ function lineMatches(rule, unit, lines, unitIndex, content) {
 
 function auditFile(filePath, rules, deps, disabledRules, root = ROOT) {
   const findings = [];
-  const relPath = path.relative(root, filePath);
+  // The fingerprint embeds this path, so a baseline written on Windows must
+  // match the same snapshot read on macOS and vice versa. Without the
+  // normalization the keys are `src\App.tsx` on one platform and `src/App.tsx`
+  // on the other, nothing matches, and the gate silently reports every
+  // accepted observation as new — the same normalization `applyExcludes`
+  // already performs for `exclude` globs.
+  const relPath = toPosixPath(path.relative(root, filePath));
 
   let content;
   try {

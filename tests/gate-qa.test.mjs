@@ -552,7 +552,7 @@ describe('gate cli', () => {
     const { code, stdout } = runGate([file, '--no-run']);
     assert.equal(code, 1);
     assert.match(stdout, /GATE FAILED/);
-    assert.match(stdout, /does not surte effect/);
+    assert.match(stdout, /has no effect/);
   });
 
   test('exits 1 when the task file does not exist', () => {
@@ -597,6 +597,85 @@ describe('gate cli', () => {
     assert.equal(code, 2, 'inspection-only must exit 2, never 0');
     assert.match(stdout, /NOT a certification/);
     assert.doesNotMatch(stdout, /may be promoted/);
+  });
+});
+
+describe('dismissed invariant', () => {
+  test('rejects status dismissed without a dismissed_reason', () => {
+    const { file } = makeTask({ status: 'dismissed' });
+    assert.ok(
+      inspectFile(file).some((f) => /dismissed_reason is missing or empty/.test(f)),
+      'a dismissal without a reason is indistinguishable from an item someone forgot about',
+    );
+  });
+
+  test('rejects a whitespace-only dismissed_reason', () => {
+    const { file } = makeTask({ status: 'dismissed', extra: 'dismissed_reason: "   "' });
+    assert.ok(inspectFile(file).some((f) => /dismissed_reason is missing or empty/.test(f)));
+  });
+
+  test('accepts status dismissed with a reason', () => {
+    const { file } = makeTask({ status: 'dismissed', extra: 'dismissed_reason: "la premisa era falsa"' });
+    assert.ok(inspectFile(file).every((f) => !/dismissed_reason/.test(f)));
+  });
+
+  test('rejects a dismissed_reason on an item that is not dismissed', () => {
+    const { file } = makeTask({ status: 'review', extra: 'dismissed_reason: "stale field"' });
+    assert.match(inspectFile(file)[0], /dismissed_reason is set but status is not "dismissed"/);
+  });
+});
+
+describe('blocking steps (PLAY-015 AC #1)', () => {
+  function sandboxWithScripts(scripts) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-block-'));
+    fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'backlog', 'tasks'), { recursive: true });
+    fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'repro', scripts }));
+    fs.writeFileSync(
+      path.join(dir, 'backlog', 'tasks', 'T.md'),
+      '---\nid: QA-TMP-1\nstatus: review\ndependencies: []\n---\n<!-- AC:BEGIN -->\n- [x] #1 a\n<!-- AC:END -->\n',
+    );
+    return dir;
+  }
+
+  function runFull(dir) {
+    try {
+      const stdout = execFileSync(
+        process.execPath,
+        [path.join(dir, 'scripts', 'gate-qa.mjs'), path.join(dir, 'backlog', 'tasks', 'T.md')],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+      );
+      return { code: 0, stdout };
+    } catch (err) {
+      if (err.status === undefined) throw err;
+      return { code: err.status, stdout: `${err.stdout || ''}${err.stderr || ''}` };
+    }
+  }
+
+  test('a blocking step with no script fails the gate instead of being skipped', () => {
+    // The defect this closes: a pyramid where only `validate` ran certified with
+    // exit 0 while every other declared-blocking step was SKIPPED.
+    const dir = sandboxWithScripts({ validate: 'node -e "process.exit(0)"' });
+    const { code, stdout } = runFull(dir);
+    assert.notEqual(code, 0, 'certifying on steps that never ran is the failure this gate exists to prevent');
+    assert.match(stdout, /blocking step has no "test" script/);
+    assert.match(stdout, /blocking step has no "gate:review" script/);
+    assert.match(stdout, /blocking step has no "audit:ux:strict" script/);
+  });
+
+  test('an optional step with no script is skipped and does not block', () => {
+    // `build` is declared optional with its reason inline: this package ships
+    // documentation and a Node CLI, there is no bundle to build.
+    const dir = sandboxWithScripts({
+      validate: 'node -e "process.exit(0)"',
+      test: 'node -e "process.exit(0)"',
+      'gate:review': 'node -e "process.exit(0)"',
+      'audit:ux:strict': 'node -e "process.exit(0)"',
+    });
+    const { code, stdout } = runFull(dir);
+    assert.equal(code, 0, 'every blocking step ran');
+    assert.match(stdout, /Production build: SKIPPED \(not applicable/);
   });
 });
 

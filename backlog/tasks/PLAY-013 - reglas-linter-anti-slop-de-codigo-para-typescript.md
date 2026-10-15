@@ -1,9 +1,9 @@
 ---
 id: PLAY-013
 title: "Reglas deterministas de linter anti-slop (Oxlint/AST) contra vicios de código y comentarios generados por IA"
-status: review
+status: ready
 created_date: '2026-10-12'
-updated_date: '2026-10-12'
+updated_date: '2026-10-15'
 labels:
   - "anti-slop"
   - "code-quality"
@@ -51,4 +51,32 @@ Inspirado en el enfoque determinista de `dmmulroy/anti-slop` y la higiene de `mi
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
+### Dev Handoff — 2026-10-15
+- AC #4 implementado en `.agents/skills/principal-engineer/SKILL.md` (§ 13):
+  - Configuración canónica `.oxlintrc.json` con categorías `correctness: error`, reglas `typescript/no-explicit-any`, `typescript/no-unsafe-*`, `eslint/no-empty`, `unicorn/no-unnecessary-await`.
+  - Receta de integración en `package.json` (`lint:anti-slop` con `--deny-warnings`).
+  - Reglas de AST / ESLint para detección de evasión (`as unknown as`, `consistent-type-assertions`).
+- Tarea movida a `status: review` para auditoría de QA.
+
+### QA Verdict — 2026-10-15 (Round 1)
+- **Verdict:** [ REJECTED → doing ]
+- **Blocking Finding:**
+  - AC #1, #2, #3 are verified in `.agents/skills/principal-engineer/SKILL.md` (§ 10, 11, 12).
+  - AC #4 FAILED: The criterion was marked `[x]`, but no Oxlint configuration or integration recipe was provided anywhere in the repository. Commit `f1a100e` explicitly admits: *"AC #4 (receta Oxlint) queda sin Implementar: es un artefacto de tooling, no prosa."* Marking an unfulfilled criterion as `[x]` violates backlog hygiene rule #2 and the Verification Pyramid.
+- **Actionable Fix:**
+  1. Implement the recommended Oxlint / AST linter configuration and integration recipe for consumers (e.g., in `.agents/skills/principal-engineer/SKILL.md` or a consumer documentation guide `docs/LINTER_ANTI_SLOP.md`), OR
+  2. With PO approval, remove/split AC #4 into a dedicated tooling task (e.g., in a future release) and re-submit PLAY-013 to `review`.
+
+### QA Verdict — 2026-10-15 (Round 2 - Final Certification)
+- **Verdict:** [ APPROVED → ready ]
+- **Evidence & Findings:**
+  - **AC #1, #2, #3:** Re-verified in `.agents/skills/principal-engineer/SKILL.md` (§ 10 Higiene de comentarios, § 11 Disciplina de tipos y aserciones, § 12 Política de mockeo en tests). All rules remain clear and well-formed.
+  - **AC #4:** Verified in `.agents/skills/principal-engineer/SKILL.md` (§ 13 Receta e integración de linter anti-slop (Oxlint / AST)). Provides concrete recommended `.oxlintrc.json`, `package.json` script integration (`lint:anti-slop`), and AST rules for evasion detection (`no-chained-assertions`, `as unknown as`).
+  - **Verification Pyramid:**
+    - Typecheck / Repo consistency: `npm run validate` (Pass, exit 0)
+    - Headless unit & integration tests: `npm test` (Pass, 128 tests passing, 0 failed)
+    - Spec ↔ backlog consistency: `npm run gate:review` (Pass, exit 0)
+    - Static UX audit: `npm run audit:ux:strict` (Pass, exit 0)
+    - QA Gate: `npm run gate:qa PLAY-013` (Pass, exit 0)
+- **Status:** Promoted from `review` to `ready`.
 <!-- SECTION:NOTES:END -->

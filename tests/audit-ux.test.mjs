@@ -211,6 +211,57 @@ describe('unit scoping (DEV-187)', () => {
   });
 });
 
+describe('localized labels', () => {
+  test('a control labelled with a translation expression is not reported', () => {
+    // `{t('header.newItem')}` IS a label. `stripExpressions` used to erase every
+    // `{...}` in the child list, so an app that ships translations failed UX-010
+    // by construction: the detector reported accessible buttons as icon-only.
+    // Location is what distinguishes this from `onClick={() => go()}`, not the
+    // presence of an expression.
+    const { code, report } = audit('i18n-app', ['--strict']);
+    assert.deepEqual(
+      report.findings,
+      [],
+      `UX-010 must not fire on a localized label: ${JSON.stringify(report.findings, null, 2)}`,
+    );
+    assert.equal(code, 0, '--strict must pass a project whose labels are all expressions');
+  });
+
+  test('the expression guard does not silence a genuinely unnamed control', () => {
+    // The other half of the sensitivity guard. Not every expression is a label:
+    // a logical expression is code, and a subtree built inside one renders only
+    // when its condition holds, so it cannot stand in for an accessible name.
+    const findings = audit('i18n-unlabelled').report.findings.filter((f) => f.rule === 'UX-010');
+    assert.deepEqual(
+      findings.map((f) => f.line).sort((a, b) => a - b),
+      [16, 23, 31],
+      'only the controls with no accessible name may be reported',
+    );
+  });
+
+  test('a mapped expression is not read as a label', () => {
+    // `{items.map(i => <li />)}` is a call, so a naive "call means text" rule
+    // would call this button labelled and silence it. The arrow is the tell.
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ux-i18n-'));
+    fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
+    fs.writeFileSync(
+      path.join(temp, 'src', 'List.tsx'),
+      'export const List = ({ items, go }) => (\n'
+      + '  <button onClick={() => go()}>\n'
+      + '    <Icon />\n'
+      + "    {items.map((item) => <li key={item}><Icon /></li>)}\n"
+      + '  </button>\n'
+      + ');\n',
+    );
+    const findings = audit(fixtureAt(temp), ['--rule', 'UX-010']).report.findings;
+    assert.ok(
+      findings.some((f) => f.line === 2),
+      `a mapped child expression must not count as a label: ${JSON.stringify(findings, null, 2)}`,
+    );
+    fs.rmSync(temp, { recursive: true, force: true });
+  });
+});
+
 describe('suppression', () => {
   test('inline suppression silences the target line only', () => {
     const report = audit('react-app').report;
@@ -322,6 +373,39 @@ describe('baseline', () => {
     assert.equal(after.report.findings.length, 0, 'a reviewed observation is absorbed');
     assert.equal(after.report.baseline.absorbed, 1);
     assert.equal(after.code, 0, 'an absorbed INFO must not fail the gate');
+    fs.rmSync(temp, { recursive: true, force: true });
+  });
+
+  test('a baseline is portable across path separator conventions', () => {
+    // The fingerprint embeds `finding.file`, so a snapshot written on Windows
+    // (`src\App.tsx`) never matched the same snapshot read on macOS
+    // (`src/App.tsx`). Nothing errored: the gate simply stopped absorbing
+    // anything and reported every reviewed observation as new. Keys are written
+    // POSIX-normalized, which is what makes one committed file serve both.
+    const temp = probeProject();
+    fs.writeFileSync(path.join(temp, 'src', 'A.tsx'), VIOLATION);
+    run(temp, ['--update-baseline']);
+
+    const file = path.join(temp, 'audit-ux-baseline.json');
+    const written = JSON.parse(fs.readFileSync(file, 'utf8'));
+    for (const key of Object.keys(written.entries)) {
+      assert.ok(
+        !key.includes('\\'),
+        `baseline keys must not embed a platform separator: "${key}"`,
+      );
+    }
+
+    // Re-key with forward slashes, exactly as a POSIX machine would have
+    // committed it, and prove the run still absorbs.
+    const posix = { ...written, entries: {} };
+    for (const [key, count] of Object.entries(written.entries)) {
+      posix.entries[key.replace(/\\/g, '/')] = count;
+    }
+    fs.writeFileSync(file, JSON.stringify(posix, null, 2));
+
+    const after = run(temp);
+    assert.equal(after.report.findings.length, 0, 'a POSIX-written baseline must absorb on any platform');
+    assert.equal(after.report.baseline.absorbed, 1);
     fs.rmSync(temp, { recursive: true, force: true });
   });
 

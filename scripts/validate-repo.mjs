@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const CANONICAL_STATUSES = ['blocked', 'doing', 'review', 'ready', 'done'];
+const CANONICAL_STATUSES = ['ideas', 'draft', 'blocked', 'doing', 'review', 'ready', 'done', 'dismissed'];
 const FORBIDDEN_IN_CORE = [
   'YourApp',
   'admin-portal',
@@ -74,7 +74,155 @@ function checkManifest() {
     fail('manifest', `coreSkills lists ${(manifest.coreSkills || []).length} entries but core has ${coreSkills.length} SKILL.md files`);
   }
 
+  // --- documentation <-> install manifest -----------------------------------
+  //
+  // A skill that documents a command the sync never installs leaves the consumer
+  // with an instruction it cannot follow: an agent asked to run `npm run gate:qa`
+  // in a repo where nothing installed it reports a pass for something that never
+  // ran. The shipped layer must be complete on its own.
+  checkDocsReferenceInstalledFiles(manifest);
+
+  // FALLBACK_CORE_FILES is used when the remote manifest cannot be fetched, so it
+  // is a second source of truth for the same list. Divergence means a consumer
+  // behind a proxy installs a different framework than everyone else.
+  checkFallbackParity(manifest);
+
+  checkPyramidParity();
+
   return manifest;
+}
+
+/**
+ * Fails when the QA skill documents blocking steps the gate does not execute.
+ * The gate is the only mechanism that can enforce "a step that did not run cannot
+ * certify". If the skill declares five blocking steps and the runner knows four,
+ * the gap is invisible to every agent reading the documentation — and it is how
+ * a skipped step ends up supporting a promotion.
+ */
+/** Maps the human labels used in the skill table to the ids used by the gate. */
+const PYRAMID_ALIASES = {
+  typecheck: 'validate',
+  'typecheck estricto': 'validate',
+  'tests headless': 'test',
+  'tests unitarios y de integración': 'test',
+  'headless tests': 'test',
+  'consistencia spec ↔ backlog': 'spec',
+  'auditoría estática de ux': 'audit:ux',
+  'build de producción': 'build',
+};
+
+/**
+ * Fails when the QA skill documents blocking steps the gate does not execute.
+ *
+ * The gate is the only mechanism that can enforce "a step that did not run cannot
+ * certify". If the skill declares five blocking steps and the runner knows four,
+ * the gap is invisible to every agent reading the documentation — and it is how
+ * a skipped step ends up supporting a promotion.
+ */
+function checkPyramidParity() {
+  const skillPath = '.agents/skills/rigorous-qa-auditor/SKILL.md';
+  const gatePath = 'scripts/gate-qa.mjs';
+  if (!exists(skillPath) || !exists(gatePath)) return;
+
+  // Steps the gate knows how to run, from its own declarative table.
+  const gate = read(gatePath);
+  const table = gate.match(/const PYRAMID_STEPS\s*=\s*\[([\s\S]*?)\n\];/);
+  if (!table) {
+    fail('pyramid', `${gatePath} no longer declares PYRAMID_STEPS`);
+    return;
+  }
+
+  const gateSteps = [...table[1].matchAll(/id:\s*'([^']+)'/g)].map((m) => m[1]);
+  const documented = [...read(skillPath).matchAll(/^\|\s*\d+\s*\|\s*([^|]+?)\s*\|[^|]*\|\s*(Sí|No)/gm)];
+
+  if (!documented.length) {
+    fail('pyramid', `${skillPath} no longer has a parseable pyramid table`);
+    return;
+  }
+
+  // The regex has exactly two capture groups: the step label and the
+  // blocking marker. Destructuring a third would read `undefined` and skip
+  // every row, which is how this check silently passed for a whole round.
+  for (const [, label, blocks] of documented) {
+    if (blocks !== 'Sí') continue;
+    const id = PYRAMID_ALIASES[label.trim().toLowerCase()] ?? label.trim().toLowerCase();
+    if (!gateSteps.includes(id)) {
+      fail(
+        'pyramid',
+        `${skillPath} declares "${label.trim()}" as blocking, but ${gatePath} does not execute it. A step that never runs cannot block a promotion, and the gap is invisible to anyone reading the docs.`,
+      );
+    }
+  }
+}
+
+/**
+ * Fails when a core skill documents a shipped path that the manifest does not
+ * install. Scoped to code paths (scripts/, docs/) that are documented as
+ * runnable, so prose references to a skill's own name are not flagged.
+ */
+function checkDocsReferenceInstalledFiles(manifest) {
+  const installed = new Set([
+    ...(manifest.core || []),
+    ...Object.values(manifest.stacks || {}).flatMap((pack) => pack.files || []),
+  ]);
+
+  const claim = /(?:node\s+)?(scripts\/[A-Za-z0-9._-]+\.(?:mjs|cjs))/g;
+
+  // Scope: the core layer, which is what actually lands in a consumer's repo.
+  // CONTRIBUTING.md and AGENTS.md are documentation *of this repository* and
+  // legitimately reference tooling that is not part of the installed framework.
+  const docs = [
+    '.agents/TEAM_PLAYBOOK.md',
+    '.agents/STATE_MACHINE.md',
+    '.agents/rules/git-workflow.md',
+    ...fs.readdirSync(path.join(ROOT, '.agents/skills'), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => `.agents/skills/${entry.name}/SKILL.md`),
+  ];
+
+  const reported = new Set();
+  for (const doc of docs) {
+    if (!exists(doc)) continue;
+    for (const match of read(doc).matchAll(claim)) {
+      const target = match[1];
+      if (installed.has(target)) continue;
+      // One finding per (doc, target): a command named twice is one defect.
+      const key = `${doc}::${target}`;
+      if (reported.has(key)) continue;
+      reported.add(key);
+      fail(
+        'manifest',
+        `${doc} tells the reader to run "${target}", but the manifest does not install it. A consumer would be instructed to run a command that does not exist in their repo.`,
+      );
+    }
+  }
+}
+
+/** Fails when the offline fallback core list drifts from the manifest. */
+function checkFallbackParity(manifest) {
+  const fallbackPath = 'scripts/sync-playbook.mjs';
+  if (!exists(fallbackPath)) return;
+
+  const source = read(fallbackPath);
+  const block = source.match(/FALLBACK_CORE_FILES\s*=\s*\[([\s\S]*?)\]/);
+  if (!block) {
+    fail('manifest', `${fallbackPath} no longer declares FALLBACK_CORE_FILES`);
+    return;
+  }
+
+  const fallback = [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const core = manifest.core || [];
+
+  for (const file of core) {
+    if (!fallback.includes(file)) {
+      fail('manifest', `${file} is in the manifest but missing from FALLBACK_CORE_FILES; offline syncs would install a smaller framework`);
+    }
+  }
+  for (const file of fallback) {
+    if (!core.includes(file)) {
+      fail('manifest', `${file} is in FALLBACK_CORE_FILES but not in the manifest`);
+    }
+  }
 }
 
 // --- 2. rule catalog <-> skill documentation -------------------------------
@@ -231,20 +379,64 @@ function checkStatusVocabulary() {
     }
   }
 
+  if (!exists('.agents/STATE_MACHINE.md')) {
+    fail('status', '.agents/STATE_MACHINE.md is missing');
+    return;
+  }
+  const stateMachineText = read('.agents/STATE_MACHINE.md');
+
+  // Every canonical status must appear as a ROW in the state table, not merely
+  // somewhere in the file. A substring test passes when the token survives
+  // anywhere — in a transition, an invariant or prose — even after the row that
+  // defines the status has been deleted.
+  const tableRows = [...stateMachineText.matchAll(/^\|\s*\*\*[^|]+\*\*\s*\|\s*`([a-z]+)`\s*\|/gm)].map((m) => m[1]);
+  if (!tableRows.length) {
+    fail('status', 'STATE_MACHINE.md no longer has a parseable status table');
+    return;
+  }
+
   for (const status of CANONICAL_STATUSES) {
-    if (!exists('.agents/STATE_MACHINE.md')) {
-      fail('status', '.agents/STATE_MACHINE.md is missing');
-      return;
+    if (!tableRows.includes(status)) {
+      fail(
+        'status',
+        `.agents/STATE_MACHINE.md does not define "${status}" as a row in the status table. A token appearing elsewhere in the file is not a definition.`,
+      );
     }
-    if (!read('.agents/STATE_MACHINE.md').includes(status)) {
-      fail('status', `.agents/STATE_MACHINE.md does not define the canonical status "${status}"`);
+  }
+
+  // And nothing else may be a row: a status invented in the table is a status
+  // the rest of the framework does not know how to handle.
+  for (const row of tableRows) {
+    if (!CANONICAL_STATUSES.includes(row)) {
+      fail('status', `STATE_MACHINE.md defines "${row}" as a status, but it is not in the canonical vocabulary`);
     }
   }
 
   // the backlog must not be modelled as a status
-  const stateMachine = exists('.agents/STATE_MACHINE.md') ? read('.agents/STATE_MACHINE.md') : '';
+  const stateMachine = stateMachineText;
   if (/\|\s*`backlog`\s*\|/.test(stateMachine)) {
     fail('status', 'STATE_MACHINE.md lists "backlog" as a status. The backlog is the absence of status; refinement is a gate.');
+  }
+
+  // The status vocabulary published to consumers must match the canonical one.
+  // docs/BACKLOG.md is the document a project copies from, so a status listed
+  // there but not defined in the state machine is a status projects will use
+  // and nothing will handle.
+  const backlogDoc = 'docs/BACKLOG.md';
+  if (exists(backlogDoc)) {
+    const declared = read(backlogDoc)
+      .split('\n')
+      .filter((line) => /\*\*Status válidos:\*\*/.test(line) || /^\s*-\s+\*\*Status:\*\*/.test(line))
+      .flatMap((line) => [...line.matchAll(/`([a-z]+)`/g)].map((m) => m[1]));
+
+    for (const status of new Set(declared)) {
+      if (!CANONICAL_STATUSES.includes(status)) {
+        fail(
+          'status',
+          `${backlogDoc} publishes "${status}" as a valid status, but STATE_MACHINE.md does not define it. A project copying this document would use a status nothing handles.`,
+        );
+      }
+    }
   }
 
   for (const doc of ['AGENTS.md', '.agents/TEAM_PLAYBOOK.md']) {

@@ -1,9 +1,9 @@
 ---
 id: PLAY-017
 title: "Disciplina de ingeniería senior y diff mínimo (ponytail): erradicación de la sobre-ingeniería en Principal Engineer"
-status: review
+status: ready
 created_date: '2026-10-12'
-updated_date: '2026-10-12'
+updated_date: '2026-10-15'
 labels:
   - "engineering"
   - "anti-bloat"
@@ -50,3 +50,20 @@ Inspirado en la filosofía de `DietrichGebert/ponytail` (*"The lazy senior dev: 
 
 <!-- SECTION:NOTES:BEGIN -->
 <!-- SECTION:NOTES:END -->
+
+## QA Certification (T2) — APPROVED
+
+Audited and certified by Rigorous QA Auditor on 2026-10-15.
+- **Executable QA Gate**: `npm run gate:qa PLAY-017` -> Exit Code 0.
+- **Verification Pyramid**:
+  - Step 1: Repo consistency: PASSED (`npm run validate`)
+  - Step 2: Headless tests: PASSED (`npm test`, 128/128 tests passing)
+  - Step 3: Spec ↔ backlog consistency: PASSED (`npm run gate:review`)
+  - Step 4: Static UX audit: PASSED (`npm run audit:ux:strict`)
+- **Acceptance Criteria Verification**:
+  - [x] #1 Actualizar `.agents/skills/principal-engineer/SKILL.md` incorporando la sección 'Disciplina Ponytail & Diff Mínimo Viable' (prohibición de sobre-ingeniería y código especulativo) (L86-102)
+  - [x] #2 Incorporar el protocolo de búsqueda previa y reutilización de componentes/helpers existentes antes de crear código nuevo o instalar paquetes (`.agents/skills/principal-engineer/SKILL.md` L94-95, `AGENTS.md` L20-22)
+  - [x] #3 Exigir el mapeo explícito de blast radius en la planificación del Principal Engineer antes de ejecutar ediciones (`.agents/skills/principal-engineer/SKILL.md` L96-97, `AGENTS.md` L23)
+  - [x] #4 Establecer el requisito de cierre honesto en los reportes de desarrollo (declarar lo no probado y riesgos remanentes) (`.agents/skills/principal-engineer/SKILL.md` L98-99, `AGENTS.md` L24-25)
+  - [x] #5 Actualizar `AGENTS.md` (Reglas Generales) reforzando la política de diffs mínimos y soluciones simples que escalan (L19-25)
+- **Verdict**: APPROVED → ready.

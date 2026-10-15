@@ -17,6 +17,7 @@ El ciclo de vida del trabajo consta de estados claramente tipados y sin ambigüe
 | **Delivery** | `review` | Implementación completa y tests locales en verde. Esperando certificación. | Rama de trabajo | Principal Engineer / Agente |
 | **Delivery** | `ready` | **Entrega formal del desarrollo (Línea de llegada del Dev/Agente).** Certificado bajo Pirámide. | Rama / Staging | **QA Auditor / Test Suite** |
 | **Producción** | `done` | **Desplegado en producción.** Empaquetado y publicado en release. | Producción / Tag | **Release Management / Deploy** |
+| **Fuera del flujo** | `dismissed` | **Descartado.** El ítem no va a existir: la premisa era falsa, el alcance quedó absorbed, o el PO decidió que no vale. No es un bloqueo ni un abandono. | Backlog (disco) | **PO / Release Management** |
 
 ### Reglas Fundamentales de Estado:
 
@@ -25,6 +26,7 @@ El ciclo de vida del trabajo consta de estados claramente tipados y sin ambigüe
 3. **`ready` es la meta del desarrollador:** El trabajo de desarrollo y del agente concluye formalmente al certificar en `ready`. Un desarrollador o agente **NUNCA** mueve una tarea a `done` durante el desarrollo.
 4. **`done` exige deploy real:** El estado `done` se asigna exclusivamente cuando el Release Manager o el pipeline empaqueta la versión y la despliega a producción (el Release Assembler promueve automáticamente de `ready` a `done`). Marcar `done` sin deploy real es una mentira de estado.
 5. **`blocked` exige `blocked_reason`:** Toda tarea en `blocked` **debe** declarar en su frontmatter el campo `blocked_reason: "<motivo>"`. Sin motivo no es un bloqueo, es una tarea abandonada en `doing` que distorsiona el WIP real. El campo es obligatorio y no vacío.
+6. **`dismissed` requiere `dismissed_reason`:** Igual que `blocked`, un descarte sin motivo escrito es indistinguible de un ítem olvidado. El campo es obligatorio. Distinguir los dos importa: `blocked` es un impedimento con salida prevista; `dismissed` es una decisión de que el ítem no existe. Un ítem descartado **no** aparece en ningún release y **no** se cuenta como capacidad entregada.
 
 ---
 
@@ -63,6 +65,8 @@ Un ítem no refinado permanece en `draft` (o `ideas` si es discovery) en el back
 | T_block | `draft` → `blocked` | PO / Dev | Impedimento externo identificado. `blocked_reason` obligatorio. |
 | T_block | `doing` → `blocked` | PO / Dev | Impedimento externo identificado. `blocked_reason` obligatorio. |
 | T_unblock | `blocked` → `doing` / `draft` | PO / Dev | El impedimento fue resuelto **o** sus `dependencies:` quedaron en `done` o fueron **desvinculadas del array**. Una dependencia que no existe en disco no está desvinculada: sigue declarada. Verificable con `node scripts/gate-qa.mjs unblock <id>`. |
+| T_dismiss | `ideas` / `draft` / `doing` → `dismissed` | PO / Release Management | `dismissed_reason` obligatorio. Solo desde `ideas`, `draft` o `doing`: **nunca desde `ready`**, porque un ítem certificado no se descarta, se entrega o se revierte a `doing`. |
+| T_revive | `dismissed` → `draft` | PO | El descarte fue un error, o cambió la premisa. Vuelve al pool **conservando su refinamiento**, igual que todo retorno al pool. |
 
 ---
 
@@ -93,16 +97,22 @@ Un ítem no refinado permanece en `draft` (o `ideas` si es discovery) en el back
 El campo `Status:` de `docs/sprints/SPRINT-XXX.md` o del frontmatter de tareas usa **exactamente** uno de estos valores canónicos en minúsculas:
 
 ```
-ideas | draft | blocked | doing | review | ready | done
+ideas | draft | blocked | doing | review | ready | done | dismissed
 ```
 
-Una tarea en `blocked` declara además su motivo en el frontmatter:
+Una tarea en `blocked` o en `dismissed` declara además su motivo en el frontmatter:
 
 ```markdown
 ---
 id: PLAY-NNN
 status: blocked
 blocked_reason: "Bloqueada: la API de pagos no define el contrato de idempotencia"
+---
+
+---
+id: PLAY-NNN
+status: dismissed
+dismissed_reason: "Descartado: la premisa era falsa, el módulo ya no existe en el producto"
 ---
 ```
 

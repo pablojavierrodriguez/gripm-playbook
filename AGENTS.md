@@ -87,9 +87,12 @@ Headline rule, for immediate effect:
 Cada agente o tarea paralela opera en su **worktree aislado**, sobre su propia rama. Receta y reglas de convivencia: [`.agents/rules/git-workflow.md`](.agents/rules/git-workflow.md) § Multi-Agent Parallelism.
 
 ```bash
-git worktree add ../<repo>-<task> <branch>
+git worktree add -b <branch> ../<repo>-<task>
 # ... trabajo aislado ...
+git fetch . <branch>:dev          # consolidar sin cambiar de rama
 git worktree remove ../<repo>-<task>
 ```
+
+> El flag `-b` es obligatorio: sin él git falla con `invalid reference` si la rama no existe, y crearla exigiría el `checkout` que esta regla prohíbe.
 
 > El aislamiento de working tree no aísla *líneas en conflicto*: dos agentes que editan el mismo archivo se mergearán igual. Para tareas que tocan los mismos documentos, secuencializar o dividir el alcance.

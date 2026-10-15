@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.0] — 2026-10-12
+
+`PLAY-010` · `PLAY-012` · `PLAY-013` · `PLAY-014` · `PLAY-015` · `PLAY-016` · `PLAY-017` · `PLAY-018`
+
+### Added
+
+- **An executable QA gate, so certification stops being a matter of prose.** A single agent asked to "act as the QA Auditor" can perform the role in the same turn that it writes the code: tick the acceptance criteria by inertia and promote the item to `ready` without running anything. `scripts/gate-qa.mjs` (`npm run gate:qa <PLAY-NNN>`) inspects the item on disk and runs the Verification Pyramid. **Exit code 0 is what satisfies the `review` → `ready` transition.** A step that cannot execute is reported `SKIPPED` and never counted as a pass; a pyramid where *nothing* ran fails the gate.
+- **`gate:unblock`**, the executable T_unblock guard (`blocked` → `doing`/`draft`), so the rule has an entry point of its own instead of annotating a list that already failed.
+- **`npm run gate:review`** and a CI step that runs it: every item in `review` must satisfy the gate on every push. A gate that only runs by hand is a gate that gets skipped.
+- **`blocked` status with a mandatory `blocked_reason`**, plus `T_block`/`T_unblock` and a dependency gate that refuses certification while any declared dependency is not `done`. A task that cannot proceed is registered as blocked instead of inflating WIP in `doing`.
+- **Multi-agent parallelism via `git worktree`.** `.git/HEAD` and the working tree are shared filesystem state: a cross-checkout silently switches another agent's branch while it writes, and its next commit lands on the wrong one. Each concurrent agent works in its own worktree — with the caveat that a worktree isolates the working tree, *not* the content, so overlapping edits still collide at merge time.
+- **Engineering discipline (Ponytail):** diff mínimo viable, mandatory reuse before creating a helper or installing a package, blast-radius mapping before editing, and an honest closing statement of what was not tested.
+- **Anti-slop rules for code, UI and copy:** comment hygiene, no chained type assertions, no module-level mocking to make a test green, a Purpose Test for visual decisions, a catalogue of default AI design clichés, and a veracity rule for copy. Design and copy skills updated alongside the engineering skill.
+- **A Grilling Session is now required at refinement gate R1**, plus an opt-in `docs/DOMAIN_TEMPLATE.md` glossary convention.
+- **`validate-repo` now fails when the core layer documents a script the manifest does not install**, and when `FALLBACK_CORE_FILES` drifts from the manifest. Both were silent: the first let skills instruct consumers to run a command that was never synced into their repo.
+
+### Fixed
+
+- **A test that passes for the wrong reason is now defined as a defect** (`CONTRIBUTING.md`), with the procedure to verify it: revert the fix, run the suite, observe a failure. This repo shipped a broken capability in two consecutive releases because its regression fixture never exercised the code it claimed to test, and the guide says how that is checked now — including the case where reverting *half* a fix proves nothing.
+
+### Changed
+
+- **`gate-qa.mjs` and `docs/DOMAIN_TEMPLATE.md` are installed by the sync.** Without this the QA skills documented a command that no consumer had: an agent told to run `npm run gate:qa` in a repo where nothing installed it would report a pass for something that never ran.
+
+---
+
+## [2.2.2] — 2026-10-09
+
+---
+
 ## [2.2.2] — 2026-10-09
 
 ### Added
@@ -162,7 +192,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Configured for npm publication under `@gripm/playbook` supporting `npx @gripm/playbook sync`.
 
-[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.2.1...HEAD
+[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.3.0
+[2.2.2]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.2.2
 [2.2.1]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.2.1
 [2.2.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.2.0
 [2.1.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.1.0

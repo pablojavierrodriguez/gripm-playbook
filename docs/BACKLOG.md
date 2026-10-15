@@ -59,6 +59,7 @@ Los IDs son estables, monotónicos y nunca se reutilizan. El prefijo de este rep
 - **Status:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`.
 - **Prioridad:** `high` · `medium` · `low`.
 - **`blocked_reason`:** obligatorio y no vacío **únicamente** cuando `status: blocked`. Fuera de ese status, el campo es un error de validación.
+- **`dismissed_reason`:** obligatorio y no vacío **únicamente** cuando `status: dismissed`. Misma lógica, mismo motivo.
 
 ---
 
@@ -87,6 +88,27 @@ Reglas:
 
 ---
 
+## 4.c Estado `dismissed`: descartar el ítem
+
+`dismissed` marca un ítem que **no va a existir**: la premisa era falsa, el alcance quedó absorbido por otro, o el PO decidió que no vale lo que cuesta. No es un bloqueo (que tiene salida prevista) ni un abandono (que se forgotó).
+
+```markdown
+---
+id: PLAY-NNN
+status: dismissed
+dismissed_reason: "Descartado: la premisa era falsa, el módulo ya no existe en el producto"
+---
+```
+
+Reglas:
+
+1. `dismissed_reason` es **obligatorio** y no vacío, por la misma razón que en `blocked`.
+2. Solo se descarta desde `ideas`, `draft` o `doing`. **Nunca desde `ready`**: un ítem certificado no se descarta, se entrega o se revierte a `doing`.
+3. Un ítem descartado **no aparece en ningún release** y **no cuenta como capacidad entregada**.
+4. Volver a `draft` conserva el refinamiento, como todo retorno al pool.
+
+---
+
 ## 5. Reglas de higiene
 
 1. Un ítem no recibe `doing` sin haber pasado el refinement gate.
@@ -97,7 +119,9 @@ Reglas:
 6. Todo tech debt detectado en QA o retrospectiva genera un ítem nuevo.
 7. **Nada se anota en el changelog hasta que se publica.** Un ítem sin archivo en `backlog/tasks/` está perdido.
 8. `status: blocked` sin `blocked_reason` no vacío es un ítem inválido.
+9. `status: dismissed` sin `dismissed_reason` no vacío es un ítem inválido.
 9. Un ítem no entra a `doing` ni se certifica en `ready` con una `dependencies:` sin resolver en `done`.
+10. Un ítem no se descarta desde `ready`: un ítem certificado se entrega o vuelve a `doing`.
 
 ---
 
@@ -115,6 +139,7 @@ dependencies: [PLAY-002]
 priority: medium
 type: feature
 blocked_reason: "Solo si status: blocked; obligatorio en ese caso"
+dismissed_reason: "Solo si status: dismissed; obligatorio en ese caso"
 ---
 
 ## Description

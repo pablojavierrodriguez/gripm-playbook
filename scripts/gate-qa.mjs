@@ -233,6 +233,16 @@ export function inspectTask(task, tasks) {
     failures.push('blocked_reason is set but status is not "blocked"');
   }
 
+  // dismissed is a decision that the item will not exist. Without a written
+  // reason it is indistinguishable from an item someone forgot about.
+  if (frontmatter.status === 'dismissed') {
+    if (!frontmatter.dismissed_reason || !frontmatter.dismissed_reason.trim()) {
+      failures.push('status is "dismissed" but dismissed_reason is missing or empty');
+    }
+  } else if (frontmatter.dismissed_reason) {
+    failures.push('dismissed_reason is set but status is not "dismissed"');
+  }
+
   // PLAY-016: dependencies gate. An item cannot be certified on top of an
   // unfinished dependency.
   for (const dep of frontmatter.dependencies || []) {
@@ -360,23 +370,46 @@ function readScripts(root = ROOT) {
 }
 
 /**
- * Resolves the repo's verification steps. Each step is looked up in package.json
- * first: a step with no script behind it is SKIPPED, never assumed green.
+ * The verification steps the gate can execute.
+ *
+ * `blocking` distinguishes "this step must pass" from "this step must run".
+ * A blocking step with no script behind it is a FAILED gate, not a skipped one:
+ * certifying on a step that never ran is exactly the assumption the gate exists
+ * to refuse. `optional: true` is the honest way to say "this project has no such
+ * step" — and it must be deliberate, never a default.
+ *
+ * The set is compared against the pyramid the QA skill documents by
+ * `scripts/validate-repo.mjs`, so the two cannot drift apart silently.
  */
+const PYRAMID_STEPS = [
+  { id: 'validate', label: 'Repo consistency', script: 'validate', blocking: true },
+  { id: 'test', label: 'Headless tests', script: 'test', blocking: true },
+  { id: 'spec', label: 'Spec ↔ backlog consistency', script: 'gate:review', blocking: true },
+  { id: 'audit:ux', label: 'Static UX audit', script: 'audit:ux:strict', blocking: true },
+  // This package ships documentation and a Node CLI; there is no production
+  // bundle to build. Declared optional deliberately, with the reason inline.
+  { id: 'build', label: 'Production build', script: 'build', blocking: false, optional: true },
+];
+
+/** The steps a gate run actually covers, in order. */
 export function resolvePyramid(root = ROOT) {
   const scripts = readScripts(root);
   const has = (name) => Boolean(scripts[name]);
-
-  return [
-    { id: 'validate', label: 'Repo consistency', script: 'validate' },
-    { id: 'test', label: 'Headless tests', script: 'test' },
-    { id: 'audit:ux', label: 'Static UX audit', script: 'audit:ux:strict' },
-    { id: 'build', label: 'Production build', script: 'build' },
-  ].map((step) => ({ ...step, available: has(step.script) }));
+  return PYRAMID_STEPS.map((step) => ({ ...step, available: has(step.script) }));
 }
 
 function runStep(step, root) {
-  if (!step.available) return { state: 'skipped', detail: `no "${step.script}" script in package.json` };
+  if (!step.available) {
+    // An unavailable BLOCKING step is a failure: it was declared as something
+    // that must pass before promotion, and it did not pass because it never ran.
+    // Optional steps are the only ones allowed to be genuinely skipped.
+    return step.optional
+      ? { state: 'skipped', detail: `not applicable to this project (no "${step.script}" script)` }
+      : {
+          state: 'failed',
+          detail: `blocking step has no "${step.script}" script in package.json; it cannot be certified on a step that never ran`,
+        };
+  }
 
   const result = spawnSync('npm', ['run', '--silent', step.script], {
     cwd: root,
@@ -498,7 +531,7 @@ export function main(argv) {
     process.exit(0);
   }
 
-  console.log('❌ GATE FAILED — promotion to "ready" does not surte effect.');
+  console.log('❌ GATE FAILED — promotion to "ready" has no effect.');
   if (nothingVerified) {
     console.log('   No verification step could run, so the gate cannot certify anything.');
   }

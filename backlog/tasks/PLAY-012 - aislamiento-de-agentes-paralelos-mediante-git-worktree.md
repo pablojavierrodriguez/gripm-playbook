@@ -1,9 +1,9 @@
 ---
 id: PLAY-012
 title: "Aislamiento de agentes concurrentes mediante git worktree para prevenir colisiones de rama y working tree"
-status: review
+status: ready
 created_date: '2026-10-12'
-updated_date: '2026-10-12'
+updated_date: '2026-10-15'
 labels:
   - "git"
   - "governance"
@@ -62,3 +62,19 @@ Incorporar al Playbook (`.agents/rules/git-workflow.md`, `AGENTS.md` y `TEAM_PLA
 
 <!-- SECTION:NOTES:BEGIN -->
 <!-- SECTION:NOTES:END -->
+
+## QA Certification (T2) — APPROVED
+
+Audited and certified by Rigorous QA Auditor on 2026-10-15.
+- **Executable QA Gate**: `npm run gate:qa PLAY-012` -> Exit Code 0.
+- **Verification Pyramid**:
+  - Step 1: Repo consistency: PASSED (`npm run validate`)
+  - Step 2: Headless tests: PASSED (`npm test`, 128/128 tests passing)
+  - Step 3: Spec ↔ backlog consistency: PASSED (`npm run gate:review`)
+  - Step 4: Static UX audit: PASSED (`npm run audit:ux:strict`)
+- **Acceptance Criteria Verification**:
+  - [x] #1 `.agents/rules/git-workflow.md` incorpora sección 'Multi-Agent Parallelism via git worktree' con reglas y recetas operativas (L27-75)
+  - [x] #2 `AGENTS.md` documenta la prohibición de checkout cruzado en entornos multi-agente concurrentes (L122-143)
+  - [x] #3 `.agents/TEAM_PLAYBOOK.md` actualiza la sección de Sub-Agent Autonomy con la pauta de aislamiento de workspaces (L56-62)
+  - [x] #4 Guía de comandos prácticos (`worktree add`, `worktree list`, `worktree remove`) documentada en docs/ o playbook de soporte (`.agents/rules/git-workflow.md`)
+- **Verdict**: APPROVED → ready.

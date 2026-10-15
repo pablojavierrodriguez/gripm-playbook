@@ -141,6 +141,70 @@ const user = payload as TotalUserResponse
 > [!CAUTION]
 > **Lección registrada en la historia de este repositorio:** un fixture llegó a pasar por el motivo equivocado —no porque la regla bajo prueba se cumpliera, sino porque el aislamiento del módulo se tragaba la ruta que se pretendía verificar. Regla operativa: cuando un test pasa, verificar **por qué** pasa antes de declararlo cobertura. Un test que pasa sin ejercitar su objetivo es un defecto con check verde.
 
+### 13. Receta e integración de linter anti-slop (Oxlint / AST)
+
+Para proyectos TypeScript/JavaScript consumidores del playbook, el linter determinista recomendado es **Oxlint** (análisis de AST ultra-rápido en Rust, 50-100x más rápido que ESLint clásico), integrable como compuerta determinista en el Paso 1 de la Pirámide de Verificación:
+
+#### 1. Configuración recomendada (`.oxlintrc.json`)
+
+```json
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "eslint/no-constant-condition": "error",
+    "eslint/no-debugger": "error",
+    "eslint/no-duplicate-case": "error",
+    "eslint/no-empty": ["error", { "allowEmptyCatch": false }],
+    "unicorn/no-unnecessary-await": "error",
+    "unicorn/prefer-ternary": "warn"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "build/**",
+    "coverage/**",
+    "node_modules/**"
+  ]
+}
+```
+
+#### 2. Receta de integración en `package.json`
+
+```json
+{
+  "scripts": {
+    "lint:anti-slop": "oxlint --deny-warnings --config .oxlintrc.json",
+    "lint": "oxlint"
+  },
+  "devDependencies": {
+    "oxlint": "^0.15.0"
+  }
+}
+```
+
+#### 3. Reglas AST de detección de evasión (no-chained-assertions)
+
+Para proyectos con soporte de plugins ESLint/AST adicionales (`@typescript-eslint/eslint-plugin` o `dmmulroy/anti-slop`), activar:
+- `@typescript-eslint/consistent-type-assertions`: `["error", { "assertionStyle": "as", "objectLiteralTypeAssertions": "never" }]`
+- `@typescript-eslint/no-unnecessary-type-assertion`: `"error"`
+- **Detección de evasión `as unknown as`:** bloquear mediante análisis AST o check estático cualquier secuencia `as\s+unknown\s+as|as\s+any\s+as`.
+
+En CI, `npm run lint:anti-slop` debe ejecutarse con exit code 1 bloqueante antes de los tests headless.
+
 ---
 
 ## Checklist pre-handoff
