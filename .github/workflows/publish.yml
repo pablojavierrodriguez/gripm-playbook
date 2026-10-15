@@ -127,7 +127,7 @@ jobs:
               fs.writeFileSync('release-notes.txt', (notes || ('Release ' + '$TAG')) + '\n');
             "
 
-            TITLE="v${VERSION} — Zero-network sync, smart orphan detection y State Machine canónica"
+            TITLE="Release $TAG"
             echo "🚀 Creando GitHub Release $TAG: $TITLE"
             gh release create "$TAG" \
               --title "$TITLE" \
