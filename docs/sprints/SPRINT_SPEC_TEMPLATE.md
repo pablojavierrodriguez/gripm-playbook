@@ -3,10 +3,12 @@
 <!--
   Status vocabulary is owned by .agents/STATE_MACHINE.md. Do not invent states.
   The backlog is NOT a status: an item with no status has simply not entered the flow yet.
-  Allowed values: (empty) | doing | review | ready | done
+  Allowed values: (empty) | draft | blocked | doing | review | ready | done | dismissed
 -->
 
-- **Status:** `[ (empty) | doing | review | ready | done ]`
+- **Status:** `[ (empty) | draft | blocked | doing | review | ready | done | dismissed ]`
+- **Blocked Reason:** `[ obligatorio y no vacío si status: blocked; omitir en otros estados ]`
+- **Dismissed Reason:** `[ obligatorio y no vacío si status: dismissed; omitir en otros estados ]`
 - **Last transition:** `[ from → to ]` by `[ actor ]` — `[ YYYY-MM-DD ]`
 - **Refined:** `[ yes (YYYY-MM-DD) | no — falta: <qué> ]`
 - **Sprint:** `[ SPRINT-XXX ]`
@@ -93,11 +95,15 @@
 > [!IMPORTANT]
 > `browser_subagent` y DevTools están **prohibidos** para lógica, estado, contratos de API o persistencia: eso se resuelve headless en los pasos 1–4. Solo se abren para issues de CSS/layout no deducibles estáticamente o por pedido explícito del usuario.
 
+**Compuerta ejecutable — gate runner:**
+
+- [ ] `node scripts/gate-qa.mjs <ID>` en verde (exit code 0 requerido para certificar)
+
 **Findings & Resolved Friction:**
 
 - **Verdict:** `[ APPROVED → ready | REJECTED → doing ]`
 
-> **T2 (`review` → `ready`) es exclusiva del QA Auditor.** El developer no auto-certifica. Al rechazar, registrar los findings accionables y mover el ítem a `doing` (T3).
+> **T2 (`review` → `ready`) es exclusiva del QA Auditor.** El developer no auto-certifica. La certificación requiere exit code 0 del runner. Al rechazar, registrar los findings accionables y mover el ítem a `doing` (T3).
 
 ---
 

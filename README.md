@@ -102,20 +102,23 @@ Full specification, with actors and guards: **[`.agents/STATE_MACHINE.md`](.agen
               │
               ▼
 [ 3. Dev Execution ] (principal-engineer) ────────► status: (pool) → doing → review
-              │
+              │                                                ▲         │
+              │                                                └─blocked─┘
               ▼
-[ 4. QA Certification ] (rigorous-qa-auditor) ────► status: review → ready   ← formal handover
+[ 4. QA Certification ] (rigorous-qa-auditor) ────► status: review → ready   ← formal handover (npm run gate:qa)
               │
               ▼
 [ 5. Release & Prod ] (PO + Delivery Lead) ───────► status: ready → done     ← after a real deploy
 ```
 
-**There are exactly four statuses: `doing`, `review`, `ready`, `done`.**
+**The canonical status vocabulary lives in [`.agents/STATE_MACHINE.md`](.agents/STATE_MACHINE.md): `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`.**
 
-- **The backlog is not a status.** An item with no status simply has not entered the flow.
-- **Refinement is a gate (R1), not a state.** An item may only enter `doing` once it has a problem statement, scoped in/out, measurable ACs and a priority.
-- **`ready` is the formal delivery of development.** Only the QA Auditor can move `review → ready`; a developer never self-certifies.
-- **Fundamental invariant:** no item can exist in production that is not `done`.
+- **The backlog is a planning container, not a status.** An item with no status simply has not entered the flow.
+- **Refinement is an interactive gate (R1), not a state.** Requires a Grilling Session to resolve edge cases, fallbacks, empty states and tradeoffs before entering `doing`.
+- **`blocked` requires `blocked_reason`.** Halts WIP inflation; unblocking (`T_unblock`) requires resolving the impediment or dependencies and is verifiable with `node scripts/gate-qa.mjs unblock <ID>`.
+- **`dismissed` requires `dismissed_reason`.** Formal decision that an item will not exist; items in `ready` are never dismissed.
+- **`ready` is the formal delivery of development.** Only the QA Auditor can move `review → ready` backed by `npm run gate:qa` (exit code 0); a developer never self-certifies.
+- **Fundamental invariant:** no item can exist in production that is not `done`, and no item can be marked `done` without an actual release deploy.
 
 **Sprints and releases are decoupled.** A release groups available `ready` items by delivered value, with or without an active sprint, historical or current.
 
@@ -154,10 +157,10 @@ The core layer is validated to contain **zero** references to any specific produ
 
 ```text
 ├── .agents/
-│   ├── TEAM_PLAYBOOK.md           # Role matrix, modes, sub-agent criteria
+│   ├── TEAM_PLAYBOOK.md           # Role matrix, modes, sub-agent criteria, worktree isolation
 │   ├── STATE_MACHINE.md           # Single source of truth for statuses & transitions
 │   ├── rules/
-│   │   └── git-workflow.md        # Commit governance (canonical copy)
+│   │   └── git-workflow.md        # Commit governance & multi-agent worktree recipe
 │   ├── skills/                    # CORE — stack agnostic, always installed
 │   │   ├── pm-orchestrator/SKILL.md
 │   │   ├── market-researcher/SKILL.md
@@ -170,14 +173,17 @@ The core layer is validated to contain **zero** references to any specific produ
 │       ├── mobile/{STACK.md, skills/…}
 │       └── pwa/{STACK.md, skills/…}
 ├── scripts/
-│   ├── audit-ux-code.cjs          # Static UX auditor (generic engine)
+│   ├── audit-ux-code.cjs          # Static UX auditor (generic engine + i18n support)
+│   ├── gate-qa.mjs                # Executable QA certification gate runner
+│   ├── gate-review-items.mjs      # CI entry point: gates all items in review
 │   ├── ux-rules.json              # Rule catalog — single source of truth
-│   ├── sync-playbook.mjs          # Installer / updater
+│   ├── sync-playbook.mjs          # Installer / updater (with parity check)
 │   └── validate-repo.mjs          # Self-consistency guardian
-├── tests/                         # Rule engine test suite (node:test)
+├── tests/                         # Test suite (node:test, 128 tests across 30 suites)
 ├── backlog/tasks/                 # Item pool, Backlog.md format (PLAY- prefix)
 ├── docs/
 │   ├── BACKLOG.md                 # Backlog convention → items live in backlog/tasks/
+│   ├── DOMAIN_TEMPLATE.md         # Canonical ubiquitous domain glossary template
 │   └── sprints/SPRINT_SPEC_TEMPLATE.md
 ├── .playbook-manifest.json        # What gets installed where
 ├── AGENTS.md                      # Master project instructions (template)
@@ -249,13 +255,20 @@ Copy `.agents/skills/*/SKILL.md` into your assistant's global skills directory (
 Validate every change in strict order. Each step is cheaper than the next.
 
 ```
-1. ✅  typecheck         tsc --noEmit / equivalent          → milliseconds
-2. ✅  headless tests    unit + integration, no browser    → seconds
-3. ✅  spec consistency  backlog ↔ sprint spec ↔ code       → seconds
-4. ✅  production build                                      → seconds–minutes
-5. ✅  static UX audit    node scripts/audit-ux-code.cjs --strict
-6. ⚠️  browser           ONLY for static-undeducible CSS/layout, or on explicit request
+1. ✅  typecheck / repo consistency    npm run validate
+2. ✅  headless tests                  npm test (unit + integration, no browser)
+3. ✅  spec & backlog consistency      npm run gate:review
+4. ✅  static UX audit                 npm run audit:ux:strict
+5. ✅  production build (if applicable) npm run build
+6. ⚠️  real browser (conditional)      ONLY for static-undeducible CSS/layout, or on explicit request
 ```
+
+### Executable QA Gate — `npm run gate:qa <ID>`
+
+Prose assertions are not gates. Transition T2 (`review` → `ready`) is enforced mechanically by `scripts/gate-qa.mjs`:
+- Verifies task frontmatter, completed acceptance criteria (`- [x]`), dependencies resolution in `done`, and valid `blocked_reason`/`dismissed_reason`.
+- Runs the Verification Pyramid headlessly. Exit code 0 is required to certify.
+- In CI, `npm run gate:review` ensures every item in `review` satisfies the gate on every push.
 
 > [!IMPORTANT]
 > Invoking a browser sub-agent for logic, state, API contracts or persistence is **prohibited** — those are auditable headlessly in milliseconds. The browser is reserved for visual CSS/layout issues that cannot be deduced statically.
@@ -357,9 +370,10 @@ Adding a signature means editing `scripts/ux-rules.json` **and** documenting it 
 The framework holds itself to its own standard:
 
 ```bash
-npm run validate    # manifest ⇄ disk, rule catalog ⇄ skill docs, core purity, links, frontmatter, status vocabulary
-npm test            # 46 tests over the rule engine and the sync layer
-npm run check:all   # both
+npm run validate     # manifest ⇄ disk, fallback parity, rule catalog ⇄ skill docs, core purity, links, status vocabulary
+npm test             # 128 tests over rule engine, sync layer, gate runner and repo validator
+npm run gate:review  # verifies every item in review satisfies the executable gate
+npm run check:all    # validate + test
 ```
 
 ---
@@ -383,12 +397,15 @@ npm run check:all   # both
 **Agentic Team Playbook** es un framework de gobernanza y delivery ágil para assistants de IA:
 
 - **Autonomía sin burocracia:** clasificación dinámica entre *Foco Quirúrgico* (fixes directos), *Dúo Táctico* (UX + código) y *Sprint & Backlog Flow* (loop formal).
-- **Patrón Role-Swapping:** en lugar de enjambres que queman tokens y colisionan en Git, un único Host Agent adopna skills modulares bajo demanda. Subagentes paralelos solo para verificaciones sin estado.
-- **Cuatro status canónicos:** `doing → review → ready → done`. **El backlog no es un status** (un ítem sin status simplemente aún no entró al flujo) y **el refinamiento es un gate (R1), no un estado**.
-- **`ready` es la entrega formal del desarrollo.** Solo el QA Auditor mueve `review → ready`; un developer nunca se autocertifica. `ready` es inmutable: un fix post-QA invalida la certificación.
-- **Invariante fundamental:** ningún ítem puede estar en producción sin estar en `done`.
+- **Patrón Role-Swapping:** en lugar de enjambres que queman tokens y colisionan en Git, un único Host Agent adopta skills modulares bajo demanda. Subagentes paralelos solo para verificaciones sin estado. Aislamiento multi-agente mediante `git worktree`.
+- **Vocabulario canónico de estados:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`. **El backlog es el pool de planificación, no un status**, y el **refinamiento es un gate interactivo (R1)** (Grilling Session para despejar ambigüedades, apoyado en el glosario de dominio `DOMAIN.md`).
+- **Estados `blocked` y `dismissed`:** motivos obligatorios y no vacíos (`blocked_reason` / `dismissed_reason`). Resolución estricta de dependencias comprobable mecánicamente con `gate-qa.mjs unblock <ID>`.
+- **`ready` es la entrega formal del desarrollo.** Solo el QA Auditor mueve `review → ready` respaldado por exit code 0 de `npm run gate:qa`. Ningún developer se auto-certifica.
+- **Disciplina senior (Ponytail):** diff mínimo viable, reutilización previa obligatoria, mapeo de blast radius y cierre honesto.
+- **Filtro Anti-Slop:** higiene de comentarios, prohibición de evasión de tipos (`as unknown as`), receta Oxlint y Purpose Test en diseño y copy.
+- **Invariante fundamental:** ningún ítem puede estar en producción sin estar en `done`, y marcar `done` sin deploy real es una mentira de estado.
 - **Desacople Sprint ↔ Release:** los releases se arman por valor entregado con ítems en `ready`, con o sin sprint activo.
-- **Pirámide de Verificación:** typecheck → tests → consistencia spec → build → auditoría UX estática. Browser subagents prohibidos para lógica, estado, API o persistencia.
+- **Pirámide de Verificación:** typecheck → tests headless → consistencia de spec/backlog → build → auditoría UX estática (con soporte de i18n y baselines portables POSIX). Browser subagents prohibidos para lógica, estado, API o persistencia.
 - **Dos capas:** *core* agnóstico de stack (siempre instalado) + *stack packs* opcionales (`react`, `mobile`, `pwa`). El core se valida como libre de referencias a producto o backend.
 - **Sync no destructivo:** `AGENTS.md` nunca se sobrescribe; las customizaciones locales se detectan por hash, se reportan como `[Protected]` y exigen `--force`; todo overwrite queda respaldado.
 
