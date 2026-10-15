@@ -1,7 +1,7 @@
 ---
 id: PLAY-010
 title: "Enviar una firma nueva exige un test que falle sin el fix"
-status: ready
+status: done
 created_date: '2026-10-06'
 updated_date: '2026-10-15'
 labels:

@@ -1,7 +1,7 @@
 ---
 id: PLAY-016
 title: "Estado 'blocked' con motivo obligatorio y gate de resolución de dependencias"
-status: ready
+status: done
 created_date: '2026-10-12'
 updated_date: '2026-10-15'
 labels:

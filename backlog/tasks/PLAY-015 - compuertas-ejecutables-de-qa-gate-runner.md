@@ -1,7 +1,7 @@
 ---
 id: PLAY-015
 title: "Compuertas de certificación de QA ejecutables (gate runner) para erradicar la auto-certificación por simulación"
-status: ready
+status: done
 created_date: '2026-10-12'
 updated_date: '2026-10-15'
 labels:

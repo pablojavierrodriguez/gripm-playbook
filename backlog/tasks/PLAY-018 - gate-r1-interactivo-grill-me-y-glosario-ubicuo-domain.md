@@ -1,7 +1,7 @@
 ---
 id: PLAY-018
 title: "Gate de refinamiento R1 interactivo (grill-me) y glosario ubicuo de dominio (DOMAIN.md) para especificaciones sin asunciones"
-status: ready
+status: done
 created_date: '2026-10-12'
 updated_date: '2026-10-15'
 labels:

@@ -1,7 +1,7 @@
 ---
 id: PLAY-017
 title: "Disciplina de ingeniería senior y diff mínimo (ponytail): erradicación de la sobre-ingeniería en Principal Engineer"
-status: ready
+status: done
 created_date: '2026-10-12'
 updated_date: '2026-10-15'
 labels:

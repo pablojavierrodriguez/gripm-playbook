@@ -1,7 +1,7 @@
 ---
 id: PLAY-012
 title: "Aislamiento de agentes concurrentes mediante git worktree para prevenir colisiones de rama y working tree"
-status: ready
+status: done
 created_date: '2026-10-12'
 updated_date: '2026-10-15'
 labels:

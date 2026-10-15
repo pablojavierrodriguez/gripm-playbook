@@ -1,7 +1,7 @@
 ---
 id: PLAY-013
 title: "Reglas deterministas de linter anti-slop (Oxlint/AST) contra vicios de código y comentarios generados por IA"
-status: ready
+status: done
 created_date: '2026-10-12'
 updated_date: '2026-10-15'
 labels:

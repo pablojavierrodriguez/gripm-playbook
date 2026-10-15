@@ -1,7 +1,7 @@
 ---
 id: PLAY-014
 title: "Filtro anti-slop en UI, copy y diseño: Purpose Test y erradicación de clichés estéticos de IA"
-status: ready
+status: done
 created_date: '2026-10-12'
 updated_date: '2026-10-15'
 labels:
