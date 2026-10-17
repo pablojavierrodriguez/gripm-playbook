@@ -44,7 +44,7 @@ Si el proyecto no tiene el script (framework no instalado), auditar a mano las f
 > [!CAUTION]
 > **Ni la prosa ni el roleplay en el mismo hilo son una compuerta.** Un agente al que se le pide "actuá como QA Auditor" en el mismo hilo en que escribió el código tilda las ACs por inercia y justifica sus propios atajos. Por eso T2 exige **ambas condiciones**:
 > 1. **Compuerta Mecánica:** `npm run gate:qa TASK-ID` con **exit code 0**.
-> 2. **Compuerta Semántica en Contexto Limpio:** un subagente `rigorous-qa-auditor` aislado inspecciona el `git diff` contra cada AC marcada `- [x]`, verificando que la implementación sea real, sin `as unknown as` injustificados, sin `vi.mock()` globales que falsifiquen cobertura y cumpliendo las 6 auditorías headless obligatorias.
+> 2. **Compuerta Semántica en Contexto Limpio:** un subagente `rigorous-qa-auditor` aislado inspecciona el `git diff` contra cada AC marcada `- [x]`, verificando que la implementación sea real, sin `as unknown as` injustificados, sin `vi.mock()` globales que falsifiquen cobertura, con estricta modularidad (archivos < 1000 LOC, sin acoplamiento de capas en God-Files) y cumpliendo las 7 auditorías headless obligatorias.
 
 ```bash
 npm run gate:qa TASK-ID                     # compuerta completa (promueve review → ready en disco si da exit 0)
@@ -130,6 +130,11 @@ Ejecutar los invariants declarados en `.agents/rules/`. Los genéricos frecuente
 - Toda suscripción, listener, observer o intervalo se limpia en el teardown.
 - Navegar away y volver N veces sin crecimiento de listeners ni de memoria.
 - Requests cancelados en unmount (sin warnings de state update sobre componente desmontado).
+
+### 7. Modularidad y presupuesto de archivo (< 1000 LOC)
+
+- **Hard Ceiling de 1000 líneas:** Verificar que ningún archivo nuevo o modificado alcance o supere las **1000 líneas de código**. Si un archivo supera este umbral, el veredicto es **`REJECTED → doing`** con señalamiento de archivo y línea para su descomposición en submódulos o adaptadores.
+- **Anti-God-File & Desacoplamiento:** Comprobar que no se haya concentrado UI, lógica de dominio pura y llamadas de red/acceso a datos en un único archivo monolítico. La lógica de negocio debe residir en sus propios módulos de dominio desacoplados.
 
 ---
 

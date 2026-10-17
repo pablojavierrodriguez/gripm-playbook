@@ -21,10 +21,18 @@ Construir software robusto, resiliente y de alto rendimiento que materialice las
 - Prohibido el uso indiscriminado de `any`, `as unknown as` para silenciar el compilador, ni `!` sin justificación.
 - El tipado se deriva de la fuente de verdad del dominio (schema de validación, tipos del cliente de datos, o tipos generados), nunca duplicado a mano.
 
-### 2. Arquitectura y estado
+### 2. Arquitectura, modularidad y estado
 
-- Módulos con una responsabilidad y boundaries explícitos. Nada de "utils" como cajón de sastre.
-- **Inputs controlados:** todo input tiene valor inicial definido (`""` o valor por defecto), nunca `undefined`. Evita transiciones uncontrolled→controlled.
+- **Architecture-First (Diseño previo obligatorio):** Si el proyecto o subsistema carece de arquitectura establecida, o si una tarea introduce un nuevo dominio, entidad o flujo complejo: diseñar y documentar primero los límites (*boundaries*), la descomposición modular y los contratos públicos antes de escribir código. Prohibido programar "a ciegas" apilando lógica sin estructura previa.
+- **Presupuesto estricto de archivo (< 1000 LOC, Hard Ceiling):** Ningún archivo de código fuente (módulo, componente, servicio, controlador, script o clase) puede alcanzar o superar las **1000 líneas de código**. Superar este umbral es un defecto arquitectónico grave que bloquea la certificación. Si un archivo crece hacia las 500 - 800 líneas, es una señal imperativa de descomposición. El rango óptimo de alta cohesión se sitúa entre **150 y 500 líneas**.
+- **Erradicación del Patrón God-File & SPoF:** Prohibido crear o alimentar archivos gigantes que concentren múltiples responsabilidades (UI, llamadas de red, mutaciones de estado, reglas de dominio y utilitarios). Un archivo monolítico se convierte en el único punto de falla (SPoF) de la aplicación, destruye el blast radius, bloquea la concurrencia entre agentes y hace imposible el testing unitario aislado.
+- **Separación estricta de capas:**
+  1. *Capa de Presentación / I/O:* Componentes, vistas, handlers CLI, controladores HTTP (únicamente orquestación de entrada/salida y renderizado).
+  2. *Capa de Dominio / Negocio:* Lógica pura, invariantes, cálculos, validaciones y reglas del negocio (100% aisladas de dependencias de renderizado o persistencia).
+  3. *Capa de Infraestructura / Persistencia:* Clientes de API, bases de datos, sistema de archivos, adaptadores externos.
+  4. *Capa de Estado / Coordinación:* Stores, reducers, hooks o coordinadores de caso de uso.
+- **Módulos con límites y contratos explícitos:** Nada de "utils" como cajón de sastre. Cada módulo expone su interfaz pública y oculta su implementación interna.
+- **Inputs controlados:** todo input tiene valor inicial definido (`""` o valor por defecto), nunca `undefined`. Evita transiciones uncontrolled a controlled.
 - **Estado remoto y caché:** mutaciones optimistas con reversión explícita ante fallo. Nunca dejar la UI mostrando un estado que el servidor rechazó.
 - **Estados de carga explícitos:** `idle` / `loading` / `success` / `error` / `empty`. El estado vacío **no es** estado de error.
 - **Hidratación de estado persistido:** la rehidratación desde almacenamiento local nunca debe destruirse ante un render transitorio de sesión nula. Un `user === null` en cold start no es motivo para borrar lo que el usuario ya tenía.

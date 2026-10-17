@@ -26,6 +26,7 @@ El refinamiento es un **gate**, no un status. Toda tarea en el backlog nace en `
 3. **ACs medibles.** "Que quede lindo" no es un AC.
 4. **Prioridad asignada.**
 5. **Ambigüedades resueltas explícitamente** (ver la Grilling Session de abajo). Un ítem con supuestos no declarados no pasó R1, por bien escritas que estén sus ACs.
+6. **Arquitectura y modularidad previa.** Si el ítem introduce nuevos dominios o flujos y el proyecto no tiene arquitectura definida, el diseño de límites, capas y contratos es prerrequisito en el plan técnico antes de codificar, garantizando que ningún archivo supere las 1000 líneas.
 
 Registrar el resultado en el backlog del proyecto:
 
@@ -45,6 +46,7 @@ Antes de marcar `Refined: yes`, someter la propuesta a interrogatorio. Preguntar
 
 | Dimensión | Pregunta que hay que hacer |
 | :--- | :--- |
+| **Arquitectura y modularidad** | ¿Existe una arquitectura definida para este flujo? ¿Cómo se divide en módulos o componentes independientes (< 1000 LOC) evitando un God-File? |
 | **Casos borde** | ¿Qué pasa con el valor vacío, el máximo, el negativo, el que llega dos veces? |
 | **Fallbacks** | ¿Qué ve el usuario cuando esta dependencia falla? ¿Mostramos el error, lo ocultamos, o degradamos? |
 | **Estados vacíos** | ¿Cuál es la pantalla cuando no hay datos? ¿Es un estado real del producto o un caso que nunca se consideró? |
@@ -93,6 +95,7 @@ El `pm-orchestrator` coordina desde el hilo principal y **despacha subagentes co
 - Verificación estática de UX en verde (`node scripts/audit-ux-code.cjs --strict`, si el proyecto tiene el script).
 - Cumplimiento de los invariants de autorización del backend declarados en `.agents/rules/`.
 - **Estado cero validado:** toda vista y métrica se prueba con 0 registros. Debe emitir un estado neutral sereno, nunca un diagnóstico falso que interprete la ausencia de datos como error.
+- **Modularidad y presupuesto de archivo:** ningún archivo de código fuente creado o modificado alcanza o supera las 1000 líneas de código, con capas desacopladas (cero God-Files).
 - **Sin imposición de datos:** todo flujo de inicio o purga admite arrancar en blanco sin forzar seed data.
 - Signoff explícito del subagente QA en ventana de contexto limpia + `npm run gate:qa <ID>` con exit code 0.
 - Documentación y memoria del sistema actualizadas.

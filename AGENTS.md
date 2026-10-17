@@ -12,7 +12,7 @@
 
 ## General Behavior & Operating Principles
 
-1. **Plan before executing.** Present a clear plan before modifying code or architecture on any non-trivial task. Wait for confirmation.
+1. **Plan before executing.** Present a clear plan before modifying code or architecture on any non-trivial task. Wait for confirmation. Si el proyecto carece de arquitectura establecida para el módulo o subsistema, diseñar límites y contratos antes de codificar.
 2. **Ask when genuinely ambiguous.** Do not guess. If there are multiple viable interpretations, clarify first.
    - **Refinamiento por preguntas, no por asunción.** Un ítem entra a `doing` solo con sus ambigüedades resueltas explícitamente: casos borde, fallbacks, estados vacíos, tradeoffs y alcance negativo, con las respuestas registradas. La desalineación inicial no la detecta QA, porque QA valida contra ACs que nacieron de la premisa equivocada. Detalle en la skill `pm-orchestrator` § Grilling Session.
    - **Glosario de dominio.** Si el proyecto mantiene un `DOMAIN.md`, consultarlo antes de nombrar un concepto del negocio: el término canónico reemplaza al párrafo y evita inventar vocabulario. Plantilla en [`docs/DOMAIN_TEMPLATE.md`](docs/DOMAIN_TEMPLATE.md). Es opt-in; ningún proyecto está obligado a tenerlo.
@@ -69,6 +69,10 @@
   - Minimum interactive tap target of **44×44px**.
   - Visible focus rings for keyboard navigation.
   - No horizontal page overflow on small screens (375px/390px).
+- **Architecture-First & Strict Modularity (Hard Ceiling < 1000 LOC):**
+  - **Architecture Before Implementation:** If the project lacks a defined architecture or a task introduces a new domain or subsystem, establish and document module boundaries, layers, and public contracts before writing code.
+  - **Inviolable 1000-Line Limit:** No single source file (module, component, service, script, or handler) may reach or exceed **1000 lines of code**. Breaching this limit is a blocking architectural defect requiring decomposition into cohesive sub-modules or adapters. Healthy modular range: **150 - 500 lines**.
+  - **Anti-God-File & Layer Separation:** Strictly separate presentation/UI, pure domain logic, infrastructure/persistence, and state management. Never bundle multi-layer logic into a giant file acting as a single point of failure (SPoF).
 
 ---
 

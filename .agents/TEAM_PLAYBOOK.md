@@ -34,7 +34,7 @@ When the host `pm-orchestrator` delegates to a specialist via `invoke_subagent`,
 | :--- | :--- | :--- | :--- |
 | **Market Researcher** | [`.agents/skills/market-researcher/SKILL.md`](skills/market-researcher/SKILL.md) | Problem statement + domain + specific UX/API questions. | `[RESEARCH]` brief: >= 3 product benchmarks, filtered domain edge-case table, and concrete recommendations. |
 | **Product Designer** | [`.agents/skills/worldclass-product-designer/SKILL.md`](skills/worldclass-product-designer/SKILL.md) | Problem statement + ACs + Research brief + project design tokens. | `[DESIGN SPEC]`: semantic tokens, >= 44×44px touch targets, all 7 interactive states, Purpose Test verdicts, and copy veracity check. |
-| **Principal Engineer** | [`.agents/skills/principal-engineer/SKILL.md`](skills/principal-engineer/SKILL.md) | Refined task (`doing`) + ACs + Design Spec + files in scope + `.agents/rules/`. | Implemented code, checked ACs (`- [x]`), green local typecheck/tests, Ponytail honest close (what was not tested + residual risk), task in `review`. |
+| **Principal Engineer** | [`.agents/skills/principal-engineer/SKILL.md`](skills/principal-engineer/SKILL.md) | Refined task (`doing`) + ACs + Design Spec + Architecture boundaries + files in scope + `.agents/rules/`. | Implemented modular code (< 1000 LOC per file, layers decoupled), checked ACs (`- [x]`), green local typecheck/tests, Ponytail honest close (what was not tested + residual risk), task in `review`. |
 | **Rigorous QA Auditor** *(NEVER in the coder's thread)* | [`.agents/skills/rigorous-qa-auditor/SKILL.md`](skills/rigorous-qa-auditor/SKILL.md) & [`.agents/skills/code-level-ux-auditor/SKILL.md`](skills/code-level-ux-auditor/SKILL.md) | **Blind audit payload only:** Task file path (ACs) + `git diff` (or commit range) + command to run `npm run gate:qa <ID>`. Zero developer rationalization history. | `[QA MATRIX]`: mechanical `gate:qa` exit code + blind semantic audit of `git diff` vs. ACs + verdict (`APPROVED -> ready` or `REJECTED -> doing` with file:line findings). |
 
 ### 🟢 When to Parallelize (Sub-Agents / Background Tasks):
@@ -121,7 +121,7 @@ Transitions, actors and guards are specified in [STATE_MACHINE.md](STATE_MACHINE
 
 ### Phase 1: Briefing & Alignment (PM Orchestrator / PO)
 - **Input:** Backlog item or user requirement.
-- **Action:** Initializes task or sprint spec using `docs/sprints/SPRINT_SPEC_TEMPLATE.md`. Refines the item until it passes the **refinement gate (R1)**: problem statement, scoped in/out, measurable ACs and priority.
+- **Action:** Initializes task or sprint spec using `docs/sprints/SPRINT_SPEC_TEMPLATE.md`. Refines the item until it passes the **refinement gate (R1)**: problem statement, scoped in/out, measurable ACs, priority, and architecture readiness (boundaries and contracts established if none exist).
 - **Output:** Clear problem statement, target personas, and measurable acceptance criteria (ACs).
 
 ### Phase 2: Benchmarking & Experience Design (Researcher + Designer)
@@ -129,7 +129,7 @@ Transitions, actors and guards are specified in [STATE_MACHINE.md](STATE_MACHINE
 - **Output:** Populates design spec, interactive states, and edge-case handling.
 
 ### Phase 3: Dev Execution (`doing` ➔ `review`) (Principal Engineer)
-- **Action:** Implements modular, strictly typed code adhering to domain invariants. Claims the item by moving it `(pool)` ➔ `doing` - only after the refinement gate passed.
+- **Action:** Implements modular, strictly typed code adhering to domain invariants. **Architecture-First:** establishes module boundaries and public contracts before coding if undefined. **Strict Modularity:** enforces hard ceiling of < 1000 LOC per file (target 150 - 500 LOC) and separates presentation, business logic, and infrastructure (zero God-Files). Claims the item by moving it `(pool)` ➔ `doing` - only after the refinement gate passed.
 - **Ticking ACs:** Checks off acceptance criteria in real-time (`- [x]`).
 - **Output:** Passes the item to `status: review` upon completing implementation and local testing. **Cannot self-certify:** moving to `ready` is exclusive to the QA Auditor.
 
@@ -141,7 +141,7 @@ Transitions, actors and guards are specified in [STATE_MACHINE.md](STATE_MACHINE
   3. ✅ Backlog & spec consistency checks
   4. ✅ Production build (`npm run build`)
   5. ✅ `node scripts/audit-ux-code.cjs --strict` (static UX audit, headless)
-- **Blind Semantic Diff Audit:** Beyond mechanical checks, the clean-context QA sub-agent verifies that every checked AC (`- [x]`) is genuinely implemented in the `git diff`, with no module-wide `vi.mock()` evasions, no `as unknown as` type escapes, and all 6 mandatory headless audits satisfied.
+- **Blind Semantic Diff Audit:** Beyond mechanical checks, the clean-context QA sub-agent verifies that every checked AC (`- [x]`) is genuinely implemented in the `git diff`, with no module-wide `vi.mock()` evasions, no `as unknown as` type escapes, strict modularity (zero files >= 1000 LOC, zero God-Files bundling multi-layer logic), and all mandatory headless audits satisfied.
 - **Anti-Browser-Subagent Inefficiency:** Prohibited to invoke `browser_subagent` for logic, state, API contracts, or persistence that can be audited in milliseconds headlessly. Reserved strictly for static-undeducible CSS/layout issues or explicit user prompt.
 - **Output:** Once both `npm run gate:qa <ID>` (`exit 0`) and the blind diff audit pass, moves the item to `status: ready`. On failure, records actionable findings (`file:line`) and moves it back to `doing` (transition T3).
 - **`ready` is the formal delivery of development**: the item is validated and immediately eligible for packaging and deployment. A certified item is frozen: any post-QA code change invalidates the certification and requires a return to `doing`.

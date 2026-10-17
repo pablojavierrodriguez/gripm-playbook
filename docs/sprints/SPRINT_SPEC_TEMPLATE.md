@@ -32,6 +32,7 @@
 - [ ] ACs medibles
 - [ ] Prioridad asignada por el PO
 - [ ] Ambigüedades resueltas y registradas (Grilling Session completada)
+- [ ] Arquitectura y límites modulares validados (< 1000 LOC por archivo)
 
 ---
 
@@ -65,6 +66,7 @@
 ## 3. ⚙️ [TECH ARCHITECTURE] Implementation & Robustness - Principal Engineer
 > Modularidad, hooks, tipado estricto e integridad de esquema.
 
+- **Architecture & Boundaries (Architecture-First, < 1000 LOC):**
 - **Files Created / Modified:**
 - **Typing & Validation:**
 - **Performance (frame budget, memory leaks):**
