@@ -69,6 +69,19 @@ const SKIP_DIRS = new Set([
 ]);
 const SKIP_FILE_PATTERN = /(\.test\.|\.spec\.|\.stories\.|\.d\.ts$|^\.env)/;
 
+const isColorSupported =
+  !('NO_COLOR' in process.env) &&
+  (process.env.FORCE_COLOR === '1' || (process.stdout?.isTTY && process.env.TERM !== 'dumb'));
+
+const c = {
+  bold: (s) => (isColorSupported ? `\x1b[1m${s}\x1b[22m` : s),
+  dim: (s) => (isColorSupported ? `\x1b[2m${s}\x1b[22m` : s),
+  cyan: (s) => (isColorSupported ? `\x1b[36m${s}\x1b[39m` : s),
+  green: (s) => (isColorSupported ? `\x1b[32m${s}\x1b[39m` : s),
+  yellow: (s) => (isColorSupported ? `\x1b[33m${s}\x1b[39m` : s),
+  red: (s) => (isColorSupported ? `\x1b[31m${s}\x1b[39m` : s),
+};
+
 const OUTPUT_FORMAT = process.argv.includes('--format')
   ? process.argv[process.argv.indexOf('--format') + 1]
   : 'human';
@@ -77,7 +90,7 @@ function fatal(message) {
   if (OUTPUT_FORMAT === 'json') {
     console.log(JSON.stringify({ error: message, findings: [] }, null, 2));
   } else {
-    console.error(`\n❌ audit-ux: ${message}\n`);
+    console.error(`\n  ${c.red('✖')} audit-ux: ${message}\n`);
   }
   process.exit(2);
 }
@@ -916,37 +929,31 @@ function printHuman(report, opts) {
   const { findings, summary, srcDir, rulesVersion } = report;
 
   if (!opts.quiet) {
-    console.log('');
-    console.log('=====================================================');
-    console.log('Static UX & Mobile Ergonomics Auditor');
-    console.log(`rules v${rulesVersion}  ·  ${summary.total} finding(s)  ·  ${srcDir}`);
-    console.log('=====================================================');
-    console.log('');
+    console.log(`\n  ${c.bold('gripm')} ${c.dim('·')} Static UX & Mobile Ergonomics Auditor`);
+    console.log(`  ${c.dim(`rules v${rulesVersion}  ·  ${summary.total} finding(s)  ·  ${srcDir}`)}\n`);
   }
 
   if (findings.length === 0) {
     if (!opts.quiet) {
-      console.log('✅ No static UX anti-patterns detected.');
-      console.log('');
+      console.log(`  ${c.green('✔')} No static UX anti-patterns detected.\n`);
     }
     return;
   }
 
-  const icons = { ERROR: '❌', WARNING: '⚠️ ', INFO: 'ℹ️ ' };
+  const icons = {
+    ERROR: c.red('✖'),
+    WARNING: c.yellow('▲'),
+    INFO: c.dim('ℹ'),
+  };
 
   for (const finding of findings) {
-    console.log(`${icons[finding.severity]} [${finding.rule}] ${finding.file}:${finding.line}`);
-    console.log(`   ${finding.message}`);
-    if (finding.fix) console.log(`   fix: ${finding.fix}`);
+    console.log(`  ${icons[finding.severity]} [${c.bold(finding.rule)}] ${finding.file}:${finding.line}`);
+    console.log(`    ${finding.message}`);
+    if (finding.fix) console.log(`    ${c.dim('fix:')} ${finding.fix}`);
     console.log('');
   }
 
-  console.log('=====================================================');
-  console.log(
-    `Summary: ${summary.ERROR} error(s), ${summary.WARNING} warning(s), ${summary.INFO} suggestion(s).`,
-  );
-  console.log('=====================================================');
-  console.log('');
+  console.log(`  ${c.bold('Summary:')} ${summary.ERROR} error(s), ${summary.WARNING} warning(s), ${summary.INFO} suggestion(s).\n`);
 }
 
 function printJson(report) {
@@ -980,7 +987,7 @@ function loadBaseline(root = ROOT) {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (parsed.version !== BASELINE_VERSION) {
       console.warn(
-        `⚠️  Baseline is v${parsed.version}, this auditor expects v${BASELINE_VERSION}. ` +
+        `  ${c.yellow('▲')} Baseline is v${parsed.version}, this auditor expects v${BASELINE_VERSION}. ` +
         `Regenerate it with: npm run audit:ux -- --update-baseline`,
       );
       return { version: BASELINE_VERSION, entries: {} };
@@ -1095,10 +1102,8 @@ function main() {
     if (opts.format === 'json') {
       printJson({ rulesVersion: catalog.version, srcDir: null, summary: { total: 0, ERROR: 0, WARNING: 0, INFO: 0 }, findings: [] });
     } else if (!opts.quiet) {
-      console.log('');
-      console.log('ℹ️  No JavaScript/TypeScript source directory found (looked for src, app, frontend, web, client).');
-      console.log('   Nothing to audit. Pass --src <dir> to point the auditor somewhere else.');
-      console.log('');
+      console.log(`  ${c.dim('ℹ')} No JavaScript/TypeScript source directory found (looked for src, app, frontend, web, client).`);
+      console.log(`    ${c.dim('Nothing to audit. Pass --src <dir> to point the auditor somewhere else.')}\n`);
     }
     return;
   }
@@ -1144,10 +1149,8 @@ function main() {
         findings: [],
       });
     } else if (!opts.quiet) {
-      console.log('');
-      console.log(`✅ Baseline written: ${BASELINE_NAME} (${total} observation(s), ${Object.keys(entries).length} unique signature(s)).`);
-      console.log('   Run `npm run audit:ux` again to see only what is new.');
-      console.log('');
+      console.log(`\n  ${c.green('✔')} Baseline written: ${BASELINE_NAME} (${total} observation(s), ${Object.keys(entries).length} unique signature(s)).`);
+      console.log(`    ${c.dim('Run `npm run audit:ux` again to see only what is new.')}\n`);
     }
     return;
   }
@@ -1170,21 +1173,19 @@ function main() {
   else {
     printHuman(report, opts);
     if (absorbed > 0 && !opts.quiet) {
-      console.log(`ℹ️  ${absorbed} observation(s) matched the accepted baseline in ${BASELINE_NAME}.`);
-      console.log('');
+      console.log(`  ${c.dim('ℹ')} ${absorbed} observation(s) matched the accepted baseline in ${BASELINE_NAME}.\n`);
     }
   }
 
   if (opts.format !== 'json' && !opts.quiet && unreadable.length) {
-    console.log(`⚠️  ${unreadable.length} directory(ies) could not be read and were skipped.`);
-    console.log('');
+    console.log(`  ${c.yellow('▲')} ${unreadable.length} directory(ies) could not be read and were skipped.\n`);
   }
 
   const blocked = finalSummary.ERROR > 0 || (opts.strict && finalSummary.WARNING > 0);
   if (blocked) {
     if (opts.format === 'json') process.exitCode = 1;
     else {
-      console.error(`⛔ audit-ux failed: ${finalSummary.ERROR} error(s)${opts.strict ? `, ${finalSummary.WARNING} warning(s)` : ''}.`);
+      console.error(`  ${c.red('✖')} audit-ux failed: ${finalSummary.ERROR} error(s)${opts.strict ? `, ${finalSummary.WARNING} warning(s)` : ''}.\n`);
       process.exitCode = 1;
     }
   }

@@ -289,45 +289,47 @@ export function inspectTask(task, tasks) {
   return failures;
 }
 
-// --- unblock transition (PLAY-016 AC #4) -------------------------------------
+const isColorSupported =
+  !('NO_COLOR' in process.env) &&
+  (process.env.FORCE_COLOR === '1' || (process.stdout?.isTTY && process.env.TERM !== 'dumb'));
 
-/**
- * Evaluates the T_unblock guard for a specific task: may a `blocked` item move
- * back to `doing`/`draft`?
- *
- * This exists as its own command because the T2 gate only ever inspects `review`
- * items. Without a separate entry point the unblock rule would be a message
- * appended to an already-failing list - present in code, absent in effect.
- */
+const c = {
+  bold: (s) => (isColorSupported ? `\x1b[1m${s}\x1b[22m` : s),
+  dim: (s) => (isColorSupported ? `\x1b[2m${s}\x1b[22m` : s),
+  cyan: (s) => (isColorSupported ? `\x1b[36m${s}\x1b[39m` : s),
+  green: (s) => (isColorSupported ? `\x1b[32m${s}\x1b[39m` : s),
+  yellow: (s) => (isColorSupported ? `\x1b[33m${s}\x1b[39m` : s),
+  red: (s) => (isColorSupported ? `\x1b[31m${s}\x1b[39m` : s),
+};
+
+function printHeader(title) {
+  console.log(`\n  ${c.bold('gripm')} ${c.dim('·')} ${title}\n`);
+}
+
 export function unblockMain(argv) {
   const target = argv.find((arg) => !arg.startsWith('--'));
   if (!target) {
     printHeader('QA Gate · unblock');
-    console.log('usage: node scripts/gate-qa.mjs unblock <TASK-ID | path/to/task.md>');
-    console.log('');
+    console.log('usage: node scripts/gate-qa.mjs unblock <TASK-ID | path/to/task.md>\n');
     process.exit(2);
   }
 
   printHeader('QA Gate · unblock (T_unblock)');
-  console.log('');
 
   const taskPath = resolveTaskPath(target);
   if (!taskPath) {
-    console.log(`❌ no task found for "${target}" in backlog/tasks/`);
-    console.log('');
+    console.log(`  ${c.red('✖')} no task found for "${target}" in backlog/tasks/\n`);
     process.exit(1);
   }
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  console.log(`task:    ${path.relative(ROOT, taskPath)}`);
-  console.log(`id:      ${frontmatter?.id ?? '(unreadable)'}`);
-  console.log(`status:  ${frontmatter?.status ?? '(missing)'}`);
-  console.log('');
+  console.log(`  ${c.dim('➜')} Task:    ${path.relative(ROOT, taskPath)}`);
+  console.log(`    ID:      ${c.bold(frontmatter?.id ?? '(unreadable)')}`);
+  console.log(`    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
 
   if (frontmatter?.status !== 'blocked') {
-    console.log(`ℹ️  this item is "${frontmatter?.status ?? '(missing)'}", not "blocked"; T_unblock does not apply.`);
-    console.log('');
+    console.log(`  ${c.dim('ℹ')} this item is "${frontmatter?.status ?? '(missing)'}", not "blocked"; T_unblock does not apply.\n`);
     process.exit(0);
   }
 
@@ -339,23 +341,15 @@ export function unblockMain(argv) {
   }
 
   if (blockers.length) {
-    console.log('--- T_unblock guard ---');
-    for (const blocker of blockers) console.log(`  ❌ ${blocker}`);
-    console.log('');
-    console.log('-----------------------------------------------------');
-    console.log('❌ UNBLOCK REFUSED - this item must stay blocked.');
-    console.log('-----------------------------------------------------');
-    console.log('');
+    console.log(`  ${c.bold('T_unblock guard:')}`);
+    for (const blocker of blockers) console.log(`    ${c.red('✖')} ${blocker}`);
+    console.log(`\n  ${c.red('✖')} UNBLOCK REFUSED - this item must stay blocked.\n`);
     process.exit(1);
   }
 
-  console.log('--- T_unblock guard ---');
-  console.log('  ✅ every dependency is done or unlinked');
-  console.log('');
-  console.log('-----------------------------------------------------');
-  console.log(`✅ UNBLOCK ALLOWED - ${frontmatter.id} may move blocked → doing.`);
-  console.log('-----------------------------------------------------');
-  console.log('');
+  console.log(`  ${c.bold('T_unblock guard:')}`);
+  console.log(`    ${c.green('✔')} every dependency is done or unlinked`);
+  console.log(`\n  ${c.green('✔')} UNBLOCK ALLOWED - ${frontmatter.id} may move blocked → doing.\n`);
   process.exit(0);
 }
 
@@ -430,43 +424,31 @@ function runStep(step, root) {
 
 // --- reporting ---------------------------------------------------------------
 
-function printHeader(title) {
-  console.log('');
-  console.log('=====================================================');
-  console.log(title);
-  console.log('=====================================================');
-}
-
 export function main(argv) {
   const target = argv.find((arg) => !arg.startsWith('--'));
   if (!target) {
     printHeader('QA Gate');
-    console.log('usage: node scripts/gate-qa.mjs <TASK-ID | path/to/task.md> [--no-run]');
-    console.log('');
+    console.log('usage: node scripts/gate-qa.mjs <TASK-ID | path/to/task.md> [--no-run]\n');
     console.log('  default     runs the pyramid and certifies (exit 0 = may promote)');
-    console.log('  --no-run    inspection only, exits 2: never certifies');
-    console.log('');
+    console.log('  --no-run    inspection only, exits 2: never certifies\n');
     process.exit(2);
   }
 
   const runPyramid = !argv.includes('--no-run');
 
   printHeader('QA Gate');
-  console.log('');
 
   const taskPath = resolveTaskPath(target);
   if (!taskPath) {
-    console.log(`❌ no task found for "${target}" in backlog/tasks/`);
-    console.log('');
+    console.log(`  ${c.red('✖')} no task found for "${target}" in backlog/tasks/\n`);
     process.exit(1);
   }
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  console.log(`task:    ${path.relative(ROOT, taskPath)}`);
-  console.log(`id:      ${frontmatter?.id ?? '(unreadable)'}`);
-  console.log(`status:  ${frontmatter?.status ?? '(missing)'}`);
-  console.log('');
+  console.log(`  ${c.dim('➜')} Task:    ${path.relative(ROOT, taskPath)}`);
+  console.log(`    ID:      ${c.bold(frontmatter?.id ?? '(unreadable)')}`);
+  console.log(`    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
 
   const { tasks, collisions } = loadTasks();
   const failures = inspectTask({ content, frontmatter }, tasks);
@@ -477,11 +459,11 @@ export function main(argv) {
     failures.push(`task id "${collision.id}" is declared by two files: ${collision.files.join(' and ')}. Task identity must be unique`);
   }
 
-  console.log('--- task inspection ---');
+  console.log(`  ${c.bold('Task inspection:')}`);
   if (failures.length) {
-    for (const failure of failures) console.log(`  ❌ ${failure}`);
+    for (const failure of failures) console.log(`    ${c.red('✖')} ${failure}`);
   } else {
-    console.log('  ✅ acceptance criteria complete, status and dependencies are valid');
+    console.log(`    ${c.green('✔')} acceptance criteria complete, status and dependencies are valid`);
   }
   console.log('');
 
@@ -490,22 +472,22 @@ export function main(argv) {
 
   if (runPyramid) {
     const steps = resolvePyramid();
-    console.log('--- verification pyramid ---');
+    console.log(`  ${c.bold('Verification pyramid:')}`);
     for (const step of steps) {
       const outcome = runStep(step, ROOT);
       if (outcome.state === 'skipped') {
-        console.log(`  - ${step.label}: SKIPPED (${outcome.detail})`);
+        console.log(`    ${c.dim('•')} ${step.label}: SKIPPED (${outcome.detail})`);
         continue;
       }
       pyramidRan += 1;
       if (outcome.state === 'passed') {
-        console.log(`  ✅ ${step.label}`);
+        console.log(`    ${c.green('✔')} ${step.label}`);
       } else {
         pyramidFailed = true;
-        console.log(`  ❌ ${step.label}: ${outcome.detail}`);
+        console.log(`    ${c.red('✖')} ${step.label}: ${outcome.detail}`);
       }
     }
-    if (!pyramidRan) console.log('  - nothing to run: the project defines no verification scripts.');
+    if (!pyramidRan) console.log(`    ${c.dim('•')} nothing to run: the project defines no verification scripts.`);
     console.log('');
   }
 
@@ -515,27 +497,21 @@ export function main(argv) {
   const nothingVerified = runPyramid && pyramidRan === 0;
   const ok = failures.length === 0 && !pyramidFailed && !nothingVerified;
 
-  console.log('-----------------------------------------------------');
   if (ok && !runPyramid) {
-    console.log(`✅ TASK INSPECTION PASSED - ${frontmatter.id} satisfies the task checks.`);
-    console.log('   NOT a certification: the pyramid did not run. Re-run without --no-run.');
-    console.log('-----------------------------------------------------');
-    console.log('');
+    console.log(`  ${c.yellow('▲')} TASK INSPECTION PASSED - ${frontmatter.id} satisfies the task checks.`);
+    console.log(`    ${c.dim('NOT a certification: the pyramid did not run. Re-run without --no-run.')}\n`);
     process.exit(2);
   }
 
   if (ok) {
-    console.log(`✅ GATE PASSED - ${frontmatter.id} may be promoted review → ready.`);
-    console.log('-----------------------------------------------------');
-    console.log('');
+    console.log(`  ${c.green('✔')} GATE PASSED - ${frontmatter.id} may be promoted review → ready.\n`);
     process.exit(0);
   }
 
-  console.log('❌ GATE FAILED - promotion to "ready" has no effect.');
+  console.log(`  ${c.red('✖')} GATE FAILED - promotion to "ready" has no effect.`);
   if (nothingVerified) {
-    console.log('   No verification step could run, so the gate cannot certify anything.');
+    console.log(`    ${c.dim('No verification step could run, so the gate cannot certify anything.')}`);
   }
-  console.log('-----------------------------------------------------');
   console.log('');
   process.exit(1);
 }

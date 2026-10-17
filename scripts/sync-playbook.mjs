@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Agentic Team Playbook Synchronizer
+ * Gripm Playbook Synchronizer
  *
  * Installs or updates the canonical framework layer (rules, core skills, tooling)
  * into any project, without touching the project layer (AGENTS.md, backlog, code).
  *
  * Architecture principle: Separation of Layers
- *   - Framework layer (synced):   .agents/**, scripts/**, docs/sprints/**
- *   - Project layer (preserved):  AGENTS.md, docs/BACKLOG.md, application code
+ * - Framework layer (synced):   .agents/**, scripts/**, docs/sprints/**
+ * - Project layer (preserved):  AGENTS.md, docs/BACKLOG.md, application code
  *
  * Safety principles
  *   1. Reproducible: syncs from a pinned git ref, not from a moving branch.
@@ -101,6 +101,16 @@ export const FALLBACK_STACKS = {
 // infra
 // ---------------------------------------------------------------------------
 
+const isColorSupported = !process.env.NO_COLOR && (Boolean(process.stdout.isTTY) || Boolean(process.env.FORCE_COLOR));
+const c = {
+  bold: (s) => (isColorSupported ? `\x1b[1m${s}\x1b[0m` : s),
+  dim: (s) => (isColorSupported ? `\x1b[2m${s}\x1b[0m` : s),
+  green: (s) => (isColorSupported ? `\x1b[32m${s}\x1b[0m` : s),
+  cyan: (s) => (isColorSupported ? `\x1b[36m${s}\x1b[0m` : s),
+  yellow: (s) => (isColorSupported ? `\x1b[33m${s}\x1b[0m` : s),
+  red: (s) => (isColorSupported ? `\x1b[31m${s}\x1b[0m` : s),
+};
+
 const sha256 = (content) => crypto.createHash('sha256').update(content).digest('hex');
 
 async function fetchText(url, { retries = FETCH_RETRIES } = {}) {
@@ -184,7 +194,8 @@ function planFiles(manifest, stacks) {
       unknown.push(name);
       continue;
     }
-    files.push(...pack);
+    const packFiles = Array.isArray(pack) ? pack : (pack?.files ?? []);
+    files.push(...packFiles);
   }
 
   return { files, stackSource, unknown };
@@ -195,22 +206,16 @@ function planFiles(manifest, stacks) {
 // ---------------------------------------------------------------------------
 
 function printBanner(targetRepo, remote, ref, pinned, stacks) {
-  const rows = [
-    ['Target', path.resolve(targetRepo)],
-    ['Upstream', `${remote}@${ref}${pinned ? '' : ' (unpinned)'}`],
-    ['Stack packs', stacks.length ? stacks.join(', ') : '(core only)'],
-  ];
-  const width = Math.max(28, ...rows.map(([k, v]) => `${k}: ${v}`.length)) + 2;
+  const upstreamDisplay = `${remote}@${ref}${pinned ? '' : ' (unpinned)'}`;
+  const stackDisplay = stacks.length ? stacks.join(', ') : '(core only)';
 
-  console.log('');
-  console.log('┌' + '─'.repeat(width + 2) + '┐');
-  console.log('│  ⚡ Agentic Team Playbook Sync'.padEnd(width + 3) + '│');
-  for (const [key, value] of rows) {
-    const line = `  ${key}: ${value}`;
-    console.log('│' + line.padEnd(width + 3) + '│');
-  }
-  console.log('└' + '─'.repeat(width + 2) + '┘');
-  console.log('');
+  console.log(`
+  ${c.bold('gripm')} ${c.dim('· Playbook Sync')}
+
+  ${c.dim('➜')}  ${c.dim('Target:')}       ${path.resolve(targetRepo)}
+  ${c.dim('➜')}  ${c.dim('Upstream:')}     ${c.cyan(upstreamDisplay)}
+  ${c.dim('➜')}  ${c.dim('Stack packs:')}  ${stackDisplay}
+`);
 }
 
 function readLock(targetRepo) {
@@ -237,8 +242,8 @@ function readLock(targetRepo) {
 // "Is this local file an older published version, or did a human edit it?"
 //
 // Answering that requires provenance, not just a hash comparison against the
-// current ref. When a project has no lockfile yet — the first sync after
-// installing the framework by hand — every file that differs from upstream
+// current ref. When a project has no lockfile yet - the first sync after
+// installing the framework by hand - every file that differs from upstream
 // looks identical: a v1 skill that nobody touched and a skill someone heavily
 // edited both raise the same flag.
 //
@@ -380,14 +385,13 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
 
   const manifest = await loadManifest(remote, ref, localSourceDir);
   if (!manifest) {
-    console.log('⚠️  Could not read the remote manifest; falling back to the built-in core list.');
-    console.log('');
+    console.log(`  ${c.yellow('▲')}  ${c.yellow('Could not read the remote manifest; falling back to the built-in core list.')}\n`);
   }
 
   const { files, stackSource, unknown } = planFiles(manifest, stacks);
 
   for (const name of unknown) {
-    console.error(`❌ Unknown stack pack "${name}". Available: ${Object.keys(stackSource).join(', ')}`);
+    console.error(`  ${c.red('✖')}  ${c.red(`Unknown stack pack "${name}". Available: ${Object.keys(stackSource).join(', ')}`)}`);
   }
   if (unknown.length) process.exitCode = 1;
 
@@ -411,13 +415,13 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
     try {
       remoteContent = await fetchRemoteFile(remote, ref, relativePath, localSourceDir);
     } catch (err) {
-      console.error(`  ❌ [Error]      ${relativePath}: ${err.message}`);
+      console.error(`  ${c.red('✖')} ${c.red('error'.padEnd(10))} ${relativePath}: ${err.message}`);
       stats.missingUpstream += 1;
       continue;
     }
 
     if (remoteContent === null) {
-      console.error(`  ⚠️  [Upstream]   ${relativePath} not found at ${ref}`);
+      console.error(`  ${c.yellow('▲')} ${c.yellow('upstream'.padEnd(10))} ${relativePath} not found at ${ref}`);
       stats.missingUpstream += 1;
       continue;
     }
@@ -431,7 +435,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
         fs.mkdirSync(path.dirname(targetFile), { recursive: true });
         fs.writeFileSync(targetFile, remoteContent, 'utf8');
       }
-      console.log(`  ✨ [Created]     ${relativePath}`);
+      console.log(`  ${c.green('✔')} ${c.green('created'.padEnd(10))} ${relativePath}`);
       stats.created += 1;
       nextLockFiles[relativePath] = remoteHash;
       continue;
@@ -441,7 +445,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
     const localHash = sha256(localContent);
 
     if (localHash === remoteHash) {
-      console.log(`  ➖ [Unchanged]   ${relativePath}`);
+      console.log(`  ${c.dim('•')} ${c.dim('unchanged'.padEnd(10))} ${relativePath}`);
       stats.unchanged += 1;
       nextLockFiles[relativePath] = localHash;
       continue;
@@ -461,7 +465,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
     if (adopt && classification !== 'managed' && !force) {
       nextLockFiles[relativePath] = localHash;
       nextCustomizations.delete(relativePath);
-      console.log(`  🧩 [Adopted]      ${relativePath} (local content recorded as the baseline)`);
+      console.log(`  ${c.cyan('✔')} ${c.cyan('adopted'.padEnd(10))} ${relativePath} ${c.dim('(local content recorded as the baseline)')}`);
       stats.adopted += 1;
       continue;
     }
@@ -490,7 +494,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
         : provenance && provenance.status === 'custom'
           ? 'no published revision matches'
           : 'local edits';
-      console.log(`  🛡️  [Protected]   ${relativePath} (${detail} — tracked as a customization)`);
+      console.log(`  ${c.yellow('▲')} ${c.yellow('protected'.padEnd(10))} ${relativePath} ${c.dim(`(${detail} - tracked as a customization)`)}`);
       stats.protected += 1;
       continue;
     }
@@ -501,7 +505,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
         protectedFiles.push(relativePath);
         nextCustomizations.add(relativePath);
         nextLockFiles[relativePath] = localHash;
-        console.log(`  🛡️  [Protected]   ${relativePath} (skipped by user)`);
+        console.log(`  ${c.yellow('▲')} ${c.yellow('protected'.padEnd(10))} ${relativePath} ${c.dim('(skipped by user)')}`);
         stats.protected += 1;
         continue;
       }
@@ -521,7 +525,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
       ? ' (recognized as an older canonical revision)'
       : classification === 'customization' ? ' (local edits backed up)' : '';
 
-    console.log(`  🔄 [Updated]     ${relativePath}${note}`);
+    console.log(`  ${c.cyan('✔')} ${c.cyan('updated'.padEnd(10))} ${relativePath}${note ? c.dim(note) : ''}`);
     stats.updated += 1;
     nextLockFiles[relativePath] = remoteHash;
   }
@@ -529,20 +533,20 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
   // --- Project layer: AGENTS.md is never overwritten -----------------------
   const agentsMdPath = path.join(targetRepo, 'AGENTS.md');
   if (fs.existsSync(agentsMdPath)) {
-    console.log('  🛡️  [Preserved]   AGENTS.md (project-specific config left untouched)');
+    console.log(`  ${c.dim('•')} ${c.dim('preserved'.padEnd(10))} AGENTS.md ${c.dim('(project-specific config left untouched)')}`);
   } else if (options.initAgents) {
     try {
       const template = await fetchRemoteFile(remote, ref, 'AGENTS.md', localSourceDir);
       if (template && !isDryRun) {
         fs.writeFileSync(agentsMdPath, template, 'utf8');
-        console.log('  ✨ [Created]     AGENTS.md (base template — customise it with your stack)');
+        console.log(`  ${c.green('✔')} ${c.green('created'.padEnd(10))} AGENTS.md ${c.dim('(base template - customize it with your stack)')}`);
         stats.created += 1;
       }
     } catch {
-      console.error('  ⚠️  Could not fetch the AGENTS.md template.');
+      console.error(`  ${c.yellow('▲')}  ${c.yellow('Could not fetch the AGENTS.md template.')}`);
     }
   } else {
-    console.log('  ℹ️  [Skipped]     AGENTS.md not found and --init-agents was not passed.');
+    console.log(`  ${c.dim('ℹ')} ${c.dim('skipped'.padEnd(10))} AGENTS.md not found and --init-agents was not passed.`);
   }
 
   // --- Lockfile ------------------------------------------------------------
@@ -558,75 +562,75 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
       customizations: [...nextCustomizations].sort(),
     };
     fs.writeFileSync(path.join(targetRepo, LOCK_PATH), `${JSON.stringify(lockPayload, null, 2)}\n`, 'utf8');
-    console.log(`  🔏 [Lockfile]    ${LOCK_PATH} (${Object.keys(nextLockFiles).length} files, ${nextCustomizations.size} customizations)`);
+    console.log(`  ${c.green('✔')} ${c.green('lockfile'.padEnd(10))} ${LOCK_PATH} ${c.dim(`(${Object.keys(nextLockFiles).length} files, ${nextCustomizations.size} customizations)`)}`);
   }
 
   const orphans = isDryRun ? [] : findOrphanedFiles(targetRepo, files, lock.files);
 
-  console.log('');
-  console.log('📊 Summary');
-  console.log(`   created:   ${stats.created}`);
-  console.log(`   updated:   ${stats.updated}`);
-  console.log(`   unchanged: ${stats.unchanged}`);
-  if (stats.adopted) console.log(`   adopted:   ${stats.adopted}`);
+  console.log(`
+  ${c.bold('Summary')}
+    ${c.dim('created:')}    ${stats.created}
+    ${c.dim('updated:')}    ${stats.updated}
+    ${c.dim('unchanged:')}  ${stats.unchanged}`);
+  if (stats.adopted) console.log(`    ${c.dim('adopted:')}    ${stats.adopted}`);
   if (stats.recognizedCanonical) {
-    console.log(`   canonical: ${stats.recognizedCanonical}  (older revision recognized, updated forward)`);
+    console.log(`    ${c.dim('canonical:')}  ${stats.recognizedCanonical} ${c.dim('(older revision recognized, updated forward)')}`);
   }
-  console.log(`   protected: ${stats.protected}  (local modifications kept)`);
-  if (stats.missingUpstream) console.log(`   missing:   ${stats.missingUpstream}  (not found upstream at ${ref})`);
+  console.log(`    ${c.dim('protected:')}  ${stats.protected ? c.yellow(stats.protected) : 0}${stats.protected ? c.dim(' (local modifications kept)') : ''}`);
+  if (stats.missingUpstream) console.log(`    ${c.dim('missing:')}    ${c.yellow(stats.missingUpstream)} ${c.dim(`(not found upstream at ${ref})`)}`);
   if (budget.remaining < HISTORY_BUDGET) {
-    console.log(`   note:      provenance lookups used ${HISTORY_BUDGET - budget.remaining}/${HISTORY_BUDGET} requests`);
+    console.log(`    ${c.dim('note:')}       ${c.dim(`provenance lookups used ${HISTORY_BUDGET - budget.remaining}/${HISTORY_BUDGET} requests`)}`);
   }
 
   if (protectedFiles.length) {
-    console.log('');
-    console.log('   Files a human owns. They are recorded in the lockfile and will');
-    console.log('   keep being protected on every future sync:');
-    for (const file of protectedFiles) console.log(`     - ${file}`);
-    console.log('   Re-run with --force to replace them, or --adopt to accept them as');
-    console.log('   the baseline you want to keep updating from.');
+    console.log(`
+  ${c.dim('Files with local changes (protected in .playbook-lock.json):')}
+${protectedFiles.map((file) => `    ${c.yellow('•')} ${file}`).join('\n')}
+
+  ${c.dim('Re-run with --force to replace them, or --adopt to accept them as')}
+  ${c.dim('the baseline you want to keep updating from.')}`);
   }
 
   if (orphans.length) {
-    console.log('');
-    console.log('   ⚠️  Framework files no longer part of the install plan (a previous');
-    console.log('      version may have moved them). Nothing was deleted:');
-    for (const file of orphans) console.log(`     - ${file}`);
-    console.log('   Review and remove them manually if they are obsolete.');
+    console.log(`
+  ${c.yellow('▲')}  ${c.yellow('Framework files no longer part of the install plan (a previous')}
+  ${c.yellow('   version may have moved them). Nothing was deleted:')}
+${orphans.map((file) => `    ${c.dim('•')} ${file}`).join('\n')}
+  ${c.dim('Review and remove them manually if they are obsolete.')}`);
   }
 
-  if (protectedFiles.length || orphans.length) {
+  if (orphans.length || (!isDryRun && protectedFiles.length)) {
     process.exitCode = 1;
   } else if (stats.missingUpstream) {
-    console.log('');
-    console.log('⚠️  Completed with warnings.');
+    console.log(`\n  ${c.yellow('▲')}  Completed with warnings.\n`);
     process.exitCode = 1;
   } else {
-    console.log('');
-    console.log(`✅ Project now carries the canonical framework layer (${ref}).`);
+    console.log(`\n  ${c.green('✔')}  ${c.green('Project now carries the canonical framework layer')} ${c.dim(`(${ref})`)}.\n`);
   }
-  console.log('');
 
   return { ...stats, protectedFiles, orphans, ref, manifestFound: !!manifest };
 }
 
-async function listStacks(remote) {
-  const { ref } = await resolveRef(remote);
-  const manifest = await loadManifest(remote, ref);
+async function listStacks(remote, sourceDir = null) {
+  const { ref } = sourceDir ? { ref: 'local' } : await resolveRef(remote);
+  const manifest = await loadManifest(remote, ref, sourceDir);
   const source = manifest && manifest.stacks ? manifest.stacks : FALLBACK_STACKS;
 
-  console.log('');
-  console.log(`Stack packs available at ${remote}@${ref}:`);
-  console.log('');
-  for (const [name, files] of Object.entries(source)) {
-    const skills = files.filter((f) => f.endsWith('SKILL.md'))
+  console.log(`
+  ${c.bold('gripm')} ${c.dim('· Playbook Stack Packs')}
+
+  ${c.dim('➜')}  ${c.dim('Upstream:')}  ${c.cyan(`${remote}@${ref}`)}
+`);
+  for (const [name, pack] of Object.entries(source)) {
+    const packFiles = Array.isArray(pack) ? pack : (pack?.files ?? []);
+    const skills = packFiles.filter((f) => f.endsWith('SKILL.md'))
       .map((f) => path.basename(path.dirname(f)));
-    console.log(`  ${name.padEnd(10)} ${skills.join(', ') || '(no skills)'}`);
+    console.log(`  • ${c.bold(name.padEnd(10))} ${skills.join(', ') || c.dim('(no skills)')}`);
   }
-  console.log('');
-  console.log('Install with:  node scripts/sync-playbook.mjs --stack <name>');
-  console.log('Core only:     node scripts/sync-playbook.mjs');
-  console.log('');
+  console.log(`
+  ${c.dim('Install with:')}  node scripts/sync-playbook.mjs --stack <name>
+  ${c.dim('Core only:')}     node scripts/sync-playbook.mjs
+`);
 }
 
 // ---------------------------------------------------------------------------
@@ -682,7 +686,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
   if (opts.help) {
     printUsage();
   } else if (opts.listStacks) {
-    listStacks(opts.remote).catch((err) => {
+    listStacks(opts.remote, opts.source).catch((err) => {
       console.error('Fatal:', err.message);
       process.exit(2);
     });
