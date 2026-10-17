@@ -13,9 +13,9 @@
  * that only exists as a paragraph is not a gate.
  *
  * Two independent halves:
- *   1. Task inspection  — the item on disk is real, complete, in `review`, and
+ *   1. Task inspection  - the item on disk is real, complete, in `review`, and
  *                         its declared dependencies are already `done`.
- *   2. Pyramid execution — the repo's own verification steps actually run and
+ *   2. Pyramid execution - the repo's own verification steps actually run and
  *                         actually pass.
  *
  * A step that cannot run is reported SKIPPED and never counted as a pass.
@@ -297,13 +297,13 @@ export function inspectTask(task, tasks) {
  *
  * This exists as its own command because the T2 gate only ever inspects `review`
  * items. Without a separate entry point the unblock rule would be a message
- * appended to an already-failing list — present in code, absent in effect.
+ * appended to an already-failing list - present in code, absent in effect.
  */
 export function unblockMain(argv) {
   const target = argv.find((arg) => !arg.startsWith('--'));
   if (!target) {
     printHeader('QA Gate · unblock');
-    console.log('usage: node scripts/gate-qa.mjs unblock <PLAY-NNN | path/to/task.md>');
+    console.log('usage: node scripts/gate-qa.mjs unblock <TASK-ID | path/to/task.md>');
     console.log('');
     process.exit(2);
   }
@@ -343,7 +343,7 @@ export function unblockMain(argv) {
     for (const blocker of blockers) console.log(`  ❌ ${blocker}`);
     console.log('');
     console.log('-----------------------------------------------------');
-    console.log('❌ UNBLOCK REFUSED — this item must stay blocked.');
+    console.log('❌ UNBLOCK REFUSED - this item must stay blocked.');
     console.log('-----------------------------------------------------');
     console.log('');
     process.exit(1);
@@ -353,7 +353,7 @@ export function unblockMain(argv) {
   console.log('  ✅ every dependency is done or unlinked');
   console.log('');
   console.log('-----------------------------------------------------');
-  console.log(`✅ UNBLOCK ALLOWED — ${frontmatter.id} may move blocked → doing.`);
+  console.log(`✅ UNBLOCK ALLOWED - ${frontmatter.id} may move blocked → doing.`);
   console.log('-----------------------------------------------------');
   console.log('');
   process.exit(0);
@@ -376,7 +376,7 @@ function readScripts(root = ROOT) {
  * A blocking step with no script behind it is a FAILED gate, not a skipped one:
  * certifying on a step that never ran is exactly the assumption the gate exists
  * to refuse. `optional: true` is the honest way to say "this project has no such
- * step" — and it must be deliberate, never a default.
+ * step" - and it must be deliberate, never a default.
  *
  * The set is compared against the pyramid the QA skill documents by
  * `scripts/validate-repo.mjs`, so the two cannot drift apart silently.
@@ -441,7 +441,7 @@ export function main(argv) {
   const target = argv.find((arg) => !arg.startsWith('--'));
   if (!target) {
     printHeader('QA Gate');
-    console.log('usage: node scripts/gate-qa.mjs <PLAY-NNN | path/to/task.md> [--no-run]');
+    console.log('usage: node scripts/gate-qa.mjs <TASK-ID | path/to/task.md> [--no-run]');
     console.log('');
     console.log('  default     runs the pyramid and certifies (exit 0 = may promote)');
     console.log('  --no-run    inspection only, exits 2: never certifies');
@@ -451,7 +451,7 @@ export function main(argv) {
 
   const runPyramid = !argv.includes('--no-run');
 
-  printHeader('QA Gate · PLAY-015');
+  printHeader('QA Gate');
   console.log('');
 
   const taskPath = resolveTaskPath(target);
@@ -494,7 +494,7 @@ export function main(argv) {
     for (const step of steps) {
       const outcome = runStep(step, ROOT);
       if (outcome.state === 'skipped') {
-        console.log(`  – ${step.label}: SKIPPED (${outcome.detail})`);
+        console.log(`  - ${step.label}: SKIPPED (${outcome.detail})`);
         continue;
       }
       pyramidRan += 1;
@@ -505,7 +505,7 @@ export function main(argv) {
         console.log(`  ❌ ${step.label}: ${outcome.detail}`);
       }
     }
-    if (!pyramidRan) console.log('  – nothing to run: the project defines no verification scripts.');
+    if (!pyramidRan) console.log('  - nothing to run: the project defines no verification scripts.');
     console.log('');
   }
 
@@ -517,7 +517,7 @@ export function main(argv) {
 
   console.log('-----------------------------------------------------');
   if (ok && !runPyramid) {
-    console.log(`✅ TASK INSPECTION PASSED — ${frontmatter.id} satisfies the task checks.`);
+    console.log(`✅ TASK INSPECTION PASSED - ${frontmatter.id} satisfies the task checks.`);
     console.log('   NOT a certification: the pyramid did not run. Re-run without --no-run.');
     console.log('-----------------------------------------------------');
     console.log('');
@@ -525,13 +525,13 @@ export function main(argv) {
   }
 
   if (ok) {
-    console.log(`✅ GATE PASSED — ${frontmatter.id} may be promoted review → ready.`);
+    console.log(`✅ GATE PASSED - ${frontmatter.id} may be promoted review → ready.`);
     console.log('-----------------------------------------------------');
     console.log('');
     process.exit(0);
   }
 
-  console.log('❌ GATE FAILED — promotion to "ready" has no effect.');
+  console.log('❌ GATE FAILED - promotion to "ready" has no effect.');
   if (nothingVerified) {
     console.log('   No verification step could run, so the gate cannot certify anything.');
   }

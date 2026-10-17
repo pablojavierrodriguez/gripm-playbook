@@ -1,4 +1,4 @@
-# Sprint Spec & Runbook — [ID / Feature Name]
+# Sprint Spec & Runbook - [ID / Feature Name]
 
 <!--
   Status vocabulary is owned by .agents/STATE_MACHINE.md. Do not invent states.
@@ -9,8 +9,8 @@
 - **Status:** `[ (empty) | draft | blocked | doing | review | ready | done | dismissed ]`
 - **Blocked Reason:** `[ obligatorio y no vacío si status: blocked; omitir en otros estados ]`
 - **Dismissed Reason:** `[ obligatorio y no vacío si status: dismissed; omitir en otros estados ]`
-- **Last transition:** `[ from → to ]` by `[ actor ]` — `[ YYYY-MM-DD ]`
-- **Refined:** `[ yes (YYYY-MM-DD) | no — falta: <qué> ]`
+- **Last transition:** `[ from → to ]` by `[ actor ]` - `[ YYYY-MM-DD ]`
+- **Refined:** `[ yes (YYYY-MM-DD) | no - falta: <qué> ]`
 - **Sprint:** `[ SPRINT-XXX ]`
 - **Backlog Item:** `[ ID ]`
 - **Date:** YYYY-MM-DD
@@ -25,7 +25,7 @@
 
 > Ningún ítem pasa a `review` con ACs sin marcar. La certificación de QA (`review` → `ready`) exige la tabla completa en verde.
 
-**Refinement gate (R1)** — un ítem solo entra a `doing` con refinamiento aprobado:
+**Refinement gate (R1)** - un ítem solo entra a `doing` con refinamiento aprobado:
 
 - [ ] Statement de problema desde la perspectiva del usuario
 - [ ] Alcance acotado **y** out-of-scope explícito
@@ -34,7 +34,7 @@
 
 ---
 
-## 1. 🔍 [RESEARCH] Benchmarks & Edge Cases — Market Researcher
+## 1. 🔍 [RESEARCH] Benchmarks & Edge Cases - Market Researcher
 > Análisis de referentes y patrones de interacción probados.
 
 - **References Analyzed:**
@@ -44,7 +44,7 @@
 
 ---
 
-## 2. 🎨 [DESIGN SPEC] Experience & Micro-Interactions — Product Designer
+## 2. 🎨 [DESIGN SPEC] Experience & Micro-Interactions - Product Designer
 > Anatomía visual, estados, movimiento y ergonomía táctil.
 
 - **Tokens & Visual Hierarchy:**
@@ -59,43 +59,43 @@
 
 ---
 
-## 3. ⚙️ [TECH ARCHITECTURE] Implementation & Robustness — Principal Engineer
+## 3. ⚙️ [TECH ARCHITECTURE] Implementation & Robustness - Principal Engineer
 > Modularidad, hooks, tipado estricto e integridad de esquema.
 
 - **Files Created / Modified:**
 - **Typing & Validation:**
 - **Performance (frame budget, memory leaks):**
 - **Verification Pyramid (local, pre-handoff):**
-  - [ ] `typecheck` — 0 errors
-  - [ ] tests — 0 failures
+  - [ ] `typecheck` - 0 errors
+  - [ ] tests - 0 failures
 
 > Al completar esta sección el ítem pasa a `status: doing` → `review` (T1).
 
 ---
 
-## 4. 🛡️ [QA MATRIX] Certification — Rigorous QA Auditor
+## 4. 🛡️ [QA MATRIX] Certification - Rigorous QA Auditor
 > Auditoría del ítem antes de certificarlo.
 
-**Verification Pyramid — orden estricto. Ningún paso se saltea.**
+**Verification Pyramid - orden estricto. Ningún paso se saltea.**
 
-1. [ ] **Typecheck estricto** — 0 errores
-2. [ ] **Tests headless** — 0 fallos
-3. [ ] **Consistencia spec ↔ backlog** — ACs, alcance y estado de commit coherentes
-4. [ ] **Build de producción** — limpio
+1. [ ] **Typecheck estricto** - 0 errores
+2. [ ] **Tests headless** - 0 fallos
+3. [ ] **Consistencia spec ↔ backlog** - ACs, alcance y estado de commit coherentes
+4. [ ] **Build de producción** - limpio
 
 **Auditoría estática de UX (headless, sin browser):**
 
 - [ ] `node scripts/audit-ux-code.cjs --strict` en verde
 
-**Auditoría visual en navegador — solo para lo no deducible estáticamente:**
+**Auditoría visual en navegador - solo para lo no deducible estáticamente:**
 
 - [ ] Layout / CSS responsive no deducible por análisis estático (viewport objetivo)
 - [ ] Consola del navegador sin errores
 
 > [!IMPORTANT]
-> `browser_subagent` y DevTools están **prohibidos** para lógica, estado, contratos de API o persistencia: eso se resuelve headless en los pasos 1–4. Solo se abren para issues de CSS/layout no deducibles estáticamente o por pedido explícito del usuario.
+> `browser_subagent` y DevTools están **prohibidos** para lógica, estado, contratos de API o persistencia: eso se resuelve headless en los pasos 1 - 4. Solo se abren para issues de CSS/layout no deducibles estáticamente o por pedido explícito del usuario.
 
-**Compuerta ejecutable — gate runner:**
+**Compuerta ejecutable - gate runner:**
 
 - [ ] `node scripts/gate-qa.mjs <ID>` en verde (exit code 0 requerido para certificar)
 
@@ -107,7 +107,7 @@
 
 ---
 
-## 5. 🚀 [RELEASE] Packaging & Deployment — Release Management
+## 5. 🚀 [RELEASE] Packaging & Deployment - Release Management
 > Llenar en el momento del release, no durante el sprint.
 
 - **Release Version:** `[ vX.Y.Z ]`

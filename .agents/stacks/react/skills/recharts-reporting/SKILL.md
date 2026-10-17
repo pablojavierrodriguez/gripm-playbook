@@ -17,7 +17,7 @@ Todo chart va envuelto en `ResponsiveContainer` con altura fija en el padre (Rec
 </div>
 ```
 
-**En móvil**: usar `width: '100%'` en el contenedor externo también para el eje X — los contenedores que no respetan esto generan scroll horizontal involuntario en vistas móviles o embebidas.
+**En móvil**: usar `width: '100%'` en el contenedor externo también para el eje X - los contenedores que no respetan esto generan scroll horizontal involuntario en vistas móviles o embebidas.
 
 ---
 
@@ -48,7 +48,7 @@ const chartData = useMemo(() =>
 
 Usar los mismos tokens de color que Tailwind (no hardcodear hex sueltos en cada chart). Definir una paleta compartida en un solo archivo (`chartColors.ts`) y reusarla en todos los reportes, para consistencia visual y para poder cambiarla en un solo lugar.
 
-Evitar depender solo del color para distinguir series (accesibilidad) — combinar con patrones de línea, íconos en la leyenda, o labels directos cuando el chart tiene pocas series.
+Evitar depender solo del color para distinguir series (accesibilidad) - combinar con patrones de línea, íconos en la leyenda, o labels directos cuando el chart tiene pocas series.
 
 ---
 

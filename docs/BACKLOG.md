@@ -55,7 +55,7 @@ Los IDs son estables, monotónicos y nunca se reutilizan. El prefijo de este rep
 ## 4. Definiciones
 
 - **ID:** `PLAY-NNN`. Estable, monotónico, nunca reutilizado. Es lo que aparece en el changelog.
-- **Refined:** flag `yes (fecha)` / `no — falta: <qué>`. Es el **gate R1**, no un status.
+- **Refined:** flag `yes (fecha)` / `no - falta: <qué>`. Es el **gate R1**, no un status.
 - **Status:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`.
 - **Prioridad:** `high` · `medium` · `low`.
 - **`blocked_reason`:** obligatorio y no vacío **únicamente** cuando `status: blocked`. Fuera de ese status, el campo es un error de validación.
@@ -71,7 +71,7 @@ Los IDs son estables, monotónicos y nunca se reutilizan. El prefijo de este rep
 ---
 id: PLAY-NNN
 status: blocked
-blocked_reason: "Bloqueada: el contrato de idempotencia de la API de pagos no está definido"
+blocked_reason: "Bloqueada: el servicio upstream / API externa no define el contrato de idempotencia"
 dependencies:
   - PLAY-012
 ---

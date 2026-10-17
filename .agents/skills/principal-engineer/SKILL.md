@@ -42,18 +42,18 @@ Categorías que aparecen en casi todos los dominios:
 
 | Categoría | Ejemplo genérico | Trampa asociada |
 | :--- | :--- | :--- |
-| **No-negatividad por signo** | Un pasivo nunca suma al patrimonio; se resta. | Acumular un balance negativo como si fuera activo. |
-| **Reversión atómica** | Editar o borrar un ítem ligado a otro revierte el saldo del otro de forma determinista. | Dejar residuos al deslinkear. |
-| **Ausencia ≠ déficit** | Con 0 registros se emite estado neutral ponderado, no un booleano que infiera error. | "Balance negativo" cuando no hay datos. |
-| **Normalización de unidades** | Toda agregación o proyección temporal convierte importes heterogéneos a la unidad objetivo. | Mezclar monedas y sumar. |
-| **Identidad de entidad** | Toda entidad creada en cliente porta un identificador válido para el esquema destino. | IDs malformados rechazados por la base. |
+| **Consistencia de signo y magnitudes** | Un consumo o decremento nunca incrementa el inventario o capacidad; se resta. | Acumular una reducción o consumo como si fuera disponibilidad neta. |
+| **Reversión atómica** | Desvincular o eliminar un ítem dependiente restaura el contador o estado del padre de forma determinista. | Dejar referencias o métricas residuales al desvincular. |
+| **Ausencia ≠ déficit** | Con 0 registros se emite un estado vacío neutral, no un indicador que infiera error. | Tratar una lista vacía o estado inicial como fallo del sistema. |
+| **Normalización de unidades** | Toda agregación o proyección convierte magnitudes heterogéneas (tiempo, bytes, medidas) a la unidad canónica objetivo. | Sumar milisegundos con segundos o kilobytes con megabytes sin conversión previa. |
+| **Identidad de entidad** | Toda entidad creada en cliente porta un identificador válido para el esquema destino. | IDs malformados rechazados por la base de datos o API. |
 
 > [!IMPORTANT]
 > Si el proyecto ya declara sus invariantes en `.agents/rules/`, **esos prevalecen**. No sobreescribas la regla del proyecto con la tabla genérica.
 
 ### 4. Seguridad y datos
 
-- Toda tabla, función y endpoint aplica la política de autorización del proyecto, negada por defecto y verificada en la capa de datos — nunca solo en el cliente.
+- Toda tabla, función y endpoint aplica la política de autorización del proyecto, negada por defecto y verificada en la capa de datos - nunca solo en el cliente.
 - Las funciones que el motor ejecuta con privilegios elevados fijan su `search_path` y no reciben input de cliente sin validar.
 - Validar y sanear en el límite de la aplicación, no en el render.
 - Nunca commitear secretos, connection strings ni access tokens.
@@ -81,6 +81,7 @@ Categorías que aparecen en casi todos los dominios:
 
 - **Fast-Track (Modo 1):** resolver bugfixes, correcciones de invariantes y tareas quirúrgicas sin burocracia de sprints.
 - **Foco atómico inquebrantable:** liderar en solitario y en un único hilo secuencial toda modificación de invariantes de dominio, schema, migraciones y políticas de autorización, evitando fragmentar esa responsabilidad en subagentes para preservar la integridad del estado.
+- **Pre-Flight Concurrency Probe & Task Claiming:** antes de modificar código o crear ramas, ejecutar el probe sincrónico del backlog (`status: doing`) y `git status`. Al tomar una tarea, estampar atómicamente `claimed_by: "<provider>:<session_or_agent_id>"` (ej: `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) en el frontmatter al moverla a `doing`. Si se detecta un par activo, prohibido revertir el árbol de trabajo: si comparten harness, coordinar autónomamente vía `send_message`; si son de proveedores heterogéneos, auto-aislarse en `git worktree`.
 - **Supervisión de subagentes (SDD):** ante una tarea de alta complejidad, delegar pasos hiper-atómicos a subagentes en contexto fresco en lugar de codificar todo en el hilo principal. El orquestador **revisa el diff, corre la verificación headless, y solo consolida en verde**. Un subagente sin el historial de la sesión no sabe qué decisiones previas parecen razonables; el prompt del paso debe declarar los archivos que toca, el comportamiento esperado y cómo se verifica. Secuencial: el paso N+1 no se lanza hasta que el N consolidó.
 
 ### 9. Disciplina Ponytail & Diff Mínimo Viable
@@ -93,7 +94,7 @@ La sobre-ingeniería especulativa es el vicio por defecto de un agente de IA. An
 
 **2. Reutilización obligatoria antes de crear.** Antes de escribir una función auxiliar o instalar un paquete: inspeccionar el repositorio en busca de utilidades existentes, y considerar la standard library del lenguaje. Una dependencia de terceros para resolver una operación de diez líneas es un defecto, no una decisión.
 
-**3. Mapa de blast radius antes de editar.** Identificar todos los puntos de contacto que el cambio puede afectar — llamadores, tests, fixtures, exports, configuración, documentación — **antes** de modificar código. "Nunca rompas lo que ya funciona" es un requisito de planeación, no de buena intención.
+**3. Mapa de blast radius antes de editar.** Identificar todos los puntos de contacto que el cambio puede afectar (llamadores, tests, fixtures, exports, configuración, documentación) antes de modificar código. "Nunca rompas lo que ya funciona" es un requisito de planeación, no de buena intención.
 
 **4. Cierre honesto obligatorio.** Toda intervención termina declarando, en una o dos líneas: **qué no probó, qué salteó conscientemente, y qué riesgo queda para el usuario.** Un reporte que solo lista lo que funcionó es un reporte incompleto, por bienintencionado que sea.
 
@@ -120,7 +121,7 @@ Ante la duda, borrar el comentario y preguntarse si el código lo deja claro. Si
 
 Este apartado es la versión operativa del principio **1. Tolerancia cero a errores de tipado**: allí se declara la intolerancia; aquí se concreta en los patrones que la instrumentan.
 
-- **Prohibidas las aserciones encadenadas:** `value as unknown as Target` no es type safety, es evasión. La corrección es **arreglar el contrato** —el tipo de la fuente, el genérico, el narrowing, el esquema de validación— no abrir un hueco en el compilador.
+- **Prohibidas las aserciones encadenadas:** `value as unknown as Target` no es type safety, es evasión. La corrección es **arreglar el contrato** (el tipo de la fuente, el genérico, el narrowing, el esquema de validación) sin abrir un hueco en el compilador.
 - **Prohibido el widening defensivo:** ensanchar a `any` o a `unknown` para silenciar un error del compilador convierte un fallo de tipado en un fallo diferido a runtime. Un error de tipos es información; silenciarlo es destruirla.
 - **Aserciones simples:** una única aserción a un tipo compatible es aceptable; dos o más encadenadas no lo son.
 - **Excepción acotada:** cuando una aserción sea realmente ineludible, debe ir acompañada de un comentario adyacente que **nombre el invariante que la hace sound**. Sin ese comentario, la aserción es deuda silenciosa.
@@ -139,7 +140,7 @@ const user = payload as TotalUserResponse
 - **Un test verde que no ejercita la integración real es un defecto, no cobertura.** El pasivo es peor que la ausencia de test: silencia la señal y ocupa el presupuesto de verificación.
 
 > [!CAUTION]
-> **Lección registrada en la historia de este repositorio:** un fixture llegó a pasar por el motivo equivocado —no porque la regla bajo prueba se cumpliera, sino porque el aislamiento del módulo se tragaba la ruta que se pretendía verificar. Regla operativa: cuando un test pasa, verificar **por qué** pasa antes de declararlo cobertura. Un test que pasa sin ejercitar su objetivo es un defecto con check verde.
+> **Lección registrada en la historia de este repositorio:** un fixture llegó a pasar por el motivo equivocado (no porque la regla bajo prueba se cumpliera, sino porque el aislamiento del módulo se tragaba la ruta que se pretendía verificar). Regla operativa: cuando un test pasa, verificar **por qué** pasa antes de declararlo cobertura. Un test que pasa sin ejercitar su objetivo es un defecto con check verde.
 
 ### 13. Receta e integración de linter anti-slop (Oxlint / AST)
 

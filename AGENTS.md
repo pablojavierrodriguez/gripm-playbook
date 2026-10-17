@@ -1,4 +1,4 @@
-# Global Agent Instructions — [PROJECT_NAME]
+# Global Agent Instructions - [PROJECT_NAME]
 
 ---
 
@@ -6,6 +6,7 @@
 
 - Code, variables, functions, and technical comments: **in English**.
 - Conversations, product documentation, and architecture decisions: **[Specify Language, e.g., English or Spanish]**.
+- **Standard Hyphen Rule (Anti-Em-Dash / Anti-AI):** Never use em-dash (`—`) or en-dash (`–`) in browser titles, UI text, select options, release titles, release notes, `CHANGELOG.md`, `releases.json`, or documentation. Always use the standard hyphen `-` with spaces (` - `). The em-dash is an artificial AI cliché that degrades product craftsmanship.
 
 ---
 
@@ -70,7 +71,7 @@
 
 ---
 
-## Git Discipline — Commits & Pushes
+## Git Discipline - Commits & Pushes
 
 > [!CAUTION]
 > **The canonical git policy lives in [.agents/rules/git-workflow.md](.agents/rules/git-workflow.md).** It is not duplicated here on purpose: two copies of a rule drift apart. Read it before any `git commit` or `git push`.
@@ -79,12 +80,14 @@ Headline rule, for immediate effect:
 
 - **NEVER** execute a git commit or push without explicit verbal authorization from the user for **each** action. Words like *"looks good"*, *"ok"*, *"proceed"* mean **implement code only**.
 
-### Multi-Agent Parallelism
+### Multi-Agent Parallelism & Dynamic Peer Discovery
 
 > [!CAUTION]
-> **Prohibido `git checkout` en el working tree principal cuando otro agente está trabajando en el mismo repositorio.** El working tree y `.git/HEAD` son estado compartido a nivel de sistema de archivos: un `checkout` cambia la rama del otro agente en silencio, mientras escribe, y el siguiente `git commit` del otro aterriza en la rama equivocada.
+> **Prohibido `git checkout` o `git restore` en el working tree principal cuando otro agente está trabajando en el mismo repositorio.** El working tree y `.git/HEAD` son estado compartido a nivel de sistema de archivos: un `checkout` cambia la rama del otro agente en silencio, mientras escribe, y el siguiente `git commit` del otro aterriza en la rama equivocada.
 
-Cada agente o tarea paralela opera en su **worktree aislado**, sobre su propia rama. Receta y reglas de convivencia: [`.agents/rules/git-workflow.md`](.agents/rules/git-workflow.md) § Multi-Agent Parallelism.
+- **Pre-Flight Concurrency Probe:** Antes de modificar archivos o ejecutar comandos de Git, consultar el backlog (`status: doing`) y `git status --porcelain`. Si hay un ítem en `doing` con `claimed_by` ajeno (formato `<provider>:<id>`, ej. `antigravity:<id>`, `cursor:<id>`, `human:<id>`), **prohibido revertir o limpiar el árbol de trabajo**.
+- **Handshake Autónomo & Protocolo Cross-Harness:** Si comparten runtime (ej. `antigravity:`), contactar al par directamente vía `send_message(Recipient: claimed_by)`. Si son de proveedores heterogéneos, respetar el lease, evitar RPC fallido y auto-aislarse de inmediato en worktree informando al usuario en chat.
+- **Auto-Worktree:** Cada agente o tarea paralela opera en su **worktree aislado**, sobre su propia rama. Receta y reglas de convivencia: [`.agents/rules/git-workflow.md`](.agents/rules/git-workflow.md) § Multi-Agent Parallelism.
 
 ```bash
 git worktree add -b <branch> ../<repo>-<task>

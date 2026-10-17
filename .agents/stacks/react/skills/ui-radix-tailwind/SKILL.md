@@ -18,7 +18,7 @@ Cada archivo envuelve un primitivo de Radix (que viene sin estilos) con clases d
 
 ---
 
-## Design System — Reglas de colores (obligatorio)
+## Design System - Reglas de colores (obligatorio)
 
 **Usar únicamente variables semánticas definidas en el proyecto:**
 - `primary` / `primary-foreground`
@@ -64,7 +64,7 @@ Favorecer siempre verificación basada en capacidades (`can('items:edit')`) ante
 
 ---
 
-## Radix es unstyled — el estilo va en el wrapper
+## Radix es unstyled - el estilo va en el wrapper
 
 ```tsx
 // components/ui/button.tsx
@@ -109,12 +109,12 @@ const buttonVariants = cva(baseStyles, {
 
 Radix ya maneja foco, teclado y ARIA correctamente. Reglas:
 
-- No quitar `:focus-visible` sin poner un estilo de foco alternativo — Radix depende de esto para navegación por teclado.
+- No quitar `:focus-visible` sin poner un estilo de foco alternativo - Radix depende de esto para navegación por teclado.
 - No agregar `onClick` a divs para simular botones cuando existe un primitivo Radix que ya resuelve eso (`Dialog`, `DropdownMenu`, etc.).
 
 ---
 
-## Bugs mobile ya resueltos — no reincidir
+## Bugs mobile ya resueltos - no reincidir
 
 ### Scroll en Dialog / AlertDialog / Sheet
 
@@ -126,7 +126,7 @@ En pantallas pequeñas (mobile web y APK), el contenido puede desbordarse. Agreg
 </DialogContent>
 ```
 
-### Inputs controlados — nunca `undefined`
+### Inputs controlados - nunca `undefined`
 
 Todo `<input>` o `<textarea>` conectado a React Hook Form o estado local debe tener un valor inicial definido. Usar `""` (string vacío) en lugar de `undefined` para evitar el warning de React "uncontrolled to controlled component":
 
@@ -193,7 +193,7 @@ Para tablas responsivas:
 Cuando una página de lista tiene **3 o más filtros**, nunca renderizarlos inline en el toolbar. Usar un único `Popover` con botón `"Filtros"` (con etiqueta en desktop y mobile) + badge contador de filtros activos. Este patrón aplica a todas las resoluciones.
 
 ```tsx
-// ✅ Correcto — Popover unificado con label y contador
+// ✅ Correcto - Popover unificado con label y contador
 <Popover>
   <PopoverTrigger asChild>
     <Button variant="outline" size="sm" className={cn("h-10 px-3",
@@ -213,7 +213,7 @@ Cuando una página de lista tiene **3 o más filtros**, nunca renderizarlos inli
   </PopoverContent>
 </Popover>
 
-// ❌ Prohibido — filtros inline en toolbar con 3+ filtros
+// ❌ Prohibido - filtros inline en toolbar con 3+ filtros
 <div className="hidden md:flex items-center gap-2">
   <Select .../>
   <Select .../>
@@ -274,7 +274,7 @@ if (dateRange?.to) {
   matchesDate = matchesDate && item.date <= toDate.toISOString();
 }
 
-// En query Supabase
+// En query de base de datos / cliente remoto (ej. Supabase, Prisma, TypeORM)
 if (dateRange?.from) query = query.gte("starts_at", dateRange.from.toISOString());
 if (dateRange?.to) {
   const toDate = new Date(dateRange.to);
@@ -287,7 +287,7 @@ if (dateRange?.to) {
 - `numberOfMonths={1}` dentro de Popovers (2 meses no entra en el ancho estándar de 320px).
 - El componente usa `react-day-picker` en modo `range` con `locale={es}` de `date-fns/locale`.
 - El placeholder por defecto es `"Seleccionar fechas"`.
-- `date-fns` y `react-day-picker` ya están en `package.json` — no instalar alternativas.
+- `date-fns` y `react-day-picker` ya están en `package.json` - no instalar alternativas.
 
 ---
 

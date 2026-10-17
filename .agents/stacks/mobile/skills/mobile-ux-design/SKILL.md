@@ -78,7 +78,7 @@ En pantallas móviles (`< 768px`), las tablas de datos **deben transformarse en 
 ```
 
 ### 4.1. Jerarquía Vertical de Tarjetas (Anti-Hacinamiento)
-En pantallas de 375px a 390px de ancho, evitar sobrecargar una sola fila horizontal con múltiples datos heterogéneos (icono + título + badges + montos + fechas).
+En pantallas de 375px a 390px de ancho, evitar sobrecargar una sola fila horizontal con múltiples datos heterogéneos (icono + título + badges + métricas o valores + fechas).
 - **Nivel 1 (Identidad y Dato Principal):** `flex items-start justify-between`. A la izquierda: Icono/avatar (36x36px) y bloque de texto con `min-w-0 flex-1` (título `truncate` + subtítulo `truncate`). A la derecha: Dato principal o cifra con `font-mono` grande y alineado.
 - **Nivel 2 (Contexto y Metadatos):** `flex flex-wrap items-center gap-1.5`. Chips sutiles para fecha, estado o categoría.
 - **Nivel 3 (Acciones y Footer):** `flex items-center justify-between pt-2 border-t`. Estado general y acciones táctiles.

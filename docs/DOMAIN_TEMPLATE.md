@@ -1,4 +1,4 @@
-# DOMAIN.md — Glosario Ubicuo de Dominio
+# DOMAIN.md - Glosario Ubicuo de Dominio
 
 > Plantilla **opt-in** para proyectos que adoptan el playbook. No es obligatoria: un proyecto sin glosario sigue siendo válido. Se recomienda cuando dos o más agentes trabajen sobre el mismo dominio.
 
@@ -53,7 +53,7 @@ previene la confusión con el término vecino.
 ## Estructura del archivo
 
 ```markdown
-# Domain — <Nombre del Producto>
+# Domain - <Nombre del Producto>
 
 <!-- Actualizado por última vez: YYYY-MM-DD por <rol> -->
 

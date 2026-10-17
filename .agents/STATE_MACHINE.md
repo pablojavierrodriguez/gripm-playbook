@@ -34,7 +34,7 @@ El ciclo de vida del trabajo consta de estados claramente tipados y sin ambigüe
 
 El refinamiento es una **condición de entrada**, no una etapa del flujo. Se modela como un flag en el ítem, no como un status.
 
-**Gate R1 — un ítem solo puede entrar a `doing` si:**
+**Gate R1 - un ítem solo puede entrar a `doing` si:**
 1. Tiene statement de problema (perspectiva del usuario, no del código).
 2. Tiene alcance acotado **y** out-of-scope explícito.
 3. Tiene ACs medibles. "Que quede lindo" no es un AC.
@@ -45,7 +45,7 @@ El flag se registra en el backlog del proyecto:
 
 ```markdown
 ### [BACKLOG-001] Título en imperativo
-- **Refined:** yes (2026-10-04)   # o: no — falta: <qué>
+- **Refined:** yes (2026-10-04)   # o: no - falta: <qué>
 ```
 
 Un ítem no refinado permanece en `draft` (o `ideas` si es discovery) en el backlog. No puede entrar a `doing` hasta que se apruebe el Gate R1.
@@ -56,8 +56,8 @@ Un ítem no refinado permanece en `draft` (o `ideas` si es discovery) en el back
 
 | # | De → A | Actor | Guard |
 | :--- | :--- | :--- | :--- |
-| T0 | `draft` → `doing` | Principal Engineer | **Gate R1 aprobado** + priorizado por el PO + **todas las `dependencies:` en `done`** + rama lista. |
-| T1 | `doing` → `review` | Principal Engineer | Código implementado, ACs marcadas `- [x]`, y pasos 1–2 de la Pirámide en verde local (`typecheck` + tests). |
+| T0 | `draft` → `doing` | Principal Engineer | **Gate R1 aprobado** + priorizado por el PO + **todas las `dependencies:` en `done`** + registro atómico de `claimed_by: "<provider>:<session_or_agent_id>"` (ej: `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) en frontmatter + rama/worktree listos. |
+| T1 | `doing` → `review` | Principal Engineer | Código implementado, ACs marcadas `- [x]`, y pasos 1 - 2 de la Pirámide en verde local (`typecheck` + tests). |
 | T2 | `review` → `ready` | **QA Auditor** | Pirámide de Verificación completa en verde **y `npm run gate:qa` con exit code 0**. Una transición declarada solo en prosa no surte efecto. |
 | T3 | `review` → `doing` | QA Auditor | Rechazado, con findings accionables registrados en la QA Matrix. |
 | T4 | `ready` → `done` | Release Management | Paquete desplegado en producción. |
@@ -79,7 +79,8 @@ Un ítem no refinado permanece en `draft` (o `ideas` si es discovery) en el back
 5. **Ni sprint ni retrospectiva se cierran por deducción.** Requieren comando textual explícito del PO.
 6. **El refinamiento nunca se pierde.** Un ítem que vuelve al pool conserva su registro de refinamiento; no se re-refina desde cero.
 7. **`ready` se-earned, no se-declara.** La transición T2 requiere exit code 0 del gate runner. Un agente que simule el rol de QA en el mismo turno en que escribe el código está violando este invariante, por bienintencionado que sea.
-8. **Ninguna dependencia se cumple porinuición.** Un ítem no entra a `doing` ni se certifica en `ready` mientras alguna tarea de su `dependencies:` no esté en `done`. La desvinculación de una dependencia es un acto explícito y queda registrada, no una omisión silenciosa.
+8. **Ninguna dependencia se cumple por intuición.** Un ítem no entra a `doing` ni se certifica en `ready` mientras alguna tarea de su `dependencies:` no esté en `done`. La desvinculación de una dependencia es un acto explícito y queda registrada, no una omisión silenciosa.
+9. **Pre-Flight Concurrency Probe & Dynamic Claiming:** Ningún agente inicia modificaciones de código ni altera ramas sin ejecutar previamente el probe de concurrencia sincrónico (`status: doing` en backlog y `git status`). Al tomar una tarea, estampa atómicamente en el frontmatter `claimed_by: "<provider>:<session_or_agent_id>"` (ej: `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`). Si existe una tarea en `doing` con `claimed_by` ajeno, **queda terminantemente prohibido ejecutar `git restore .`, `git checkout .` o `git clean` sobre el árbol de trabajo compartido**. La coordinación entre agentes pares se canaliza autónomamente: si comparten harness (ej: `antigravity:` a `antigravity:`), se comunican vía `send_message`; si pertenecen a proveedores heterogéneos (`cursor:`, `claude-code:`, `human:`), el agente detecta la barrera de mensajería, respeta el lease sin emitir RPC fallido y se auto-aísla mecánicamente mediante `git worktree`.
 
 ---
 
@@ -104,13 +105,13 @@ Una tarea en `blocked` o en `dismissed` declara además su motivo en el frontmat
 
 ```markdown
 ---
-id: PLAY-NNN
+id: TASK-ID
 status: blocked
-blocked_reason: "Bloqueada: la API de pagos no define el contrato de idempotencia"
+blocked_reason: "Bloqueada: el servicio upstream / API externa no define el contrato de idempotencia"
 ---
 
 ---
-id: PLAY-NNN
+id: TASK-ID
 status: dismissed
 dismissed_reason: "Descartado: la premisa era falsa, el módulo ya no existe en el producto"
 ---

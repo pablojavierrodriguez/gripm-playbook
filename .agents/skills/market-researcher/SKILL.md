@@ -43,7 +43,7 @@ Anticipar límites **antes** de que los reporten los usuarios. Las familias que 
 | **Unidad y formato** | Múltiples monedas/unidades/zonas horarias; separadores decimales regionales. |
 | **Ciclo temporal** | Fecha de corte vs. fecha de vencimiento; proyecciones; qué pasa al cambiar de mes. |
 | **Relaciones** | Eliminar o editar algo referenciado por otro ítem. |
-| **Parcialidad** | Cancelaciones parciales, montos parciales, estado parcial. |
+| **Parcialidad** | Cancelaciones parciales, importes o entregas parciales, estado parcial. |
 | **Concurrencia** | Dos sesiones editando lo mismo; doble submit. |
 | **Restricciones de acceso** | El usuario puede ver pero no editar; datos de otro tenant. |
 

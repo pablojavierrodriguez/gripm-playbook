@@ -27,7 +27,7 @@ A widespread misconception is that a "multi-agent team" requires running 5 indep
 In real software engineering, autonomous background swarms fail for three reasons:
 
 1. **Git & state collisions.** Concurrent processes mutating the same codebase produce race conditions, overwritten code and corrupted branch history.
-2. **Context bloat & token explosion.** Inter-agent chatter inflates context windows and multiplies cost by 5–10x with high latency.
+2. **Context bloat & token explosion.** Inter-agent chatter inflates context windows and multiplies cost by 5 - 10x with high latency.
 3. **Hallucinatory feedback loops.** When one agent assumes an obsolete API, the next one validates it and builds on a false premise.
 
 ### The architecture: role-swapping via progressive disclosure
@@ -122,7 +122,7 @@ Full specification, with actors and guards: **[`.agents/STATE_MACHINE.md`](.agen
 
 **Sprints and releases are decoupled.** A release groups available `ready` items by delivered value, with or without an active sprint, historical or current.
 
-**Sprint lifecycle is timeboxed.** If items finish early, the PO expands scope with refined backlog items. The agent **never** closes a sprint or runs a retrospective by deduction — only on explicit textual command.
+**Sprint lifecycle is timeboxed.** If items finish early, the PO expands scope with refined backlog items. The agent **never** closes a sprint or runs a retrospective by deduction - only on explicit textual command.
 
 ---
 
@@ -130,7 +130,7 @@ Full specification, with actors and guards: **[`.agents/STATE_MACHINE.md`](.agen
 
 The framework is deliberately split so that installing it does not impose a stack.
 
-### Core — always installed, stack agnostic
+### Core - always installed, stack agnostic
 
 | Skill | Role |
 | :--- | :--- |
@@ -141,7 +141,7 @@ The framework is deliberately split so that installing it does not impose a stac
 | `rigorous-qa-auditor` | Verification Pyramid, a11y, certification authority |
 | `code-level-ux-auditor` | 13 static UX signatures + the `audit-ux` CLI |
 
-### Stack packs — installed on demand
+### Stack packs - installed on demand
 
 | Pack | Skills |
 | :--- | :--- |
@@ -161,14 +161,14 @@ The core layer is validated to contain **zero** references to any specific produ
 │   ├── STATE_MACHINE.md           # Single source of truth for statuses & transitions
 │   ├── rules/
 │   │   └── git-workflow.md        # Commit governance & multi-agent worktree recipe
-│   ├── skills/                    # CORE — stack agnostic, always installed
+│   ├── skills/                    # CORE - stack agnostic, always installed
 │   │   ├── pm-orchestrator/SKILL.md
 │   │   ├── market-researcher/SKILL.md
 │   │   ├── worldclass-product-designer/SKILL.md
 │   │   ├── principal-engineer/SKILL.md
 │   │   ├── rigorous-qa-auditor/SKILL.md
 │   │   └── code-level-ux-auditor/SKILL.md
-│   └── stacks/                    # OPTIONAL — installed with --stack <name>
+│   └── stacks/                    # OPTIONAL - installed with --stack <name>
 │       ├── react/{STACK.md, skills/…}
 │       ├── mobile/{STACK.md, skills/…}
 │       └── pwa/{STACK.md, skills/…}
@@ -176,7 +176,7 @@ The core layer is validated to contain **zero** references to any specific produ
 │   ├── audit-ux-code.cjs          # Static UX auditor (generic engine + i18n support)
 │   ├── gate-qa.mjs                # Executable QA certification gate runner
 │   ├── gate-review-items.mjs      # CI entry point: gates all items in review
-│   ├── ux-rules.json              # Rule catalog — single source of truth
+│   ├── ux-rules.json              # Rule catalog - single source of truth
 │   ├── sync-playbook.mjs          # Installer / updater (with parity check)
 │   └── validate-repo.mjs          # Self-consistency guardian
 ├── tests/                         # Test suite (node:test, 128 tests across 30 suites)
@@ -196,7 +196,7 @@ The core layer is validated to contain **zero** references to any specific produ
 
 ## 🚀 Quickstart
 
-### Option A — Project-level install (recommended)
+### Option A - Project-level install (recommended)
 
 ```bash
 git clone https://github.com/pablojavierrodriguez/gripm-playbook.git temp-playbook
@@ -215,7 +215,7 @@ node scripts/sync-playbook.mjs --stack react --stack mobile
 node scripts/sync-playbook.mjs --list-stacks
 ```
 
-### Option B — Zero-clone sync into an existing repo
+### Option B - Zero-clone sync into an existing repo
 
 ```bash
 npx @gripm/playbook sync
@@ -244,7 +244,7 @@ Useful flags: `--dry-run`, `--tag <ref>`, `--adopt`, `--force`, `--no-history`, 
 
 **Migrating from a hand-installed copy.** The first sync has no lockfile, so it cannot tell an untouched v1 skill from an edited one. It resolves that by asking the upstream history. If you would rather not spend those requests, `--no-history` protects anything unrecognised, or `--adopt` keeps every differing file and records it as the baseline you want to keep updating from.
 
-### Option C — Global installation
+### Option C - Global installation
 
 Copy `.agents/skills/*/SKILL.md` into your assistant's global skills directory (e.g. `~/.gemini/config/skills/`) to make them available in every workspace.
 
@@ -263,7 +263,7 @@ Validate every change in strict order. Each step is cheaper than the next.
 6. ⚠️  real browser (conditional)      ONLY for static-undeducible CSS/layout, or on explicit request
 ```
 
-### Executable QA Gate — `npm run gate:qa <ID>`
+### Executable QA Gate - `npm run gate:qa <ID>`
 
 Prose assertions are not gates. Transition T2 (`review` → `ready`) is enforced mechanically by `scripts/gate-qa.mjs`:
 - Verifies task frontmatter, completed acceptance criteria (`- [x]`), dependencies resolution in `done`, and valid `blocked_reason`/`dismissed_reason`.
@@ -271,7 +271,7 @@ Prose assertions are not gates. Transition T2 (`review` → `ready`) is enforced
 - In CI, `npm run gate:review` ensures every item in `review` satisfies the gate on every push.
 
 > [!IMPORTANT]
-> Invoking a browser sub-agent for logic, state, API contracts or persistence is **prohibited** — those are auditable headlessly in milliseconds. The browser is reserved for visual CSS/layout issues that cannot be deduced statically.
+> Invoking a browser sub-agent for logic, state, API contracts or persistence is **prohibited** - those are auditable headlessly in milliseconds. The browser is reserved for visual CSS/layout issues that cannot be deduced statically.
 
 ---
 
@@ -288,7 +288,7 @@ node scripts/audit-ux-code.cjs --rule UX-006   # single signature
 npm run audit:ux:baseline                      # snapshot what was already reviewed
 ```
 
-**Every occurrence is reported, not one per file.** A codebase with 487 findings shows 487 — that is what a baseline is for. `audit-ux-baseline.json` records the observations already reviewed so a project can adopt the auditor without either silencing the gate or drowning in noise nobody will read. `ERROR` is never absorbed: a severity that breaks the build cannot be switched off by a file.
+**Every occurrence is reported, not one per file.** A codebase with 487 findings shows 487 - that is what a baseline is for. `audit-ux-baseline.json` records the observations already reviewed so a project can adopt the auditor without either silencing the gate or drowning in noise nobody will read. `ERROR` is never absorbed: a severity that breaks the build cannot be switched off by a file.
 
 **13 signatures:** `UX-001` decimal comma blocker · `UX-002` keyboard shortcuts on touch · `UX-003` drag/scroll collision · `UX-004` date localisation leak · `UX-005` autocapitalise trap · `UX-006` fixed bottom UI occlusion · `UX-007` horizontal crowding · `UX-008` micro-Jank · `UX-009` sub-44px target · `UX-010` unnamed icon button · `UX-011` arbitrary font size · `UX-012` no tactile feedback · `UX-013` missing tabular numerals.
 
@@ -331,7 +331,7 @@ A project that needs its own signatures names a catalog of its own in `"rules"` 
 }
 ```
 
-**`UX-NNN` is reserved.** A local rule using that pattern is rejected with an error, because one id has to mean one thing across every consumer — a project reading its own `UX-009` as "touch target" while the skill documents something else is how catalogs stop being trustworthy. Pick your own prefix.
+**`UX-NNN` is reserved.** A local rule using that pattern is rejected with an error, because one id has to mean one thing across every consumer - a project reading its own `UX-009` as "touch target" while the skill documents something else is how catalogs stop being trustworthy. Pick your own prefix.
 
 **For anything the declarative catalog cannot express**, import the engine instead of copying it:
 
@@ -397,7 +397,7 @@ npm run check:all    # validate + test
 **Agentic Team Playbook** es un framework de gobernanza y delivery ágil para assistants de IA:
 
 - **Autonomía sin burocracia:** clasificación dinámica entre *Foco Quirúrgico* (fixes directos), *Dúo Táctico* (UX + código) y *Sprint & Backlog Flow* (loop formal).
-- **Patrón Role-Swapping:** en lugar de enjambres que queman tokens y colisionan en Git, un único Host Agent adopta skills modulares bajo demanda. Subagentes paralelos solo para verificaciones sin estado. Aislamiento multi-agente mediante `git worktree`.
+- **Patrón Role-Swapping:** en lugar de enjambres que queman tokens y colisionan en Git, un único Host Agent adopta skills modulares bajo demanda. Subagentes paralelos solo para verificaciones sin estado. Aislamiento multi-agente mediante `git worktree` y protocolo sincrónico de Peer Discovery (`claimed_by`).
 - **Vocabulario canónico de estados:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`. **El backlog es el pool de planificación, no un status**, y el **refinamiento es un gate interactivo (R1)** (Grilling Session para despejar ambigüedades, apoyado en el glosario de dominio `DOMAIN.md`).
 - **Estados `blocked` y `dismissed`:** motivos obligatorios y no vacíos (`blocked_reason` / `dismissed_reason`). Resolución estricta de dependencias comprobable mecánicamente con `gate-qa.mjs unblock <ID>`.
 - **`ready` es la entrega formal del desarrollo.** Solo el QA Auditor mueve `review → ready` respaldado por exit code 0 de `npm run gate:qa`. Ningún developer se auto-certifica.

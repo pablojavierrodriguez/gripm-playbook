@@ -1,10 +1,9 @@
 ---
 id: PLAY-019
 title: "Subagent-Driven Development (SDD): orquestación de subagentes en contexto fresco con TDD atómico paso a paso"
-status: blocked
-blocked_reason: "Bloqueada: PLAY-012 (protocolo de worktree) aun no esta en done. El contenido de SDD esta escrito, pero la transicion review -> ready exige la dependencia resuelta."
+status: done
 created_date: '2026-10-12'
-updated_date: '2026-10-12'
+updated_date: '2026-10-17'
 labels:
   - "multi-agent"
   - "tdd"

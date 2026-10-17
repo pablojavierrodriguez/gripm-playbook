@@ -1,6 +1,6 @@
 ---
 name: forms-rhf-zod
-description: Usar esta skill siempre que se cree o modifique un formulario — esquemas de validación con Zod, configuración de React Hook Form, manejo de errores, o integración con componentes Radix UI. También cuando el usuario mencione formularios, validación, "form", inputs, o mensajes de error de campos.
+description: Usar esta skill siempre que se cree o modifique un formulario - esquemas de validación con Zod, configuración de React Hook Form, manejo de errores, o integración con componentes Radix UI. También cuando el usuario mencione formularios, validación, "form", inputs, o mensajes de error de campos.
 ---
 
 # Formularios: React Hook Form + Zod
@@ -10,7 +10,7 @@ Patrón estándar para todos los formularios del proyecto.
 ## Patrón base
 
 1. Definir el schema de Zod (fuente de verdad de la validación).
-2. Inferir el tipo TS del schema (`z.infer<typeof schema>`) — nunca declarar el tipo del formulario a mano por separado, para que no se desincronice del schema.
+2. Inferir el tipo TS del schema (`z.infer<typeof schema>`) - nunca declarar el tipo del formulario a mano por separado, para que no se desincronice del schema.
 3. Conectar con `useForm` + `zodResolver`.
 
 ```ts
@@ -34,7 +34,7 @@ const { register, control, handleSubmit, formState: { errors } } =
 
 ---
 
-## Inputs siempre controlados — nunca `undefined`
+## Inputs siempre controlados - nunca `undefined`
 
 **Regla crítica**: inicializar siempre todos los campos con `defaultValues` en `useForm`. Usar `""` (string vacío) para strings, nunca `undefined`.
 
@@ -101,7 +101,7 @@ if (error.status === 409 || error.code === 'CONFLICT') {
 }
 ```
 
-No usar errores genéricos de formulario cuando se puede mapear a un campo específico — mejora sustancialmente la UX.
+No usar errores genéricos de formulario cuando se puede mapear a un campo específico - mejora sustancialmente la UX.
 
 ---
 
@@ -110,7 +110,7 @@ No usar errores genéricos de formulario cuando se puede mapear a un campo espec
 Para campos de objetos anidados (como metadatos o configuraciones estructuradas), guardar los campos con acceso por punto y proteger contra `undefined`:
 
 ```ts
-// ✅ Correcto — guardar contra undefined en defaultValues
+// ✅ Correcto - guardar contra undefined en defaultValues
 defaultValues: {
   metadata: {
     website: entity?.metadata?.website ?? '',
@@ -123,11 +123,11 @@ Garantizar siempre que las propiedades anidadas inicialicen con fallback para ev
 
 ---
 
-## Inputs numéricos y montos localizados
+## Inputs numéricos y valores decimales localizados
 
-En aplicaciones con formato regional hispanohablante o europeo, los montos suelen presentarse con separador de miles por punto (`.`) y decimales por coma (`,`).
+En aplicaciones con formato regional hispanohablante o europeo, los valores numéricos y métricas suelen presentarse con separador de miles por punto (`.`) y decimales por coma (`,`).
 
-**Regla de Oro:** Nunca usar `<input type="number">` para montos si se pretende admitir decimales en español o separador de miles, ya que el navegador móvil/desktop fuerza la notación anglosajona (`.`) y rechaza comas.
+**Regla de Oro:** Nunca usar `<input type="number">` para valores con decimales o importes si se pretende admitir decimales en español o separador de miles, ya que el navegador móvil/desktop fuerza la notación anglosajona (`.`) y rechaza comas.
 
 ### Patrón canónico con `formatThousandsInput` / `parseThousandsInput`
 
@@ -138,15 +138,15 @@ En aplicaciones con formato regional hispanohablante o europeo, los montos suele
 import { z } from 'zod';
 import { formatThousandsInput, parseThousandsInput } from '@/lib/utils';
 
-// Schema Zod para montos localizados
+// Schema Zod para valores numéricos localizados
 export const amountSchema = z.preprocess(
   (val) => (typeof val === 'string' ? parseThousandsInput(val) : val),
-  z.number().positive({ message: 'El monto debe ser mayor a 0' })
+  z.number().positive({ message: 'El valor debe ser mayor a 0' })
 );
 ```
 
 ```tsx
-// Input controlado para montos con auto-formateo en blur o cambio
+// Input controlado para valores numéricos con auto-formateo en blur o cambio
 <input
   type="text"
   inputMode="decimal"

@@ -17,7 +17,7 @@ Que el producto se sienta tan pulido, reactivo y sobrio de usar como los mejores
 
 La interfaz **asiste, no juzga**.
 
-- Microcopy afirmativo y específico. Nombrar la acción, no la ausencia: "Sin movimientos en este período", no "Sin datos".
+- Microcopy afirmativo y específico. Nombrar la acción, no la ausencia: "Sin actividad en este período" o "Sin elementos registrados", no "Sin datos".
 - **Anti-paternalismo:** el diseño respeta la autonomía del usuario. En onboarding o hard resets nunca se imponen defaults; se ofrece siempre una bifurcación explícita entre la opción recomendada y el lienzo en blanco.
 - **Estado cero:** ante ausencia de actividad o 0 registros, nunca emitir alerta ni color de error. Un estado vacío es un estado **válido**: comunícalo con serenidad y ofrecé el siguiente paso.
 - Empty states proactivos: guían al primer uso con contexto y una acción concreta, no con un "no hay nada".
@@ -38,7 +38,7 @@ La interfaz **asiste, no juzga**.
 
 - **Feedback inmediato al toque:** toda acción táctil responde en el mismo frame (`active:scale-[0.98]`, cambio de fondo).
 - **Motion con propósito:** entrada de sheets y modales con curvas que comuniquen origen. Nada de animación decorativa que delays la respuesta.
-- Transiciones cortas (150–250ms) para estado; más largas solo para entrada/salida de superficies.
+- Transiciones cortas (150 - 250ms) para estado; más largas solo para entrada/salida de superficies.
 - Respetar `prefers-reduced-motion`: es una accesibilidad, no un extra.
 
 ---
@@ -48,7 +48,7 @@ La interfaz **asiste, no juzga**.
 - **Target táctil efectivo ≥ 44×44px** en cualquier elemento clickeable. Verificado con `getBoundingClientRect()`, no con la clase CSS.
 - Acciones primarias al alcance del pulgar en móvil: bottom sheets y bottom action bars.
 - **Nunca más de 2 acciones visibles por fila** en listas y tarjetas. Las secundarias van a un menú con target cómodo.
-- Inputs numéricos: teclado declarado según el tipo de dato (`inputMode="decimal"`, `inputMode="tel"`), con parseo por locale. Nunca `type="number"` para montos.
+- Inputs numéricos: teclado declarado según el tipo de dato (`inputMode="decimal"`, `inputMode="tel"`), con parseo por locale. Nunca `type="number"` para valores numéricos con coma o decimales.
 - Sheets y modales con scroll seguro: alto máximo acotado, `overflow-y-auto`, y padding inferior que respete la safe area.
 
 ---
@@ -68,7 +68,7 @@ Todo componente interactivo define **todos** estos estados, explícitamente:
 
 | Estado | Contenido |
 | :--- | :--- |
-| Default | — |
+| Default | - |
 | Hover | Solo en dispositivos con puntero |
 | Active / Focus | Focus ring **siempre visible** para navegación por teclado |
 | Disabled | Con motivo comunicado, no solo atenuado |
@@ -82,7 +82,7 @@ Todo componente interactivo define **todos** estos estados, explícitamente:
 
 Esta skill **no prescribe** colores, tipografías, radios ni valores concretos. El proyecto es dueño de su sistema visual; el playbook define el criterio con el que se juzga.
 
-Lo que sí define es un filtro. Ante **toda** decisión visual —una técnica que ya está en el repo, una que propone el stack de diseño, una que "se ve moderna"— se aplica el **Purpose Test**:
+Lo que sí define es un filtro. Ante **toda** decisión visual (una técnica que ya está en el repo, una que propone el stack de diseño, o una que "se ve moderna") se aplica el **Purpose Test**:
 
 > **¿Qué propósito de jerarquía, legibilidad o accesibilidad cumple esta técnica?**
 
@@ -121,10 +121,10 @@ En componentes, copy y mockups, el contenido cumple la misma ley: **lo que se af
 
 Si no hay dato real, el camino es uno de dos, y ambos son válidos:
 
-1. Mostrar el **estado cero** real (sección 1) —sereno, con el siguiente paso— cuando el cero es un dato verdadero.
+1. Mostrar el **estado cero** real (sección 1) - sereno, con el siguiente paso - cuando el cero es un dato verdadero.
 2. **Omitir** la afirmación y dejar que la superficie respire.
 
-El placeholder de maquetado se marca como tal (`Lorem`, `—`, `0`) para que nadie lo confunda con un dato de producción. Un mockup que parece real y no lo es es un bug de contenido, no un atajo.
+El placeholder de maquetado se marca como tal (`Lorem`, `-`, `0`) para que nadie lo confunda con un dato de producción. Un mockup que parece real y no lo es es un bug de contenido, no un atajo.
 
 ---
 

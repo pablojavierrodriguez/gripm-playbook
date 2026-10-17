@@ -16,7 +16,7 @@
       "nearby": "Fire only when at least one of these is present within +/- window lines of the candidate line.",
       "needsContent": "Fire only when at least one of these exists in the element's own subtree (element + descendants).",
       "unlessContent": "Disable the whole rule when ANY of these exists in the element's own subtree.",
-      "alsoContent": "Fire when the element's own content — excluding nested elements — matches. Use it when the element that renders a value is the one to report, rather than its wrapper.",
+      "alsoContent": "Fire when the element's own content - excluding nested elements - matches. Use it when the element that renders a value is the one to report, rather than its wrapper.",
       "unlessVisibleText": "true disables the rule when the element renders visible text. Tags, nested elements and {expressions} are excluded by construction.",
       "unlessFile": "Disable the whole rule when the file path contains ANY of these substrings.",
       "onlyFile": "Run the rule only when the file path contains ANY of these substrings. The positive counterpart of unlessFile; without it a rule scoped by context cannot be expressed.",
@@ -31,7 +31,7 @@
       "id": "UX-001",
       "title": "Regional decimal comma blocker (input[type=number])",
       "severity": "ERROR",
-      "signature": "<input type=\"number\"> used to capture monetary amounts or balances.",
+      "signature": "<input type=\"number\"> used to capture numeric values with decimals.",
       "impact": "On LATAM mobile keyboards the native numeric pad often exposes only ',' and disables '.', while HTML5 type=\"number\" rejects ',' in WebKit/Blink, yielding an empty value or a silent error.",
       "fix": "Replace with inputMode=\"decimal\" plus locale-aware format/parse helpers.",
       "check": {
@@ -118,9 +118,9 @@
       "id": "UX-007",
       "title": "Horizontal crowding on mobile cards (< 640px)",
       "severity": "INFO",
-      "signature": "A justify-between flex row packing three or more complex nodes (icon + category + account + badge + amount) without truncate or wrap.",
-      "impact": "Long titles overlap or push the amount out of a 375px viewport.",
-      "fix": "Enforce the two-level invariant: row 1 for identity and amount, row 2 for context chips. Add min-w-0 to flex children and collapse secondary actions into a menu.",
+      "signature": "A justify-between flex row packing three or more complex nodes (icon + label + state + badge + value) without truncate or wrap.",
+      "impact": "Long titles overlap or push the value out of a 375px viewport.",
+      "fix": "Enforce the two-level invariant: row 1 for identity and value, row 2 for context chips. Add min-w-0 to flex children and collapse secondary actions into a menu.",
       "check": {
         "line": ["flex items-center justify-between", "justify-between items-center"],
         "unlessLine": ["min-w-0", "flex-wrap", "truncate", "shrink-0"],
@@ -200,9 +200,9 @@
     },
     {
       "id": "UX-013",
-      "title": "Monetary value without tabular numerals",
+      "title": "Numeric value without tabular numerals",
       "severity": "INFO",
-      "signature": "Currency values rendered through a number/currency formatter without tabular-nums or a monospace data font.",
+      "signature": "Numeric values rendered through a number or quantity formatter without tabular-nums or a monospace data font.",
       "impact": "Proportional digits cause horizontal micro-jumps as amounts change between renders.",
       "fix": "Apply tabular-nums (or the project's monospace data token) to every numeric column.",
       "check": {
@@ -212,7 +212,7 @@
         "unlessNearby": ["tabular-nums", "font-mono", "fontMono"],
         "window": 3
       },
-      "message": "Currency value without tabular-nums / monospace data font. May cause horizontal text jitter."
+      "message": "Numeric value without tabular-nums / monospace data font. May cause horizontal text jitter."
     }
   ]
 }

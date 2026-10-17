@@ -1,9 +1,9 @@
 ---
 id: PLAY-020
 title: "El manifest y su fallback deben tener un unico origen de verdad"
-status: draft
+status: done
 created_date: '2026-10-12'
-updated_date: '2026-10-12'
+updated_date: '2026-10-17'
 labels:
   - "packaging"
   - "tooling"
@@ -37,11 +37,11 @@ Corregido en 2.3.0 con dos checks nuevos (`checkDocsReferenceInstalledFiles` y `
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] #1 Un check de `validate-repo` falla cuando un archivo del manifest no esta en `FALLBACK_CORE_FILES`, y viceversa
-- [ ] #2 Un check de `validate-repo` falla cuando la capa nucleo documenta un comando `scripts/*` que el manifest no instala
-- [ ] #3 Un test cubre ambos checks: mutar cualquiera de los dos debe hacerlos caer
-- [ ] #4 `FALLBACK_CORE_FILES` esta generating desde el manifest, o la duplicacion esta documentada con la razon de existir
-- [ ] #5 `npm run check:all` en verde
+- [x] #1 Un check de `validate-repo` falla cuando un archivo del manifest no esta en `FALLBACK_CORE_FILES`, y viceversa
+- [x] #2 Un check de `validate-repo` falla cuando la capa nucleo documenta un comando `scripts/*` que el manifest no instala
+- [x] #3 Un test cubre ambos checks: mutar cualquiera de los dos debe hacerlos caer
+- [x] #4 `FALLBACK_CORE_FILES` esta generating desde el manifest, o la duplicacion esta documentada con la razon de existir
+- [x] #5 `npm run check:all` en verde
 <!-- AC:END -->
 
 ## Implementation Plan

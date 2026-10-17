@@ -23,19 +23,19 @@ El refinamiento es un **gate**, no un status. Un ítem del backlog no puede reci
 2. **Alcance acotado** y **out-of-scope explícito** (anti scope creep).
 3. **ACs medibles.** "Que quede lindo" no es un AC.
 4. **Prioridad asignada.**
-5. **Ambigüedades resueltas explícitamente** — ver la Grilling Session de abajo. Un ítem con supuestos no declarados no pasó R1, por bien escritas que estén sus ACs.
+5. **Ambigüedades resueltas explícitamente** (ver la Grilling Session de abajo). Un ítem con supuestos no declarados no pasó R1, por bien escritas que estén sus ACs.
 
 Registrar el resultado en el backlog del proyecto:
 
 ```markdown
 ### [BACKLOG-001] Título en imperativo
-- **Refined:** yes (2026-10-04)   # o: no — falta: <qué>
+- **Refined:** yes (2026-10-04)   # o: no - falta: <qué>
 - **Status:** (sin asignar)
 ```
 
 > **No inventar estados.** El vocabulario de status está en `.agents/STATE_MACHINE.md`. El backlog no es un status.
 
-#### Grilling Session — obligatoria antes de cerrar el alcance
+#### Grilling Session - obligatoria antes de cerrar el alcance
 
 > **Un ítem no se refina por asunción ni por deducción pasiva.** El modo de fallo más caro del desarrollo con agentes no es escribir código malo: es escribir código *correcto para un producto que nadie pidió*. La desalineación inicial no se detecta en QA, porque el QA valida contra los ACs, y los ACs nacieron de la premisa equivocada.
 
@@ -78,7 +78,7 @@ El propósito es doble y concreto:
 2. Pedir inputs al **Market Researcher** antes de definir soluciones.
 3. Pasar el brief al **World-Class Product Designer** para especificación visual y micro-interacciones.
 4. Presentar el plan al usuario para aprobación formal.
-5. Despachar la implementación al **Principal Engineer** (status `doing`).
+5. Despachar la implementación al **Principal Engineer** (status `doing` con registro atómico de `claimed_by: "<provider>:<session_or_agent_id>"`).
 6. Asignar la certificación al **Rigorous QA Auditor** (status `review` → `ready`).
 
 ### 4. Definition of Done (DoD)
@@ -103,9 +103,9 @@ Determinar de forma autónoma si el requerimiento amerita:
 
 | Modo | Cuándo | Overhead |
 | :--- | :--- | :--- |
-| **Modo 1 — Foco Quirúrgico** | Bugfix puntual, invariante, linter, test fallando. | Cero papeleo. Solo verificación atómica. |
-| **Modo 2 — Dúo Táctico** | Rediseño de componente, modal/sheet, ergonomía, gráfico. | Plan liviano en chat. Sin sprint doc salvo schema. |
-| **Modo 3 — Sprint & Backlog** | Feature de backlog, migración de schema, workflow de negocio complejo. | Loop formal completo. |
+| **Modo 1 - Foco Quirúrgico** | Bugfix puntual, invariante, linter, test fallando. | Cero papeleo. Solo verificación atómica. |
+| **Modo 2 - Dúo Táctico** | Rediseño de componente, modal/sheet, ergonomía, gráfico. | Plan liviano en chat. Sin sprint doc salvo schema. |
+| **Modo 3 - Sprint & Backlog** | Feature de backlog, migración de schema, workflow de negocio complejo. | Loop formal completo. |
 
 No pedir confirmación metodológica al usuario para elegir modo.
 
@@ -113,8 +113,8 @@ No pedir confirmación metodológica al usuario para elegir modo.
 
 > Configurar los nombres de rama en `.agents/rules/git-workflow.md` del proyecto. Convención sugerida:
 
-- **`dev`** — trunk de desarrollo. Todo trabajo cotidiano y sprints integran acá.
-- **`main`** — producción exclusiva. Solo recibe merges al momento del release.
+- **`dev`** - trunk de desarrollo. Todo trabajo cotidiano y sprints integran acá.
+- **`main`** - producción exclusiva. Solo recibe merges al momento del release.
 - Ramas de refactor o épicas estructurales: `feat/<slug>` / `refactor/<slug>`, mergeadas a `dev` solo tras validación completa.
 - **Paralelismo de agentes:** si múltiples hilos tocan archivos superpuestos, abrir ramas independientes (`work/<tarea>`, `agent/<tarea>`) e integrar a `dev` corriendo la Pirámide de Verificación completa antes de cualquier release.
 

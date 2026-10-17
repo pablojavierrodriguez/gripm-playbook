@@ -34,9 +34,15 @@ Los dos fallos que produce:
 1. **Commits en la rama equivocada.** El agente A corre `git commit` después de que B cambió de rama, y sus cambios quedan asentados sobre el trabajo de B.
 2. **Cambios no stageados bloquean o corrompen el checkout del otro.**
 
-### Regla
+### Regla y Protocolo de Descubrimiento Previo (Pre-Flight Concurrency Probe)
 
-Cuando dos o más agentes operan en simultáneo sobre el mismo repositorio, **cada agente o tarea paralela trabaja en su propio worktree**. Ningún agente cambia de rama en el working tree principal.
+Antes de ejecutar cualquier comando de Git o modificar archivos:
+1. **Probe Sincrónico:** El agente inspecciona el backlog (`status: doing`) y `git status --porcelain`. Si detecta un ítem en `doing` con `claimed_by` distinto de su propia identidad namespaced (`<provider>:<id>`), **descubre dinámicamente que hay un par activo**.
+2. **Salvaguarda de Árbol Compartido:** Queda terminantemente prohibido ejecutar `git checkout .`, `git restore .` o `git clean`. El agente asume que los cambios no commiteados pertenecen a su colega.
+3. **Handshake Autónomo & Protocolo Cross-Harness:**
+   - **Intra-harness (mismo runtime, ej: `antigravity:`):** Emite un `send_message` al `claimed_by` de la tarea activa para coordinar o consensuar prioridades.
+   - **Cross-harness (distinto proveedor, ej: `cursor:`, `claude-code:`, `human:`):** Respeta el lease sin intentar RPC inviable, notifica en chat al usuario y procede directo al aislamiento en worktree.
+4. **Aislamiento en Worktree:** Cuando dos o más agentes operan en simultáneo sobre el mismo repositorio, **cada agente o tarea paralela trabaja en su propio worktree**. Ningún agente cambia de rama en el working tree principal.
 
 ### Receta
 
@@ -55,7 +61,7 @@ git worktree remove ../<repo>-<task>
 ```
 
 > [!CAUTION]
-> **`-b` no es opcional.** `git worktree add ../<repo>-<task> <branch>` falla con `fatal: invalid reference` si la rama todavía no existe, y crearla exige `git checkout -b` en el working tree principal — la operación exacta que esta regla prohíbe. La receta de aislamiento no se puede seguir sin violar la regla que sirve.
+> **`-b` no es opcional.** `git worktree add ../<repo>-<task> <branch>` falla con `fatal: invalid reference` si la rama todavía no existe, y crearla exige `git checkout -b` en el working tree principal - la operación exacta que esta regla prohíbe. La receta de aislamiento no se puede seguir sin violar la regla que sirve.
 >
 > La consolidación usa `git fetch . <branch>:dev` **precisamente para no hacer `git checkout`**: `git checkout dev && git merge <branch>` contradice la prohibición de cambiar de rama en el worktree principal.
 
@@ -77,6 +83,6 @@ git worktree prune                # limpiar referencias de worktrees ya borrados
 
 ## Consolidated Task Commits & Clean Releases
 
-- **Consolidated Cadence:** 1 verified task in `ready` = 1 clean, atomic commit including the code and its associated `DEV-XXX` task markdown file. Do not create noisy micro-commits during scratch work or exploration.
+- **Consolidated Cadence:** 1 verified task in `ready` = 1 clean, atomic commit including the code and its associated task specification file (e.g. `[TASK-ID] - slug.md` or issue link). Do not create noisy micro-commits during scratch work or exploration.
 - **Pre-Commit Enforcement:** Ensure pre-commit verification hooks pass cleanly (typecheck, tests, backlog sync) before completing commits.
-- **No Stealth Commits:** Never chain hidden or stealth commits. Maintain explicit task ID in commit title (`feat(DEV-XXX): ...` or `fix(DEV-XXX): ...`).
+- **No Stealth Commits:** Never chain hidden or stealth commits. Maintain explicit task ID in commit title (`feat([TASK-ID]): ...` or `fix([TASK-ID]): ...`).

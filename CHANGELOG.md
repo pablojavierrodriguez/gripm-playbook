@@ -9,7 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.3.0] — 2026-10-12
+## [2.4.0] - 2026-10-17
+
+`PLAY-019` · `PLAY-020` · `PLAY-021` · `PLAY-022` · `PLAY-023`
+
+### Added
+
+- **Autonomous Inter-Agent Coordination Protocol (IACP) & Dynamic Peer Discovery** (`PLAY-023`). Eliminates concurrent agent collisions on shared working trees. Task items in `backlog/tasks/` serve as the single source of truth for active claims via namespaced URI `claimed_by: "<provider>:<session_or_agent_id>"` (e.g. `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) at transition T0 (`draft` ➔ `doing`). Newly invoked agents execute a synchronous Pre-Flight Concurrency Probe inspecting active `doing` items and git status, prohibiting destructive commands (`git restore .`, `git checkout .`, `git clean`) on dirty working trees. Intra-harness peers communicate directly via `send_message(Recipient: claimed_by)`, while cross-harness peers respect leases without futile RPCs and automatically isolate concurrent work in individual `git worktree` instances without human intermediary.
+- **Subagent-Driven Development (SDD) with atomic TDD** (`PLAY-019`). Countermeasure against context fatigue in complex implementations. Decomposes tasks into hyper-atomic, self-contained steps executed by fresh subagents in isolated workspaces, sequentially supervised and verified before consolidation.
+- **Packaging single source of truth** (`PLAY-020`). Mechanical consistency checks in `validate-repo.mjs` ensuring `.playbook-manifest.json` and fallback lists remain in strict parity with automated test coverage.
+
+### Changed
+
+- **100% stack and domain agnostic core** (`PLAY-021`). Eradicated financial and banking domain terminology (balances, liabilities, equity, payment APIs) from invariant definitions and contracts, replacing them with universal software engineering principles (capacity limits, rate limiting, unit normalization). Fixed task prefixes (`DEV-XXX`) replaced by canonical placeholders (`TASK-ID`).
+- **Standard hyphen rule (Anti-Em-Dash)** (`PLAY-022`). Replaced artificial AI em-dashes (`—`) and en-dashes (`–`) with standard hyphens (` - `) across all documentation, templates, and specifications.
+
+---
+
+## [2.3.0] - 2026-10-12
 
 `PLAY-010` · `PLAY-012` · `PLAY-013` · `PLAY-014` · `PLAY-015` · `PLAY-016` · `PLAY-017` · `PLAY-018`
 

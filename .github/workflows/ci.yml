@@ -2,9 +2,17 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
 
 jobs:
   quality:
@@ -30,9 +38,108 @@ jobs:
         run: node scripts/audit-ux-code.cjs --format json
 
       # A gate that only ever runs by hand is a gate that gets skipped. Every
-      # item in `review` must satisfy the executable gate on every push.
-      - name: Executable QA gate — every item in review
+      # item in review must satisfy the executable gate on every push.
+      - name: Executable QA gate - every item in review
         run: npm run gate:review
 
       - name: Package contents sanity check
         run: npm pack --dry-run
+
+  publish:
+    name: Publish to npm & GitHub Release
+    needs: [quality]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check if package version is already published
+        id: check_npm
+        run: |
+          set -euo pipefail
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          echo "pkg_version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+
+          if npm view "@gripm/playbook@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "ℹ️  @gripm/playbook@${PKG_VERSION} ya está publicado en npmjs. Se omite el despliegue."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "🚀 Nueva versión detectada: @gripm/playbook@${PKG_VERSION}. Procediendo al release."
+          fi
+
+      - name: Validate package surface
+        if: steps.check_npm.outputs.already_published == 'false'
+        run: |
+          set -euo pipefail
+          npm run validate
+          npm pack --dry-run
+
+      - name: Publish to npm with provenance
+        if: steps.check_npm.outputs.already_published == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
+
+      - name: Create annotated git tag and push to remote
+        if: steps.check_npm.outputs.already_published == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.check_npm.outputs.pkg_version }}"
+          TAG="v${VERSION}"
+
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo "ℹ️  Tag $TAG ya existe en el remoto."
+          else
+            echo "🏷️  Creando y publicando tag anotado $TAG..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "$TAG - Release oficial de @gripm/playbook"
+            git push origin "$TAG"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.check_npm.outputs.already_published == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.check_npm.outputs.pkg_version }}
+        run: |
+          set -euo pipefail
+          TAG="v${RELEASE_VERSION}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "✅ GitHub Release $TAG ya existe. Omitiendo creación duplicada."
+          else
+            echo "📦 Extrayendo notas de la release desde CHANGELOG.md..."
+            RELEASE_VERSION="$RELEASE_VERSION" node -e "
+              const fs = require('fs');
+              const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+              const version = process.env.RELEASE_VERSION;
+              const part = changelog.split('## [' + version + ']')[1];
+              const notes = part ? part.split(/\n## \[/)[0].replace(/^[^\n]*\n/, '').trim() : ('Release oficial v' + version + ' de @gripm/playbook');
+              fs.writeFileSync('release-notes.txt', notes + '\n');
+            "
+
+            echo "🚀 Creando GitHub Release $TAG..."
+            gh release create "$TAG" \
+              --title "v$RELEASE_VERSION" \
+              --notes-file release-notes.txt
+            echo "✅ GitHub Release $TAG creada exitosamente."
+          fi

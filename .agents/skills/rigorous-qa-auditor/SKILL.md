@@ -22,14 +22,14 @@ Ejecutar **en orden estricto**. Cada paso es más barato que el siguiente; salta
 | 1 | Typecheck estricto | ms | Sí |
 | 2 | Tests headless | s | Sí |
 | 3 | Consistencia spec ↔ backlog | s | Sí |
-| 4 | Build de producción | s–min | Sí |
+| 4 | Build de producción | s - min | Sí |
 | 5 | Auditoría estática de UX | s | Sí |
 | 6 | Navegador real | min | **Solo si no es deducible estáticamente** |
 
 > [!CAUTION]
 > **Prohibido abrir un browser para lo que se resuelve headless en milisegundos.** Contratos de API, lógica de estado, computación, persistencia y formatting se verifican con types, tests y el auditor estático. El navegador queda reservado para CSS/layout no deducible estáticamente, o por pedido explícito del usuario.
 
-### Paso 5 — Auditoría estática de UX
+### Paso 5 - Auditoría estática de UX
 
 ```bash
 node scripts/audit-ux-code.cjs --strict
@@ -39,14 +39,14 @@ Cubre 13 firmas estáticas: bloqueo de coma decimal, atajos de teclado en tácti
 
 Si el proyecto no tiene el script (framework no instalado), auditar a mano las firmas de la skill `code-level-ux-auditor`.
 
-### Compuerta ejecutable — `npm run gate:qa`
+### Compuerta ejecutable - `npm run gate:qa`
 
 > [!CAUTION]
 > **La prosa no es una compuerta.** Un único agente al que se le pide "actuá como QA Auditor" puede simular el rol en el mismo turno en que escribe el código, tildar las ACs por inercia y promover el ítem a `ready` sin haber corrido nada. Por eso T2 no se cumple declarando: se cumple con **exit code 0**.
 
 ```bash
-npm run gate:qa PLAY-042          # compuerta completa
-node scripts/gate-qa.mjs PLAY-042 --no-run   # solo inspección; sale con 2, nunca certifica
+npm run gate:qa TASK-ID          # compuerta completa
+node scripts/gate-qa.mjs TASK-ID --no-run   # solo inspección; sale con 2, nunca certifica
 ```
 
 > [!CAUTION]
@@ -72,14 +72,14 @@ Códigos de salida: `0` certificada · `1` falla · `2` solo inspección (`--no-
 La regla T_unblock tiene su propia entrada, separada de la certificación: el gate T2 solo inspecciona ítems en `review`, así que un ítem `blocked` siempre fallaría el chequeo de status antes de que el guard se evalúe.
 
 ```bash
-node scripts/gate-qa.mjs unblock PLAY-042
+node scripts/gate-qa.mjs unblock TASK-ID
 ```
 
-Rechaza el desbloqueo (`exit 1`) si alguna dependencia sigue sin resolver. Una dependencia **inexistente** también bloquea: no está en `done` ni desvinculada, sigue declarada en el array. Para desbloquear hay que resolverla o **sacarla del array explícitamente** — omitirla en silencio no es desvinculación.
+Rechaza el desbloqueo (`exit 1`) si alguna dependencia sigue sin resolver. Una dependencia **inexistente** también bloquea: no está en `done` ni desvinculada, sigue declarada en el array. Para desbloquear hay que resolverla o **sacarla del array explícitamente** (omitirla en silencio no es desvinculación).
 
 El ítem no `blocked` no le aplica a este comando: sale con `exit 0` y aclara que la transición no corresponde.
 
-### Paso 6 — Navegador (condicional)
+### Paso 6 - Navegador (condicional)
 
 - Consola sin errores ni warnings.
 - Viewports objetivo verificados (375px / 390px, más el breakpoint de escritorio).
@@ -106,7 +106,7 @@ Probar **toda vista y toda métrica con 0 registros**. Debe emitirse un estado n
 ### 3. Numeración y localización
 
 - Separadores de miles y decimales coherentes **en todos los surfaces**: headers, tarjetas, listas, reportes, gráficos y exports.
-- Importes mayores al umbral de miles siempre separan.
+- Cifras o importes mayores al umbral de miles siempre separan.
 - Fechas con nombres de mes/día localizadas (firma UX-004).
 
 ### 4. Inputs y stress test
