@@ -30,12 +30,12 @@ A single LLM thread that writes code and then "pretends" to be the QA Auditor in
 
 When the host `pm-orchestrator` delegates to a specialist via `invoke_subagent`, the sub-agent runs in a **fresh context window** and receives an explicit **Handoff Contract**:
 
-| Sub-Agent Role | Skill Required to Read First | Clean Input Provided by Orchestrator | Mandatory Output Returned |
-| :--- | :--- | :--- | :--- |
-| **Market Researcher** | [`.agents/skills/market-researcher/SKILL.md`](skills/market-researcher/SKILL.md) | Problem statement + domain + specific UX/API questions. | `[RESEARCH]` brief: >= 3 product benchmarks, filtered domain edge-case table, and concrete recommendations. |
-| **Product Designer** | [`.agents/skills/worldclass-product-designer/SKILL.md`](skills/worldclass-product-designer/SKILL.md) | Problem statement + ACs + Research brief + project design tokens. | `[DESIGN SPEC]`: semantic tokens, >= 44×44px touch targets, all 7 interactive states, Purpose Test verdicts, and copy veracity check. |
-| **Principal Engineer** | [`.agents/skills/principal-engineer/SKILL.md`](skills/principal-engineer/SKILL.md) | Refined task (`doing`) + ACs + Design Spec + Architecture boundaries + files in scope + `.agents/rules/`. | Implemented modular code (< 1000 LOC per file, layers decoupled), checked ACs (`- [x]`), green local typecheck/tests, Ponytail honest close (what was not tested + residual risk), task in `review`. |
-| **Rigorous QA Auditor** *(NEVER in the coder's thread)* | [`.agents/skills/rigorous-qa-auditor/SKILL.md`](skills/rigorous-qa-auditor/SKILL.md) & [`.agents/skills/code-level-ux-auditor/SKILL.md`](skills/code-level-ux-auditor/SKILL.md) | **Blind audit payload only:** Task file path (ACs) + `git diff` (or commit range) + command to run `npm run gate:qa <ID>`. Zero developer rationalization history. | `[QA MATRIX]`: mechanical `gate:qa` exit code + blind semantic audit of `git diff` vs. ACs + verdict (`APPROVED -> ready` or `REJECTED -> doing` with file:line findings). |
+| Sub-Agent Role | Harness Invocation (`invoke_subagent`) | Skill Required to Read First | Clean Input Provided by Orchestrator | Mandatory Output Returned |
+| :--- | :--- | :--- | :--- | :--- |
+| **Market Researcher** | `TypeName: "research"`<br>`Workspace: "inherit"`<br>*(Read-only + Web search)* | [`.agents/skills/market-researcher/SKILL.md`](skills/market-researcher/SKILL.md) | Problem statement + domain + specific UX/API questions. | `[RESEARCH]` brief: >= 3 product benchmarks, filtered domain edge-case table, and concrete recommendations. |
+| **Product Designer** | `TypeName: "research"` *(o `"self"` si genera assets)*<br>`Workspace: "inherit"`<br>*(Read-first design specification)* | [`.agents/skills/worldclass-product-designer/SKILL.md`](skills/worldclass-product-designer/SKILL.md) | Problem statement + ACs + Research brief + project design tokens. | `[DESIGN SPEC]`: semantic tokens, >= 44×44px touch targets, all 7 interactive states, Purpose Test verdicts, and copy veracity check. |
+| **Principal Engineer** | `TypeName: "self"`<br>`Workspace: "inherit"` *(o `"share"` en SDD paralelo)*<br>*(Full write + Terminal tools)* | [`.agents/skills/principal-engineer/SKILL.md`](skills/principal-engineer/SKILL.md) | Refined task (`doing`) + ACs + Design Spec + Architecture boundaries + files in scope + `.agents/rules/`. | Implemented modular code (< 1000 LOC per file, layers decoupled), checked ACs (`- [x]`), green local typecheck/tests, Ponytail honest close (what was not tested + residual risk), task in `review`. |
+| **Rigorous QA Auditor** *(NEVER in the coder's thread)* | `TypeName: "self"`<br>`Workspace: "inherit"`<br>*(Contract-bounded: NO source code edits, terminal execution only)* | [`.agents/skills/rigorous-qa-auditor/SKILL.md`](skills/rigorous-qa-auditor/SKILL.md) & [`.agents/skills/code-level-ux-auditor/SKILL.md`](skills/code-level-ux-auditor/SKILL.md) | **Blind audit payload only:** Task file path (ACs) + `git diff` (or commit range) + command to run `npm run gate:qa <ID>`. Zero developer rationalization history. | `[QA MATRIX]`: mechanical `gate:qa` exit code + blind semantic audit of `git diff` vs. ACs + verdict (`APPROVED -> ready` or `REJECTED -> doing` with file:line findings). |
 
 ### 🟢 When to Parallelize (Sub-Agents / Background Tasks):
 1. **Blind QA Certification (`rigorous-qa-auditor`):**
@@ -61,7 +61,7 @@ Un único hilo ejecutando un plan extenso sufre **fatiga de contexto**: olvida i
 
 **1. Planes a prueba de contexto.** El `pm-orchestrator` desglosa el trabajo en pasos **hiper-atómicos e independientes**. Cada paso se redacta bajo Red-Green TDD con instrucciones explícitas y autocontenidas: un subagente `principal-engineer` sin historial debe poder ejecutarlo sin desviarse. El paso declara qué archivos toca, qué se espera que haga, y cómo se verifica.
 
-**2. Un subagente fresco por paso.** El orquestador **no** pica todo el código en el hilo principal. Despacha un subagente nuevo para el paso N, operando sobre el árbol o en un worktree aislado (ver § Workspace Isolation).
+**2. Un subagente fresco por paso.** El orquestador **no** pica todo el código en el hilo principal. Despacha un subagente nuevo para el paso N (`TypeName: "self"`), operando sobre el árbol (`Workspace: "inherit"`) o en aislamiento (`Workspace: "share"` / worktree aislado, ver § Workspace Isolation).
 
 **3. Supervisión y consolidación secuencial.** El orquestador revisa el diff producido, corre la verificación headless, y **solo cuando pasa en verde** consolida y dispara el paso N+1. Un subagente constructor no se lanza en paralelo con el siguiente sobre los mismos archivos. Al completar todos los pasos y pasar a `review`, el orquestador despacha al subagente `rigorous-qa-auditor` en contexto limpio para certificar.
 
@@ -71,6 +71,9 @@ Un único hilo ejecutando un plan extenso sufre **fatiga de contexto**: olvida i
 ### 🔒 Workspace Isolation & Autonomous Inter-Agent Coordination (IACP)
 
 When two or more agents or sub-agents work on the same repository at the same time, **each one operates in its own git worktree on its own branch**, and nobody runs `git checkout` in the main working tree. `.git/HEAD` and the working tree are shared filesystem state: a cross-checkout silently switches the other agent's branch *while it is writing*, and its next commit lands on the wrong branch.
+
+> [!TIP]
+> En entornos con soporte nativo de subagentes (como Antigravity), el aislamiento de árbol puede activarse declarando `Workspace: "share"` en `invoke_subagent` (crea un espacio de trabajo compartiendo el repositorio subyacente similar a un git worktree sin duplicar almacenamiento). Para procesos manuales o agentes externos, usar la receta canónica de `git worktree add`.
 
 #### 🤝 Dynamic Peer Discovery & Handshake Protocol
 

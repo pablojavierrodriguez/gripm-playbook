@@ -81,13 +81,13 @@ El propósito es doble y concreto:
 El `pm-orchestrator` coordina desde el hilo principal y **despacha subagentes con contexto limpio** pasando contratos explícitos de entrada/salida:
 
 1. Abrir el documento de sprint desde `docs/sprints/SPRINT_SPEC_TEMPLATE.md` (Modo 3) o definir el plan en chat (Modo 2).
-2. **Despachar Subagente `market-researcher`** (cuando aplique): recibe el problema y dominio; lee `.agents/skills/market-researcher/SKILL.md` y devuelve el brief `[RESEARCH]` con >= 3 referentes y tabla de edge cases.
-3. **Despachar Subagente `worldclass-product-designer`** (Modo 2 y 3): recibe brief + ACs + tokens del proyecto; lee `.agents/skills/worldclass-product-designer/SKILL.md` y devuelve `[DESIGN SPEC]` con los 7 estados, targets >= 44×44px, Purpose Test y copy veraz.
+2. **Despachar Subagente `market-researcher`** (cuando aplique): `TypeName: "research"`, solo lectura + web; recibe el problema y dominio; lee `.agents/skills/market-researcher/SKILL.md` y devuelve el brief `[RESEARCH]` con >= 3 referentes y tabla de edge cases.
+3. **Despachar Subagente `worldclass-product-designer`** (Modo 2 y 3): `TypeName: "research"` (o `"self"` si genera assets); recibe brief + ACs + tokens del proyecto; lee `.agents/skills/worldclass-product-designer/SKILL.md` y devuelve `[DESIGN SPEC]` con los 7 estados, targets >= 44×44px, Purpose Test y copy veraz.
 4. Presentar el plan al usuario para aprobación formal antes de escribir código.
-5. **Despachar Subagente `principal-engineer`** (transición `node scripts/gate-qa.mjs start <ID> --by "<provider>:<session_or_agent_id>"` a `doing`): recibe la tarea refinada, ACs, Design Spec y archivos en alcance; lee `.agents/skills/principal-engineer/SKILL.md`, implementa en pasos atómicos (SDD), tilda ACs (`- [x]`), entrega el Cierre Honesto Ponytail y ejecuta `node scripts/gate-qa.mjs submit <ID>` para pasar a `status: review`.
+5. **Despachar Subagente `principal-engineer`** (transición `node scripts/gate-qa.mjs start <ID> --by "<provider>:<session_or_agent_id>"` a `doing`): `TypeName: "self"` (con permisos de escritura y comandos); recibe la tarea refinada, ACs, Design Spec y archivos en alcance; lee `.agents/skills/principal-engineer/SKILL.md`, implementa en pasos atómicos (SDD), tilda ACs (`- [x]`), entrega el Cierre Honesto Ponytail y ejecuta `node scripts/gate-qa.mjs submit <ID>` para pasar a `status: review`.
 6. **Despachar Subagente `rigorous-qa-auditor` en ventana de contexto limpia (OBLIGATORIO para `review` → `ready`)**:
    - **Prohibido auto-certificar en el mismo hilo que escribió el código.**
-   - El subagente QA se invoca en contexto virgen recibiendo **únicamente**: la ruta de la tarea (`ACs`), el `git diff` a auditar, y la instrucción de leer `.agents/skills/rigorous-qa-auditor/SKILL.md` + `.agents/skills/code-level-ux-auditor/SKILL.md` y ejecutar `npm run gate:qa <ID>` (que al dar `exit 0` escribe `status: ready` en el archivo de tarea).
+   - El subagente QA se invoca en contexto virgen (`TypeName: "self"`, acotado por contrato: sin permisos de edición de código fuente) recibiendo **únicamente**: la ruta de la tarea (`ACs`), el `git diff` a auditar, y la instrucción de leer `.agents/skills/rigorous-qa-auditor/SKILL.md` + `.agents/skills/code-level-ux-auditor/SKILL.md` y ejecutar `npm run gate:qa <ID>` (que al dar `exit 0` escribe `status: ready` en el archivo de tarea).
 
 ### 4. Definition of Done (DoD)
 
