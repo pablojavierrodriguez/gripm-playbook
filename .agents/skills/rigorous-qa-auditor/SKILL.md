@@ -133,7 +133,7 @@ Ejecutar los invariants declarados en `.agents/rules/`. Los genéricos frecuente
 
 ### 7. Modularidad y presupuesto de archivo (< 1000 LOC)
 
-- **Hard Ceiling de 1000 líneas:** Verificar que ningún archivo nuevo o modificado alcance o supere las **1000 líneas de código**. Si un archivo supera este umbral, el veredicto es **`REJECTED → doing`** con señalamiento de archivo y línea para su descomposición en submódulos o adaptadores.
+- **Presupuesto de 1000 líneas y Visibilidad de Deuda:** Verificar si algún archivo nuevo o modificado alcanza o supera las **1000 líneas de código**. Si un archivo supera este umbral, QA lo documenta como hallazgo de deuda técnica. El PO arbitra si se exige refactorización inmediata antes de certificar (`REJECTED → doing`) o si se aprueba la entrega registrando la tarea de refactor debidamente priorizada en el backlog para no bloquear la salida de valor prioritario.
 - **Anti-God-File & Desacoplamiento:** Comprobar que no se haya concentrado UI, lógica de dominio pura y llamadas de red/acceso a datos en un único archivo monolítico. La lógica de negocio debe residir en sus propios módulos de dominio desacoplados.
 
 ---

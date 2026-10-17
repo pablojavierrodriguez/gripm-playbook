@@ -100,6 +100,8 @@ function parseArgs(argv) {
     src: null,
     config: null,
     strict: false,
+    canonicalOnly: false,
+    only: null,
     format: 'human',
     listRules: false,
     rules: [],
@@ -114,6 +116,8 @@ function parseArgs(argv) {
       case '--src': opts.src = argv[++i]; break;
       case '--config': opts.config = argv[++i]; break;
       case '--strict': opts.strict = true; break;
+      case '--canonical-only': opts.canonicalOnly = true; break;
+      case '--only': opts.only = argv[++i]; break;
       case '--format': opts.format = argv[++i]; break;
       case '--list-rules': opts.listRules = true; break;
       case '--rule': opts.rules.push(argv[++i]); break;
@@ -128,6 +132,10 @@ function parseArgs(argv) {
 
   if (!['human', 'json'].includes(opts.format)) {
     fatal(`Unknown --format "${opts.format}". Expected "human" or "json".`);
+  }
+
+  if (opts.only && !['canonical', 'local'].includes(opts.only)) {
+    fatal(`Unknown --only "${opts.only}". Expected "canonical" or "local".`);
   }
 
   return opts;
@@ -164,7 +172,10 @@ function loadRules() {
     seen.add(rule.id);
   }
 
-  return { version: parsed.version || 1, rules: parsed.rules };
+  return {
+    version: parsed.version || 1,
+    rules: parsed.rules.map((rule) => ({ ...rule, origin: 'canonical' })),
+  };
 }
 
 /**
@@ -178,7 +189,7 @@ function loadRules() {
  * "my UX-009 is touch target" while the skill documents something else, so a
  * local catalog using that pattern is rejected rather than merged.
  */
-function loadLocalRules(relativePath, root) {
+function loadLocalRules(relativePath, root, canonical) {
   const localPath = path.resolve(root, relativePath);
 
   if (!fs.existsSync(localPath)) {
@@ -196,13 +207,24 @@ function loadLocalRules(relativePath, root) {
     fatal(`Local rule catalog ${localPath} has no "rules" array.`);
   }
 
+  const canonicalMap = new Map((canonical?.rules || []).map((r) => [r.id, r]));
+
   for (const rule of parsed.rules) {
-    if (typeof rule.id === 'string' && /^UX-\d{3}$/.test(rule.id)) {
-      fatal(
-        `Local rule ${rule.id} uses the reserved canonical pattern. ` +
-        'UX-NNN belongs to scripts/ux-rules.json so that one id means one thing ' +
-        'across every consumer. Give the local rule its own prefix.',
-      );
+    if (typeof rule.id === 'string') {
+      if (canonicalMap.has(rule.id)) {
+        const canonicalRule = canonicalMap.get(rule.id);
+        fatal(
+          `Local rule ${rule.id} collides with canonical rule "${canonicalRule.title}". ` +
+          'A local catalog adds rules; it cannot redefine shared ones.',
+        );
+      }
+      if (/^UX-\d{3}$/.test(rule.id)) {
+        fatal(
+          `Local rule ${rule.id} uses the reserved canonical pattern. ` +
+          'UX-NNN belongs to scripts/ux-rules.json so that one id means one thing ' +
+          'across every consumer. Give the local rule its own prefix.',
+        );
+      }
     }
   }
 
@@ -213,17 +235,7 @@ function loadCatalog(config, root) {
   const canonical = loadRules();
   if (!config || !config.rules) return { ...canonical, localRules: [] };
 
-  const local = loadLocalRules(config.rules, root);
-
-  const canonicalIds = new Set(canonical.rules.map((rule) => rule.id));
-  for (const rule of local.rules) {
-    if (canonicalIds.has(rule.id)) {
-      fatal(
-        `Local rule ${rule.id} collides with a canonical signature. ` +
-        'A local catalog adds rules; it cannot redefine shared ones.',
-      );
-    }
-  }
+  const local = loadLocalRules(config.rules, root, canonical);
 
   const merged = [
     ...canonical.rules.map((rule) => ({ ...rule, origin: 'canonical' })),
@@ -911,6 +923,7 @@ function auditFile(filePath, rules, deps, disabledRules, root = ROOT) {
 
       findings.push({
         rule: rule.id,
+        origin: rule.origin || 'canonical',
         title: rule.title,
         severity: rule.severity,
         file: relPath,
@@ -947,13 +960,18 @@ function printHuman(report, opts) {
   };
 
   for (const finding of findings) {
-    console.log(`  ${icons[finding.severity]} [${c.bold(finding.rule)}] ${finding.file}:${finding.line}`);
+    const originTag = finding.origin === 'local' ? ` ${c.dim('[local]')}` : ` ${c.dim('[canonical]')}`;
+    console.log(`  ${icons[finding.severity]} [${c.bold(finding.rule)}]${originTag} ${finding.file}:${finding.line}`);
     console.log(`    ${finding.message}`);
     if (finding.fix) console.log(`    ${c.dim('fix:')} ${finding.fix}`);
     console.log('');
   }
 
-  console.log(`  ${c.bold('Summary:')} ${summary.ERROR} error(s), ${summary.WARNING} warning(s), ${summary.INFO} suggestion(s).\n`);
+  const originBreakdown =
+    typeof summary.canonical === 'number' && typeof summary.local === 'number'
+      ? ` (${summary.canonical} canonical, ${summary.local} local)`
+      : '';
+  console.log(`  ${c.bold('Summary:')} ${summary.ERROR} error(s), ${summary.WARNING} warning(s), ${summary.INFO} suggestion(s)${originBreakdown}.\n`);
 }
 
 function printJson(report) {
@@ -1000,9 +1018,21 @@ function loadBaseline(root = ROOT) {
   return { version: BASELINE_VERSION, entries: {} };
 }
 
-function writeBaseline(findings, root = ROOT) {
+function writeBaseline(findings, root = ROOT, partialRuleIds = null) {
   const entries = {};
+
+  if (partialRuleIds instanceof Set) {
+    const existing = loadBaseline(root);
+    for (const [key, count] of Object.entries(existing.entries || {})) {
+      const ruleId = key.split('|')[0];
+      if (!partialRuleIds.has(ruleId)) {
+        entries[key] = count;
+      }
+    }
+  }
+
   for (const finding of findings) {
+    if (partialRuleIds instanceof Set && !partialRuleIds.has(finding.rule)) continue;
     const key = fingerprint(finding);
     entries[key] = (entries[key] || 0) + 1;
   }
@@ -1049,7 +1079,7 @@ function printRuleCatalog(catalog) {
   const local = (catalog.localRules || []).length;
   console.log('');
   console.log(
-    `Rule catalog v${catalog.version} — ${catalog.rules.length} signatures`
+    `Rule catalog v${catalog.version} - ${catalog.rules.length} signatures`
     + (local ? ` (${catalog.rules.length - local} canonical, ${local} local)` : ''),
   );
   if (catalog.localPath) console.log(`Local catalog: ${path.basename(catalog.localPath)}`);
@@ -1100,7 +1130,7 @@ function main() {
 
   if (!srcDir) {
     if (opts.format === 'json') {
-      printJson({ rulesVersion: catalog.version, srcDir: null, summary: { total: 0, ERROR: 0, WARNING: 0, INFO: 0 }, findings: [] });
+      printJson({ rulesVersion: catalog.version, srcDir: null, summary: { total: 0, ERROR: 0, WARNING: 0, INFO: 0, canonical: 0, local: 0 }, findings: [] });
     } else if (!opts.quiet) {
       console.log(`  ${c.dim('ℹ')} No JavaScript/TypeScript source directory found (looked for src, app, frontend, web, client).`);
       console.log(`    ${c.dim('Nothing to audit. Pass --src <dir> to point the auditor somewhere else.')}\n`);
@@ -1129,8 +1159,12 @@ function main() {
     || a.rule.localeCompare(b.rule)
   ));
 
-  const summary = { total: findings.length, ERROR: 0, WARNING: 0, INFO: 0 };
-  for (const finding of findings) summary[finding.severity] += 1;
+  const summary = { total: findings.length, ERROR: 0, WARNING: 0, INFO: 0, canonical: 0, local: 0 };
+  for (const finding of findings) {
+    summary[finding.severity] += 1;
+    if (finding.origin === 'local') summary.local += 1;
+    else summary.canonical += 1;
+  }
 
   // A snapshot of already-reviewed observations lets a project adopt the
   // auditor on a codebase that already carries hundreds of findings, without
@@ -1138,7 +1172,24 @@ function main() {
   const { keys: unreviewed } = diffAgainstBaseline(findings, ROOT);
 
   if (opts.updateBaseline) {
-    const entries = writeBaseline(findings.filter((f) => f.severity !== 'ERROR'));
+    let partialRuleIds = null;
+    if (opts.only === 'local') {
+      partialRuleIds = new Set((catalog.localRules || []).map((r) => r.id));
+    } else if (opts.only === 'canonical') {
+      partialRuleIds = new Set(catalog.rules.filter((r) => r.origin !== 'local').map((r) => r.id));
+    }
+    if (opts.rules.length > 0) {
+      const requested = new Set(opts.rules);
+      partialRuleIds = partialRuleIds
+        ? new Set([...partialRuleIds].filter((id) => requested.has(id)))
+        : requested;
+    }
+
+    const entries = writeBaseline(
+      findings.filter((f) => f.severity !== 'ERROR'),
+      ROOT,
+      partialRuleIds,
+    );
     const total = Object.values(entries).reduce((sum, n) => sum + n, 0);
 
     if (opts.format === 'json') {
@@ -1158,8 +1209,12 @@ function main() {
   const reported = findings.filter((f) => unreviewed.has(f));
   const absorbed = findings.length - reported.length;
 
-  const finalSummary = { total: reported.length, ERROR: 0, WARNING: 0, INFO: 0 };
-  for (const finding of reported) finalSummary[finding.severity] += 1;
+  const finalSummary = { total: reported.length, ERROR: 0, WARNING: 0, INFO: 0, canonical: 0, local: 0 };
+  for (const finding of reported) {
+    finalSummary[finding.severity] += 1;
+    if (finding.origin === 'local') finalSummary.local += 1;
+    else finalSummary.canonical += 1;
+  }
 
   const report = {
     rulesVersion: catalog.version,
@@ -1181,11 +1236,17 @@ function main() {
     console.log(`  ${c.yellow('▲')} ${unreadable.length} directory(ies) could not be read and were skipped.\n`);
   }
 
-  const blocked = finalSummary.ERROR > 0 || (opts.strict && finalSummary.WARNING > 0);
+  const gatingFindings = opts.canonicalOnly
+    ? reported.filter((f) => f.origin !== 'local')
+    : reported;
+  const gatingErrors = gatingFindings.filter((f) => f.severity === 'ERROR').length;
+  const gatingWarnings = gatingFindings.filter((f) => f.severity === 'WARNING').length;
+
+  const blocked = gatingErrors > 0 || (opts.strict && gatingWarnings > 0);
   if (blocked) {
     if (opts.format === 'json') process.exitCode = 1;
     else {
-      console.error(`  ${c.red('✖')} audit-ux failed: ${finalSummary.ERROR} error(s)${opts.strict ? `, ${finalSummary.WARNING} warning(s)` : ''}.\n`);
+      console.error(`  ${c.red('✖')} audit-ux failed: ${gatingErrors} error(s)${opts.strict ? `, ${gatingWarnings} warning(s)` : ''}${opts.canonicalOnly ? ' (canonical only)' : ''}.\n`);
       process.exitCode = 1;
     }
   }
@@ -1223,7 +1284,7 @@ function auditProject(options = {}) {
     return {
       rulesVersion: catalog.version,
       srcDir: null,
-      summary: { total: 0, ERROR: 0, WARNING: 0, INFO: 0 },
+      summary: { total: 0, ERROR: 0, WARNING: 0, INFO: 0, canonical: 0, local: 0 },
       findings: [],
       unreadable: [],
       absorbed: 0,
@@ -1261,8 +1322,12 @@ function auditProject(options = {}) {
     absorbed = findings.length - reported.length;
   }
 
-  const summary = { total: reported.length, ERROR: 0, WARNING: 0, INFO: 0 };
-  for (const finding of reported) summary[finding.severity] += 1;
+  const summary = { total: reported.length, ERROR: 0, WARNING: 0, INFO: 0, canonical: 0, local: 0 };
+  for (const finding of reported) {
+    summary[finding.severity] += 1;
+    if (finding.origin === 'local') summary.local += 1;
+    else summary.canonical += 1;
+  }
 
   return {
     rulesVersion: catalog.version,

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.0] - 2026-10-17
+
+`PLAY-008` · `PLAY-009` · `PLAY-024` · `PLAY-025`
+
+### Added
+
+- **Architecture-First & Strict Modularity Governance (`< 1000 LOC`)** (`PLAY-024`). Stack and domain agnostic architectural rules across `AGENTS.md`, `.agents/TEAM_PLAYBOOK.md`, `principal-engineer`, `pm-orchestrator`, `rigorous-qa-auditor`, and `docs/sprints/SPRINT_SPEC_TEMPLATE.md`. Requires defining module boundaries and contracts before implementation when a subsystem lacks architecture, enforces strict layer separation (anti-God-File), and establishes a 1000-line ceiling per source file (healthy range: 150 - 500 LOC) while respecting PO sovereignty over technical debt vs. urgent delivery.
+- **Mechanical File Line Budget Tool (`scripts/check-loc.mjs`)** (`PLAY-025`). Zero-dependency CLI and programmatic API (`checkLoc`, `parseArgs`) synced to consumer repositories via `.playbook-manifest.json`. Scans source directories (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.vue`, `.svelte`, `.py`, `.go`, `.rs`, `.rb`, `.java`, `.kt`, `.cs`, `.php`, `.swift`), respects `.gitignore` and `.locignore`, and warns at `>= 500 LOC` and `> 1000 LOC`. Runs in **advisory mode by default (`exit 0`)** to give visibility of technical debt without blocking urgent value releases, reminding the team to track and prioritize refactoring in `backlog/tasks/` under PO sovereignty. Supports opt-in `--strict` (`exit 1`), `--max <N>`, `--warn <N>`, and `--format json`.
+- **Canonical Package `exports` Map & Local Rule Catalog Validation** (`PLAY-008`). Added `"exports"` map to `package.json` (`"."`, `"./audit"`, `"./gate"`, `"./check-loc"`, `"./package.json"`, `"./scripts/*"`) so consumers can import `@gripm/playbook/audit`, `@gripm/playbook/gate`, and `@gripm/playbook/check-loc` via stable subpaths. Extended `scripts/validate-repo.mjs` (`checkLocalCatalog`) to validate local UX catalogs declared in `.uxaudit.json` against schema defects and canonical rule ID collisions, naming the collided canonical rule's title in `scripts/audit-ux-code.cjs`.
+- **Canonical vs. Local Finding Separation & Partial Baseline Regeneration** (`PLAY-009`). Every finding in `scripts/audit-ux-code.cjs` now declares `origin: "canonical" | "local"` in JSON output, human output (`[canonical]` / `[local]`), and summary breakdowns (`summary.canonical`, `summary.local`). Added `--canonical-only` to scope `--strict` exit code evaluation exclusively to canonical playbook rules, and `--only canonical|local` (alongside `--rule <ID>`) to `--update-baseline` so partial baseline snapshots preserve existing review entries for rules outside the regenerated subset.
+
+---
+
 ## [2.4.0] - 2026-10-17
 
 `PLAY-019` · `PLAY-020` · `PLAY-021` · `PLAY-022` · `PLAY-023`

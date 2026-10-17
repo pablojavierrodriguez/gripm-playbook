@@ -440,35 +440,134 @@ function checkStatusVocabulary() {
   }
 }
 
-// --- run -------------------------------------------------------------------
-const manifest = checkManifest();
-checkRuleParity();
-checkCorePurity();
-checkLinks();
-checkFrontmatter();
-checkStatusVocabulary();
+// --- 7. local catalog validation -------------------------------------------
+export function checkLocalCatalog(root = ROOT) {
+  const localErrors = [];
+  const report = (msg) => {
+    localErrors.push(msg);
+    fail('local-catalog', msg);
+  };
 
-console.log('');
-console.log('=====================================================');
-console.log('Playbook Repository Validator');
-console.log('=====================================================');
+  const configPath = path.join(root, '.uxaudit.json');
+  if (!fs.existsSync(configPath)) return localErrors;
 
-if (warnings.length) {
-  console.log('');
-  for (const message of warnings) console.log(`⚠️  ${message}`);
+  let config;
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  } catch (err) {
+    report(`.uxaudit.json is not valid JSON: ${err.message}`);
+    return localErrors;
+  }
+
+  if (!config || !config.rules) return localErrors;
+
+  const localCatalogPath = path.resolve(root, config.rules);
+  if (!fs.existsSync(localCatalogPath)) {
+    report(`Configured local rules file does not exist: ${config.rules}`);
+    return localErrors;
+  }
+
+  let catalog;
+  try {
+    catalog = JSON.parse(fs.readFileSync(localCatalogPath, 'utf8'));
+  } catch (err) {
+    report(`Local rules catalog ${config.rules} is not valid JSON: ${err.message}`);
+    return localErrors;
+  }
+
+  if (!Array.isArray(catalog.rules)) {
+    report(`Local rules catalog ${config.rules} does not declare a "rules" array`);
+    return localErrors;
+  }
+
+  let canonicalCatalog = { rules: [] };
+  const canonicalPath = fs.existsSync(path.join(root, 'scripts/ux-rules.json'))
+    ? path.join(root, 'scripts/ux-rules.json')
+    : path.join(ROOT, 'scripts/ux-rules.json');
+  if (fs.existsSync(canonicalPath)) {
+    try {
+      canonicalCatalog = JSON.parse(fs.readFileSync(canonicalPath, 'utf8'));
+    } catch {}
+  }
+  const canonicalMap = new Map((canonicalCatalog.rules || []).map((r) => [r.id, r]));
+
+  const seenIds = new Set();
+  for (const rule of catalog.rules) {
+    for (const field of ['id', 'title', 'severity', 'message']) {
+      if (!rule[field]) {
+        report(`Local rule is missing required field "${field}": ${JSON.stringify(rule)}`);
+      }
+    }
+
+    if (rule.severity && !['ERROR', 'WARNING', 'INFO'].includes(rule.severity)) {
+      report(`Local rule "${rule.id || '(unnamed)'}" has invalid severity "${rule.severity}". Allowed: ERROR, WARNING, INFO.`);
+    }
+
+    const hasValidCheck =
+      rule.check &&
+      typeof rule.check === 'object' &&
+      ((Array.isArray(rule.check.line) && rule.check.line.length > 0) ||
+        (Array.isArray(rule.check.file) && rule.check.file.length > 0) ||
+        Boolean(rule.check.type));
+
+    if (!hasValidCheck) {
+      report(`Local rule "${rule.id || '(unnamed)'}" is missing a valid "check" definition`);
+    }
+
+    if (rule.id) {
+      if (seenIds.has(rule.id)) {
+        report(`Duplicate rule id in local catalog: ${rule.id}`);
+      }
+      seenIds.add(rule.id);
+
+      if (canonicalMap.has(rule.id)) {
+        const canonicalRule = canonicalMap.get(rule.id);
+        report(
+          `Local rule "${rule.id}" collides with canonical rule "${canonicalRule.title}". Local rule IDs must be unique.`,
+        );
+      } else if (typeof rule.id === 'string' && /^UX-\d{3}$/.test(rule.id)) {
+        report(
+          `Local rule "${rule.id}" uses the reserved canonical pattern "UX-NNN". Local rules must use a project-specific prefix.`,
+        );
+      }
+    }
+  }
+
+  return localErrors;
 }
 
-if (errors.length) {
+// --- run -------------------------------------------------------------------
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const manifest = checkManifest();
+  checkRuleParity();
+  checkCorePurity();
+  checkLinks();
+  checkFrontmatter();
+  checkStatusVocabulary();
+  checkLocalCatalog();
+
   console.log('');
-  for (const message of errors) console.log(`❌ ${message}`);
+  console.log('=====================================================');
+  console.log('Playbook Repository Validator');
+  console.log('=====================================================');
+
+  if (warnings.length) {
+    console.log('');
+    for (const message of warnings) console.log(`⚠️  ${message}`);
+  }
+
+  if (errors.length) {
+    console.log('');
+    for (const message of errors) console.log(`❌ ${message}`);
+    console.log('');
+    console.log(`${errors.length} error(s), ${warnings.length} warning(s).`);
+    console.log('=====================================================');
+    console.log('');
+    process.exit(1);
+  }
+
   console.log('');
-  console.log(`${errors.length} error(s), ${warnings.length} warning(s).`);
+  console.log(`✅ Repository is consistent.${manifest ? ` Manifest v${manifest.version}.` : ''}`);
   console.log('=====================================================');
   console.log('');
-  process.exit(1);
 }
-
-console.log('');
-console.log(`✅ Repository is consistent.${manifest ? ` Manifest v${manifest.version}.` : ''}`);
-console.log('=====================================================');
-console.log('');

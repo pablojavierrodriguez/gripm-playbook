@@ -1,0 +1,5 @@
+# .locignore
+# Exclusions for the file line budget and modularity checker (check-loc)
+
+# Standalone legacy audit engine (monolithic zero-dependency asset synced to consumer projects)
+scripts/audit-ux-code.cjs

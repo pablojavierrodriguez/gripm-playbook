@@ -69,9 +69,9 @@
   - Minimum interactive tap target of **44×44px**.
   - Visible focus rings for keyboard navigation.
   - No horizontal page overflow on small screens (375px/390px).
-- **Architecture-First & Strict Modularity (Hard Ceiling < 1000 LOC):**
+- **Architecture-First & Strict Modularity (Ceiling < 1000 LOC):**
   - **Architecture Before Implementation:** If the project lacks a defined architecture or a task introduces a new domain or subsystem, establish and document module boundaries, layers, and public contracts before writing code.
-  - **Inviolable 1000-Line Limit:** No single source file (module, component, service, script, or handler) may reach or exceed **1000 lines of code**. Breaching this limit is a blocking architectural defect requiring decomposition into cohesive sub-modules or adapters. Healthy modular range: **150 - 500 lines**.
+  - **1000-Line Limit & Technical Debt Visibility:** Source files (modules, components, services, scripts, or handlers) should remain under **1000 lines of code** (healthy modular range: **150 - 500 lines**). The `check-loc` tool provides clear visibility of modular technical debt. It is advisory by default to respect PO sovereignty and prevent blocking urgent releases; the PO arbitrates whether to refactor immediately or record and prioritize the debt in the backlog.
   - **Anti-God-File & Layer Separation:** Strictly separate presentation/UI, pure domain logic, infrastructure/persistence, and state management. Never bundle multi-layer logic into a giant file acting as a single point of failure (SPoF).
 
 ---

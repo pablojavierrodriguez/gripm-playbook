@@ -75,6 +75,7 @@ export const FALLBACK_CORE_FILES = [
   '.agents/skills/code-level-ux-auditor/SKILL.md',
   'scripts/audit-ux-code.cjs',
   'scripts/gate-qa.mjs',
+  'scripts/check-loc.mjs',
   'scripts/ux-rules.json',
   'docs/sprints/SPRINT_SPEC_TEMPLATE.md',
   'docs/DOMAIN_TEMPLATE.md',

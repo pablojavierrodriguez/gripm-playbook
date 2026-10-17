@@ -520,6 +520,7 @@ describe('programmatic API (PLAY-005)', () => {
 
   test('a local rule may not squat a canonical UX-NNN id', () => {
     const temp = createProject();
+    // 1. Colliding with an existing canonical rule (UX-009) names the canonical signature
     writeLocalCatalog(temp, { version: 1, rules: [{ ...LOCAL_RULE.rules[0], id: 'UX-009' }] });
     fs.writeFileSync(
       path.join(temp, '.uxaudit.json'),
@@ -527,6 +528,21 @@ describe('programmatic API (PLAY-005)', () => {
     );
 
     let stderr = '';
+    try {
+      execFileSync(process.execPath, [AUDITOR, '--format', 'json'], {
+        env: { ...process.env, AUDIT_UX_ROOT: temp },
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      stderr = err.stdout || '';
+      assert.equal(err.status, 2, 'a colliding canonical id is a fatal usage error');
+    }
+    assert.match(JSON.parse(stderr).error, /collides with canonical rule "Sub-44px touch target"/);
+
+    // 2. Using an unassigned UX-NNN id triggers the reserved canonical pattern error
+    writeLocalCatalog(temp, { version: 1, rules: [{ ...LOCAL_RULE.rules[0], id: 'UX-099' }] });
+    stderr = '';
     try {
       execFileSync(process.execPath, [AUDITOR, '--format', 'json'], {
         env: { ...process.env, AUDIT_UX_ROOT: temp },
@@ -628,5 +644,157 @@ describe('robustness', () => {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     assert.equal(JSON.parse(stdout).findings.length, 0);
+  });
+});
+
+describe('canonical vs local findings & partial baseline (PLAY-009)', () => {
+  const LOCAL_WARN_CATALOG = {
+    version: 1,
+    rules: [
+      {
+        id: 'LOC-001',
+        title: 'Local custom warning',
+        severity: 'WARNING',
+        message: 'Local rule triggered.',
+        check: { line: ['data-local-warn'] },
+      },
+    ],
+  };
+
+  function setupMixedProject({ canonicalWarn = true, localWarn = true } = {}) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ux-play009-'));
+    fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'rules.json'), JSON.stringify(LOCAL_WARN_CATALOG, null, 2));
+    fs.writeFileSync(
+      path.join(temp, '.uxaudit.json'),
+      JSON.stringify({ src: 'src', rules: 'rules.json' }),
+    );
+
+    const lines = [];
+    if (canonicalWarn) {
+      // UX-009 WARNING: Sub-44px touch target (<button with h-6)
+      lines.push('export const Bar = () => <button className="h-6 w-6" onClick={fn}>bar</button>;');
+    }
+    if (localWarn) {
+      lines.push('export const Foo = () => <div data-local-warn="1">foo</div>;');
+    }
+    if (!lines.length) {
+      lines.push('export const Ok = () => <div>ok</div>;');
+    }
+    fs.writeFileSync(path.join(temp, 'src', 'App.tsx'), lines.join('\n') + '\n');
+    return temp;
+  }
+
+  test('JSON and human output declare origin (canonical vs local) and summary breakdown (AC #1 & #5)', () => {
+    const temp = setupMixedProject({ canonicalWarn: true, localWarn: true });
+
+    const jsonOut = execFileSync(process.execPath, [AUDITOR, '--format', 'json'], {
+      env: { ...process.env, AUDIT_UX_ROOT: temp },
+      encoding: 'utf8',
+    });
+    const report = JSON.parse(jsonOut);
+    assert.equal(report.summary.canonical, 1);
+    assert.equal(report.summary.local, 1);
+
+    const canonicalFinding = report.findings.find((f) => f.rule === 'UX-009');
+    const localFinding = report.findings.find((f) => f.rule === 'LOC-001');
+    assert.equal(canonicalFinding.origin, 'canonical');
+    assert.equal(localFinding.origin, 'local');
+
+    const humanOut = execFileSync(process.execPath, [AUDITOR], {
+      env: { ...process.env, AUDIT_UX_ROOT: temp, NO_COLOR: '1' },
+      encoding: 'utf8',
+    });
+    assert.match(humanOut, /\[UX-009\] \[canonical\]/);
+    assert.match(humanOut, /\[LOC-001\] \[local\]/);
+    assert.match(humanOut, /\(1 canonical, 1 local\)/);
+
+    fs.rmSync(temp, { recursive: true, force: true });
+  });
+
+  test('--strict --canonical-only ignores local warnings for exit code but fails on canonical warnings (AC #2)', () => {
+    // Only local warning present -> --strict fails, but --strict --canonical-only passes!
+    const localOnly = setupMixedProject({ canonicalWarn: false, localWarn: true });
+
+    let strictCode = 0;
+    try {
+      execFileSync(process.execPath, [AUDITOR, '--strict', '--format', 'json'], {
+        env: { ...process.env, AUDIT_UX_ROOT: localOnly },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      strictCode = err.status;
+    }
+    assert.equal(strictCode, 1, '--strict alone must fail on local WARNING');
+
+    let canonicalOnlyCode = 0;
+    try {
+      execFileSync(process.execPath, [AUDITOR, '--strict', '--canonical-only', '--format', 'json'], {
+        env: { ...process.env, AUDIT_UX_ROOT: localOnly },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      canonicalOnlyCode = err.status;
+    }
+    assert.equal(canonicalOnlyCode, 0, '--strict --canonical-only must pass when only local WARNING exists');
+
+    // Canonical warning present -> --strict --canonical-only fails!
+    const both = setupMixedProject({ canonicalWarn: true, localWarn: true });
+    let bothCode = 0;
+    try {
+      execFileSync(process.execPath, [AUDITOR, '--strict', '--canonical-only', '--format', 'json'], {
+        env: { ...process.env, AUDIT_UX_ROOT: both },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      bothCode = err.status;
+    }
+    assert.equal(bothCode, 1, '--strict --canonical-only must fail when canonical WARNING exists');
+
+    fs.rmSync(localOnly, { recursive: true, force: true });
+    fs.rmSync(both, { recursive: true, force: true });
+  });
+
+  test('--update-baseline --only local regenerates local signatures without losing canonical baseline entries (AC #3 & #4)', () => {
+    const temp = setupMixedProject({ canonicalWarn: true, localWarn: true });
+
+    // 1. Write full baseline (absorbs both UX-009 and LOC-001)
+    execFileSync(process.execPath, [AUDITOR, '--update-baseline', '--quiet'], {
+      env: { ...process.env, AUDIT_UX_ROOT: temp },
+    });
+
+    const initialBaseline = JSON.parse(fs.readFileSync(path.join(temp, 'audit-ux-baseline.json'), 'utf8'));
+    const initialKeys = Object.keys(initialBaseline.entries);
+    assert.equal(initialKeys.some((k) => k.startsWith('UX-009|')), true);
+    assert.equal(initialKeys.some((k) => k.startsWith('LOC-001|')), true);
+
+    // 2. Modify App.tsx: add a second local violation, and temporarily remove canonical violation from file
+    // to prove that regenerating `--only local` preserves the canonical entry in the baseline!
+    fs.writeFileSync(
+      path.join(temp, 'src', 'App.tsx'),
+      [
+        'export const Foo1 = () => <div data-local-warn="1">foo1</div>;',
+        'export const Foo2 = () => <div data-local-warn="2">foo2</div>;',
+      ].join('\n') + '\n',
+    );
+
+    execFileSync(process.execPath, [AUDITOR, '--update-baseline', '--only', 'local', '--quiet'], {
+      env: { ...process.env, AUDIT_UX_ROOT: temp },
+    });
+
+    const updatedBaseline = JSON.parse(fs.readFileSync(path.join(temp, 'audit-ux-baseline.json'), 'utf8'));
+    const updatedKeys = Object.keys(updatedBaseline.entries);
+
+    // Canonical UX-009 entry was preserved even though it wasn't in the partial run!
+    assert.equal(
+      updatedKeys.some((k) => k.startsWith('UX-009|')),
+      true,
+      'canonical baseline review must be preserved during --only local update',
+    );
+    // Both new local occurrences are recorded
+    const localEntries = updatedKeys.filter((k) => k.startsWith('LOC-001|'));
+    assert.equal(localEntries.length, 2, 'local baseline entries must be updated');
+
+    fs.rmSync(temp, { recursive: true, force: true });
   });
 });
