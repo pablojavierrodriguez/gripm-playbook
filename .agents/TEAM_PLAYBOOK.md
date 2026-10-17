@@ -6,52 +6,67 @@ This playbook establishes a collaborative, autonomous operating loop between spe
 
 ---
 
-## 🚦 Dynamic Decision Matrix (System Autonomy)
+## 🚦 Default Entry Point & Dynamic Decision Matrix
 
-The user should never have to manually specify when to trigger a sprint or which role to activate. The system automatically classifies incoming requests into one of three operating tracks:
+**Default Conversation Role:** Every conversation thread defaults to the **[`pm-orchestrator`](skills/pm-orchestrator/SKILL.md)** as the host agent talking to the user, **unless** the user explicitly invokes another role or skill directly (e.g., *"act directly as Principal Engineer"*).
 
-| Operating Track | Typical Triggers | Roles Involved | Overhead / Documentation |
+The user never has to manually specify when to trigger a sprint or which sub-agent to spawn. The `pm-orchestrator` automatically classifies incoming requests into one of three operating tracks and dispatches the required sub-agents:
+
+| Operating Track | Typical Triggers | Execution & Sub-Agent Topology | Overhead / Documentation |
 | :--- | :--- | :--- | :--- |
-| **Mode 1: Surgical Focus** *(Fast-Track)* | Targeted bugfixes, calculations/invariants, copy/typo tweaks, linter fixes, failing unit tests. | **Principal Engineer** (direct, exclusive control). | **Zero bureaucracy.** No sprint doc. Atomic modification + verification (typecheck + tests). |
-| **Mode 2: Tactical Duo** *(UX + Engineering)* | Component redesign, new modals/sheets, ergonomics & touch targets, visual charts. | **Product Designer** + **Principal Engineer** (+ QA check). | **Lightweight.** Plan outlined directly in chat. No sprint doc unless touching database schema. |
-| **Mode 3: Full Sprint & Backlog Flow** | Major backlog feature, database schema migrations, complex business workflows. | Loop: **PM Orchestrator** ➔ **Designer** ➔ **Principal Engineer** ➔ **QA Auditor** ➔ **Release Management**. | **Formal.** Tracked via backlog task or sprint spec, verified through the Verification Pyramid and packaged by value. |
+| **Mode 1: Surgical Focus** *(Fast-Track)* | Targeted bugfixes, calculations/invariants, copy/typo tweaks, linter fixes, failing unit tests. | **Host Orchestrator** applies [`principal-engineer`](skills/principal-engineer/SKILL.md) rules directly (or via 1 focused sub-agent). If certifying a backlog item (`review` ➔ `ready`), spawns a clean-context [`rigorous-qa-auditor`](skills/rigorous-qa-auditor/SKILL.md) sub-agent. | **Zero bureaucracy.** No sprint doc. Atomic modification + verification (`typecheck` + tests). |
+| **Mode 2: Tactical Duo** *(UX + Engineering)* | Component redesign, new modals/sheets, ergonomics & touch targets, visual charts. | **Host (`pm-orchestrator`)** dispatches clean-context sub-agents: **[`worldclass-product-designer`](skills/worldclass-product-designer/SKILL.md)** ➔ **[`principal-engineer`](skills/principal-engineer/SKILL.md)** ➔ **[`rigorous-qa-auditor`](skills/rigorous-qa-auditor/SKILL.md)**. | **Lightweight.** Plan outlined directly in chat. No sprint doc unless touching database schema. |
+| **Mode 3: Full Sprint & Backlog Flow** | Major backlog feature, database schema migrations, complex business workflows. | **Host (`pm-orchestrator`)** orchestrates isolated sub-agents: **[`market-researcher`](skills/market-researcher/SKILL.md)** ➔ **[`worldclass-product-designer`](skills/worldclass-product-designer/SKILL.md)** ➔ **[`principal-engineer`](skills/principal-engineer/SKILL.md)** (SDD) ➔ **[`rigorous-qa-auditor`](skills/rigorous-qa-auditor/SKILL.md)** ➔ **Release Management**. | **Formal.** Tracked via backlog task or sprint spec, verified through the Verification Pyramid and packaged by value. |
 
 ---
 
-## 🤖 Sub-Agent Autonomy & The Verification Pyramid
+## 🤖 Sub-Agent Context Isolation & Handoff Contracts
 
-The team decides when to spawn sub-agents (e.g. browser subagents, background jobs) under a golden rule:
+A single LLM thread that writes code and then "pretends" to be the QA Auditor in the same context window suffers from **confirmation bias**: it inherits its own assumptions, excuses, and blind spots. To eliminate roleplay theatre, this framework enforces **Context Isolation via Sub-Agents (`invoke_subagent`)**:
 
-> **"Atomic focus on domain logic; parallel hands on exploration and verification."**
+> **"Orchestrate from the hub; isolate execution and verification in clean sub-agent contexts."**
+
+### 📋 Mandatory Sub-Agent Handoff Matrix
+
+When the host `pm-orchestrator` delegates to a specialist via `invoke_subagent`, the sub-agent runs in a **fresh context window** and receives an explicit **Handoff Contract**:
+
+| Sub-Agent Role | Skill Required to Read First | Clean Input Provided by Orchestrator | Mandatory Output Returned |
+| :--- | :--- | :--- | :--- |
+| **Market Researcher** | [`.agents/skills/market-researcher/SKILL.md`](skills/market-researcher/SKILL.md) | Problem statement + domain + specific UX/API questions. | `[RESEARCH]` brief: >= 3 product benchmarks, filtered domain edge-case table, and concrete recommendations. |
+| **Product Designer** | [`.agents/skills/worldclass-product-designer/SKILL.md`](skills/worldclass-product-designer/SKILL.md) | Problem statement + ACs + Research brief + project design tokens. | `[DESIGN SPEC]`: semantic tokens, >= 44×44px touch targets, all 7 interactive states, Purpose Test verdicts, and copy veracity check. |
+| **Principal Engineer** | [`.agents/skills/principal-engineer/SKILL.md`](skills/principal-engineer/SKILL.md) | Refined task (`doing`) + ACs + Design Spec + files in scope + `.agents/rules/`. | Implemented code, checked ACs (`- [x]`), green local typecheck/tests, Ponytail honest close (what was not tested + residual risk), task in `review`. |
+| **Rigorous QA Auditor** *(NEVER in the coder's thread)* | [`.agents/skills/rigorous-qa-auditor/SKILL.md`](skills/rigorous-qa-auditor/SKILL.md) & [`.agents/skills/code-level-ux-auditor/SKILL.md`](skills/code-level-ux-auditor/SKILL.md) | **Blind audit payload only:** Task file path (ACs) + `git diff` (or commit range) + command to run `npm run gate:qa <ID>`. Zero developer rationalization history. | `[QA MATRIX]`: mechanical `gate:qa` exit code + blind semantic audit of `git diff` vs. ACs + verdict (`APPROVED -> ready` or `REJECTED -> doing` with file:line findings). |
 
 ### 🟢 When to Parallelize (Sub-Agents / Background Tasks):
-1. **Auditing Visual Layouts (`browser_subagent`):**
-   - Reserved **exclusively** for visual layout/CSS issues not deducible statically, complex viewport rendering, or upon explicit user request.
-2. **Exploratory Research & Benchmarking (Market Researcher):**
+1. **Blind QA Certification (`rigorous-qa-auditor`):**
+   - **Always isolated** in a fresh sub-agent context so verification is unbiased by the implementation conversation.
+2. **Exploratory Research & Benchmarking (`market-researcher`):**
    - Investigate industry references (Linear, Stripe, Notion, Obsidian) or analyze external API documentation without polluting the core technical context.
-3. **Accessibility (a11y) & Static Code Audits:**
+3. **Accessibility (a11y) & Static Code Audits (`code-level-ux-auditor`):**
    - Execute contrast ratios, accessibility checks, or static UX scans (`npm run audit:ux`) asynchronously.
+4. **Auditing Visual Layouts (`browser_subagent`):**
+   - Reserved **exclusively** for visual layout/CSS issues not deducible statically, complex viewport rendering, or upon explicit user request.
 
-### 🔴 When to Keep STRICT ATOMIC FOCUS (Single-thread, No Sub-Agents):
+### 🔴 When to Keep STRICT SEQUENTIAL WRITER FOCUS (One Active Mutator at a Time):
 1. **Domain Logic & State Invariants:**
-   - Core business logic, central state stores, and data integrity require strict sequential reasoning. Fragmenting domain logic across parallel subagents risks race conditions and contradictory code.
+   - Core business logic, central state stores, and data integrity require strict sequential reasoning. Never spawn two concurrent coder sub-agents mutating the same domain store at the same time.
 2. **Database Schemas & Migrations:**
-   - Schema foundations, migrations, and Row-Level Security (RLS) policies must be designed and validated by a single technical mind to guarantee idempotence.
+   - Schema foundations, migrations, and Row-Level Security (RLS) policies must be designed and validated sequentially to guarantee idempotence.
 3. **Core Architectural Refactoring & Backlog Parsers:**
    - Backlog sync engines, parsers, and global context providers require end-to-end coherence.
 
 ### 🔁 Subagent-Driven Development (SDD)
 
-Un único hilo ejecutando un plan extenso sufre **fatiga de contexto**: olvida instrucciones tempranas, mezcla estados, reintroduce regresiones en tests que pasaban y empieza a parchear improvisando. SDD es el antidote para tareas de alta complejidad.
+Un único hilo ejecutando un plan extenso sufre **fatiga de contexto**: olvida instrucciones tempranas, mezcla estados, reintroduce regresiones en tests que pasaban y empieza a parchear improvisando. SDD es el antídoto para tareas de alta complejidad.
 
-**1. Planes a prueba de contexto.** Desglosar el trabajo en pasos **hiper-atómicos e independientes**. Cada paso se redacta bajo Red-Green TDD con instrucciones explícitas y autocontenidas: un subagente sin historial debe poder ejecutarlo sin desviarse. El paso declara qué archivos toca, qué se espera que haga, y cómo se verifica.
+**1. Planes a prueba de contexto.** El `pm-orchestrator` desglosa el trabajo en pasos **hiper-atómicos e independientes**. Cada paso se redacta bajo Red-Green TDD con instrucciones explícitas y autocontenidas: un subagente `principal-engineer` sin historial debe poder ejecutarlo sin desviarse. El paso declara qué archivos toca, qué se espera que haga, y cómo se verifica.
 
-**2. Un subagente fresco por paso.** El orquestador **no** pica todo el código en el hilo principal. Despacha un subagente nuevo para el paso N, operando en un worktree aislado (ver § Workspace Isolation).
+**2. Un subagente fresco por paso.** El orquestador **no** pica todo el código en el hilo principal. Despacha un subagente nuevo para el paso N, operando sobre el árbol o en un worktree aislado (ver § Workspace Isolation).
 
-**3. Supervisión y consolidación secuencial.** El orquestador revisa el diff producido, corre la verificación headless, y **solo cuando pasa en verde** consolida y dispara el paso N+1. Un subagente no se lanza en paralelo con el siguiente sobre el mismo trabajo.
+**3. Supervisión y consolidación secuencial.** El orquestador revisa el diff producido, corre la verificación headless, y **solo cuando pasa en verde** consolida y dispara el paso N+1. Un subagente constructor no se lanza en paralelo con el siguiente sobre los mismos archivos. Al completar todos los pasos y pasar a `review`, el orquestador despacha al subagente `rigorous-qa-auditor` en contexto limpio para certificar.
 
 > [!CAUTION]
-> SDD es para **tareas de alta complejidad**. Para un bugfix puntual es sobre-ingeniería: el costo de coordinar el contexto no se recupera. Aplica el criterio Ponytail - la estructura existe para cuando el problema la amerita, no por defecto.
+> SDD multi-paso es para **tareas de alta complejidad**. Para un bugfix puntual (Modo 1) es sobre-ingeniería: aplica el criterio Ponytail - la estructura existe para cuando el problema la amerita, no por defecto.
 
 ### 🔒 Workspace Isolation & Autonomous Inter-Agent Coordination (IACP)
 
@@ -118,29 +133,31 @@ Transitions, actors and guards are specified in [STATE_MACHINE.md](STATE_MACHINE
 - **Ticking ACs:** Checks off acceptance criteria in real-time (`- [x]`).
 - **Output:** Passes the item to `status: review` upon completing implementation and local testing. **Cannot self-certify:** moving to `ready` is exclusive to the QA Auditor.
 
-### Phase 4: QA Gate (`review` ➔ `ready`) - Formal Handover of Development (QA Auditor)
-- **Action:** Audits the item using the **Verification Pyramid (Zero-Waste Testing)** in strict sequence:
-  1. ✅ `tsc --noEmit` (strict typing, 0 errors)
+### Phase 4: QA Gate (`review` ➔ `ready`) - Formal Handover in a Clean-Context Sub-Agent (QA Auditor)
+- **Mandatory Clean-Context Sub-Agent:** The thread that implemented the code **never** executes Phase 4. The `pm-orchestrator` spawns an isolated [`rigorous-qa-auditor`](skills/rigorous-qa-auditor/SKILL.md) sub-agent (`invoke_subagent`) with a clean context window, passing only the task path (ACs) and the `git diff`.
+- **Action:** The QA sub-agent audits the item using the **Verification Pyramid (Zero-Waste Testing)** in strict sequence:
+  1. ✅ `tsc --noEmit` / `npm run validate` (strict typing & repo consistency, 0 errors)
   2. ✅ Unit & integration tests (`npm test`, headless code 0)
   3. ✅ Backlog & spec consistency checks
   4. ✅ Production build (`npm run build`)
   5. ✅ `node scripts/audit-ux-code.cjs --strict` (static UX audit, headless)
+- **Blind Semantic Diff Audit:** Beyond mechanical checks, the clean-context QA sub-agent verifies that every checked AC (`- [x]`) is genuinely implemented in the `git diff`, with no module-wide `vi.mock()` evasions, no `as unknown as` type escapes, and all 6 mandatory headless audits satisfied.
 - **Anti-Browser-Subagent Inefficiency:** Prohibited to invoke `browser_subagent` for logic, state, API contracts, or persistence that can be audited in milliseconds headlessly. Reserved strictly for static-undeducible CSS/layout issues or explicit user prompt.
-- **Output:** Once verified, moves the item to `status: ready`. On failure, records actionable findings and moves it back to `doing` (transition T3).
+- **Output:** Once both `npm run gate:qa <ID>` (`exit 0`) and the blind diff audit pass, moves the item to `status: ready`. On failure, records actionable findings (`file:line`) and moves it back to `doing` (transition T3).
 - **`ready` is the formal delivery of development**: the item is validated and immediately eligible for packaging and deployment. A certified item is frozen: any post-QA code change invalidates the certification and requires a return to `doing`.
 
-#### The gate is executable, not a promise
+#### Double Gate: Mechanical Runner + Blind Sub-Agent
 
-> **Prose is not a gate.** An agent asked to "act as the QA Auditor" can perform the role in the same turn that it wrote the code, tick the ACs by inertia, and promote the item on discourse alone. This playbook ships the gate as a program so that T2 is satisfied by **exit code 0**, not by an assertion.
+> **Neither prose nor same-thread roleplay is a gate.** An agent asked to "act as the QA Auditor" in the same turn that it wrote the code will tick the ACs by inertia and rationalize its own shortcuts. This playbook prevents both failure modes: `scripts/gate-qa.mjs` enforces the mechanical gate (**exit code 0**), and **context isolation (`invoke_subagent`)** enforces an unbiased semantic audit of the `git diff`.
 
 ```bash
-npm run gate:qa TASK-ID                    # full gate
+npm run gate:qa TASK-ID                    # full mechanical gate
 node scripts/gate-qa.mjs TASK-ID --no-run  # inspection only; exits 2, never certifies
 ```
 
 The runner rejects, mechanically: an item not in `review`; any unchecked acceptance criterion; a `blocked_reason` that is missing, empty or whitespace on a `blocked` item (and a stray `blocked_reason` on an item that is not blocked); and any declared dependency that is missing from disk or not in `done`. It then runs the pyramid, and a step that cannot execute is reported `SKIPPED` - **a pyramid where nothing ran fails the gate rather than passing it**, because certification on an unexecuted gate is the exact theatre this runner exists to prevent.
 
-Running the gate is not the verdict: the QA Auditor still issues it. The runner is the evidence, not the judge.
+Running the gate is necessary (`exit 0`) and the clean-context QA Auditor sub-agent issues the final verdict after auditing the `git diff` against the ACs.
 
 #### `blocked`: registering an impediment
 

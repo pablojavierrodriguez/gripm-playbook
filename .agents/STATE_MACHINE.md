@@ -58,8 +58,8 @@ Un ítem no refinado permanece en `draft` (o `ideas` si es discovery) en el back
 | :--- | :--- | :--- | :--- |
 | T0 | `draft` → `doing` | Principal Engineer | **Gate R1 aprobado** + priorizado por el PO + **todas las `dependencies:` en `done`** + registro atómico de `claimed_by: "<provider>:<session_or_agent_id>"` (ej: `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) en frontmatter + rama/worktree listos. |
 | T1 | `doing` → `review` | Principal Engineer | Código implementado, ACs marcadas `- [x]`, y pasos 1 - 2 de la Pirámide en verde local (`typecheck` + tests). |
-| T2 | `review` → `ready` | **QA Auditor** | Pirámide de Verificación completa en verde **y `npm run gate:qa` con exit code 0**. Una transición declarada solo en prosa no surte efecto. |
-| T3 | `review` → `doing` | QA Auditor | Rechazado, con findings accionables registrados en la QA Matrix. |
+| T2 | `review` → `ready` | **QA Auditor (Subagente Aislado)** | Pirámide de Verificación completa en verde, **`npm run gate:qa` con exit code 0**, y **auditoría ciega del `git diff` ejecutada en un subagente con ventana de contexto limpia (`invoke_subagent`)**. Ni la prosa ni el mismo hilo que escribió el código pueden certificar. |
+| T3 | `review` → `doing` | QA Auditor (Subagente Aislado) | Rechazado, con findings accionables (`archivo:línea`) registrados en la QA Matrix. |
 | T4 | `ready` → `done` | Release Management | Paquete desplegado en producción. |
 | T5 | `doing` → `draft` | PO | Timebox del sprint expirado, o depriorizado explícitamente. |
 | T_block | `draft` → `blocked` | PO / Dev | Impedimento externo identificado. `blocked_reason` obligatorio. |
@@ -73,12 +73,12 @@ Un ítem no refinado permanece en `draft` (o `ideas` si es discovery) en el back
 ## 4. Invariantes
 
 1. **Producción ⊆ `done`.** Ningún ítem puede estar en producción sin estar en `done`. Violarlo es un incidente de proceso, no un detalle de bookkeeping.
-2. **El developer no auto-certifica.** T2 (`review` → `ready`) es exclusiva del QA Auditor. El Principal Engineer jamás mueve su propio ítem a `ready`.
+2. **El developer no auto-certifica (Aislamiento de Contexto Obligatorio).** T2 (`review` → `ready`) es exclusiva del QA Auditor corriendo en un **subagente con ventana de contexto limpia (`invoke_subagent`)**. El hilo o subagente que implementó el código jamás mueve su propio ítem a `ready`.
 3. **`ready` es inmutable.** Una vez certificado, el código no se modifica sin volver a `doing`. Un fix post-QA **invalida la certificación**: el ítem vuelve a `doing` y reingresa por T1/T2 completas.
 4. **T4 exige deploy real.** Marcar `done` sin desplegar es una mentira de estado.
 5. **Ni sprint ni retrospectiva se cierran por deducción.** Requieren comando textual explícito del PO.
 6. **El refinamiento nunca se pierde.** Un ítem que vuelve al pool conserva su registro de refinamiento; no se re-refina desde cero.
-7. **`ready` se-earned, no se-declara.** La transición T2 requiere exit code 0 del gate runner. Un agente que simule el rol de QA en el mismo turno en que escribe el código está violando este invariante, por bienintencionado que sea.
+7. **`ready` se gana con doble compuerta (Mecánica + Subagente Ciego).** La transición T2 requiere exit code 0 de `npm run gate:qa` **más** la revisión del `git diff` contra las ACs en un subagente QA sin el historial de desarrollo. Un agente que simule el rol de QA en el mismo hilo en que escribió el código está violando este invariante, por bienintencionado que sea.
 8. **Ninguna dependencia se cumple por intuición.** Un ítem no entra a `doing` ni se certifica en `ready` mientras alguna tarea de su `dependencies:` no esté en `done`. La desvinculación de una dependencia es un acto explícito y queda registrada, no una omisión silenciosa.
 9. **Pre-Flight Concurrency Probe & Dynamic Claiming:** Ningún agente inicia modificaciones de código ni altera ramas sin ejecutar previamente el probe de concurrencia sincrónico (`status: doing` en backlog y `git status`). Al tomar una tarea, estampa atómicamente en el frontmatter `claimed_by: "<provider>:<session_or_agent_id>"` (ej: `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`). Si existe una tarea en `doing` con `claimed_by` ajeno, **queda terminantemente prohibido ejecutar `git restore .`, `git checkout .` o `git clean` sobre el árbol de trabajo compartido**. La coordinación entre agentes pares se canaliza autónomamente: si comparten harness (ej: `antigravity:` a `antigravity:`), se comunican vía `send_message`; si pertenecen a proveedores heterogéneos (`cursor:`, `claude-code:`, `human:`), el agente detecta la barrera de mensajería, respeta el lease sin emitir RPC fallido y se auto-aísla mecánicamente mediante `git worktree`.
 

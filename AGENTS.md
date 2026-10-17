@@ -24,19 +24,20 @@
 5. **Never break what already works.** Understand full blast radius before refactoring.
 6. **Agile Delivery Flow (Backlog [draft] ➔ Dev [doing] ➔ QA [ready] ➔ Release Management ➔ Prod [done]):**
    > The delivery status vocabulary lives in **[.agents/STATE_MACHINE.md](.agents/STATE_MACHINE.md)**. All items in the backlog reside in `draft` (or `ideas` for discovery). The delivery flow actively transitions: `draft` ➔ `doing` ➔ `review` ➔ `ready` ➔ `done`. **The backlog is a planning container, not a status value.** Refinement is a gate (R1) before entering `doing`.
+   - **Default Entry Point (`pm-orchestrator`):** Unless the user explicitly invokes another role or skill directly, every conversation thread starts with the host agent operating as [`pm-orchestrator`](.agents/skills/pm-orchestrator/SKILL.md) - leading the Grilling Session, classifying the operating mode, and orchestrating specialized sub-agents.
    - **Dev (`doing` ➔ `review`):** Implements code and checks acceptance criteria (`- [x]`). At completion, transitions task to `review`.
-   - **QA (`review` ➔ `ready`):** Audits under the Verification Pyramid. Transitions to `ready` as the **formal handover of development (developer/agent finish line)**. This transition is exclusive to the QA role: a developer never self-certifies, and NEVER marks `done`.
+   - **QA (`review` ➔ `ready` - Mandatory Clean-Context Sub-Agent):** Audits under the Verification Pyramid. Transitions to `ready` as the **formal handover of development (developer/agent finish line)**. This transition is exclusive to the QA role and **MUST run in an isolated sub-agent with a clean context window (`invoke_subagent`)** that receives only the task ACs, the `git diff`, and [`rigorous-qa-auditor`](.agents/skills/rigorous-qa-auditor/SKILL.md) + `npm run gate:qa <ID>`. The context that wrote the code NEVER self-certifies in the same thread, and NEVER marks `done`.
    - **Release Management (PO + Scrum/Delivery Lead):** Assembles releases by **delivered value** from all available `ready` items (historical or current).
    - **Production Deployment (`ready` ➔ `done`):** Deployed package items become `done`. Marking `done` without an actual deploy is a state lie.
    - **Fundamental Invariants:** **No item can exist in production that is not in `done`**, and **no item can be marked `done` without an actual release deploy**.
 7. **Decoupled Sprints & Releases:** Sprints and releases have no 1:1 coupling. Releases are created based on delivered value with any available `ready` items, with or without an active sprint.
 8. **Sprint Lifecycle & PO Sovereignty:** Sprints are fixed timeboxes. If items complete before the timebox expires, the PO expands scope with refined backlog items to prevent idle gaps. Sprints rarely conclude prematurely. The agent NEVER closes a sprint or triggers a retrospective by deduction; only upon explicit textual command from the PO.
-9. **Dynamic Operating Modes:** The user should never need to manually specify what role or framework to trigger. The agent dynamically classifies requests between:
-   - *(a) Mode 1: Surgical Focus / Fast-Track:* Direct Principal Engineer intervention for bugfixes, invariants, and minor tweaks (zero paperwork).
-   - *(b) Mode 2: Tactical Duo:* Product Designer + Principal Engineer for component/modal redesigns.
-   - *(c) Mode 3: Full Backlog & Sprint Flow:* Full agile delivery loop for backlog features or structural changes.
-   See [.agents/TEAM_PLAYBOOK.md](.agents/TEAM_PLAYBOOK.md) for the role matrix and sub-agent criteria.
-10. **Sub-Agent Autonomy:** Golden rule: *"Atomic focus on domain logic; parallel hands on exploration and verification"*. Dispatch sub-agents for benchmarks or non-blocking research, while preserving strict single-threaded focus on domain rules, schemas, and state invariants.
+9. **Dynamic Operating Modes:** The user should never need to manually specify what role or framework to trigger. The `pm-orchestrator` dynamically classifies requests between:
+   - *(a) Mode 1: Surgical Focus / Fast-Track:* Direct [`principal-engineer`](.agents/skills/principal-engineer/SKILL.md) intervention for targeted bugfixes, invariants, and minor tweaks (zero sprint paperwork; if certifying a backlog task `review` ➔ `ready`, still requires `gate:qa` + clean-context QA sub-agent).
+   - *(b) Mode 2: Tactical Duo:* [`worldclass-product-designer`](.agents/skills/worldclass-product-designer/SKILL.md) + [`principal-engineer`](.agents/skills/principal-engineer/SKILL.md) sub-agents + clean-context [`rigorous-qa-auditor`](.agents/skills/rigorous-qa-auditor/SKILL.md) for component/modal redesigns.
+   - *(c) Mode 3: Full Backlog & Sprint Flow:* Full agile delivery loop orchestrated by [`pm-orchestrator`](.agents/skills/pm-orchestrator/SKILL.md) across isolated role sub-agents for backlog features or structural changes.
+   See [.agents/TEAM_PLAYBOOK.md](.agents/TEAM_PLAYBOOK.md) for the role matrix, handoff contracts, and sub-agent criteria.
+10. **Sub-Agent Autonomy & Context Isolation:** Golden rule: *"Orchestrate from the hub; isolate execution and verification in clean sub-agent contexts"*. The host `pm-orchestrator` dispatches sub-agents (`invoke_subagent`) with explicit skill paths and contracts for research, UX spec, SDD implementation steps, and blind QA certification, while keeping domain rules, schemas, and state invariants strictly sequential (one active writer at a time).
 
 ---
 

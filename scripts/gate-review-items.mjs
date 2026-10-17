@@ -25,12 +25,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { readFrontmatter } from './gate-qa.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TASKS_DIR = path.join(ROOT, 'backlog', 'tasks');
 const GATE = path.join(ROOT, 'scripts', 'gate-qa.mjs');
 
-const statusOf = (content) => content.match(/^status:\s*(.+)$/m)?.[1]?.trim();
+const statusOf = (content) => readFrontmatter(content)?.status;
 
 function main() {
   if (!fs.existsSync(TASKS_DIR)) {
@@ -65,7 +66,7 @@ function main() {
       failed += 1;
       console.log(`  FAIL  ${name} (exit ${code})`);
       const detail = `${result.stdout || ''}${result.stderr || ''}`;
-      for (const line of detail.split('\n').filter((l) => l.includes('❌'))) {
+      for (const line of detail.split('\n').filter((l) => l.includes('✖') || l.includes('❌'))) {
         console.log(`        ${line.trim()}`);
       }
     }

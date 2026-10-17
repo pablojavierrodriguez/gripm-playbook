@@ -7,7 +7,7 @@ description: Diseña interfaces y micro-interacciones de calibre mundial. Jerarq
 
 ## Misión
 
-Que el producto se sienta tan pulido, reactivo y sobrio de usar como los mejores herramientas de su categoría. Cero interfaces genéricas: cada elemento interactivo debe comunicar artesanía, solidez y cuidado.
+Que el producto se sienta tan pulido, reactivo y sobrio de usar como las mejores herramientas de su categoría. Cero interfaces genéricas: cada elemento interactivo debe comunicar artesanía, solidez y cuidado.
 
 > Esta skill define **criterio de diseño**. El design system concreto (tokens, librería de componentes, framework de motion) es el del proyecto: consultalo antes de proponer valores concretos.
 
@@ -37,7 +37,7 @@ La interfaz **asiste, no juzga**.
 ## 3. Micro-interacciones y motion
 
 - **Feedback inmediato al toque:** toda acción táctil responde en el mismo frame (`active:scale-[0.98]`, cambio de fondo).
-- **Motion con propósito:** entrada de sheets y modales con curvas que comuniquen origen. Nada de animación decorativa que delays la respuesta.
+- **Motion con propósito:** entrada de sheets y modales con curvas que comuniquen origen. Nada de animación decorativa que demore la respuesta.
 - Transiciones cortas (150 - 250ms) para estado; más largas solo para entrada/salida de superficies.
 - Respetar `prefers-reduced-motion`: es una accesibilidad, no un extra.
 

@@ -2,11 +2,11 @@
 
 <!--
   Status vocabulary is owned by .agents/STATE_MACHINE.md. Do not invent states.
-  The backlog is NOT a status: an item with no status has simply not entered the flow yet.
-  Allowed values: (empty) | draft | blocked | doing | review | ready | done | dismissed
+  The backlog is NOT a status: every item starts in `draft` (or `ideas` for discovery); zero items exist without a status.
+  Allowed values: ideas | draft | blocked | doing | review | ready | done | dismissed
 -->
 
-- **Status:** `[ (empty) | draft | blocked | doing | review | ready | done | dismissed ]`
+- **Status:** `[ ideas | draft | blocked | doing | review | ready | done | dismissed ]`
 - **Blocked Reason:** `[ obligatorio y no vacío si status: blocked; omitir en otros estados ]`
 - **Dismissed Reason:** `[ obligatorio y no vacío si status: dismissed; omitir en otros estados ]`
 - **Last transition:** `[ from → to ]` by `[ actor ]` - `[ YYYY-MM-DD ]`
@@ -31,6 +31,7 @@
 - [ ] Alcance acotado **y** out-of-scope explícito
 - [ ] ACs medibles
 - [ ] Prioridad asignada por el PO
+- [ ] Ambigüedades resueltas y registradas (Grilling Session completada)
 
 ---
 
@@ -52,7 +53,9 @@
 - **Micro-Interactions & Sensory Feedback:**
 - **Interactive States:**
   - *Default:*
+  - *Hover:*
   - *Active / Focus:*
+  - *Disabled:*
   - *Loading / Skeleton:*
   - *Empty State:*
   - *Error State:*

@@ -1,11 +1,11 @@
 # Backlog
 
-> **Este archivo no es el backlog.** Es la convención que lo governa.
+> **Este archivo no es el backlog.** Es la convención que lo gobierna.
 > Los ítems de **este** repo viven en **`backlog/tasks/`**, en formato [Backlog.md](https://github.com/MrLesk/Backlog.md), el mismo estándar que usan `gripm` y `dev-board`. `backlog/` no se instala: si adoptás el playbook en tu proyecto, este archivo es la guía y vos creás tu propio `backlog/tasks/`.
 >
 > **Vocabulary de estados:** ver [`.agents/STATE_MACHINE.md`](../.agents/STATE_MACHINE.md).
 > **Status válidos:** `ideas` | `draft` | `blocked` | `doing` | `review` | `ready` | `done` | `dismissed`
-> **El backlog no es un status.** Un ítem sin status es un ítem que aún no entró al flujo. Para recibir `doing` tiene que haber pasado el **refinement gate (R1)**.
+> **El backlog no es un status.** Toda tarea en el backlog nace con `status: draft` (o `ideas` si es exploratoria); cero ítems sin status. Para pasar a `doing` tiene que haber aprobado el **refinement gate (R1)** (`node scripts/gate-qa.mjs start <ID>`).
 
 ---
 
@@ -35,16 +35,16 @@ Un ítem del playbook es un ítem de la organización. Si viviera en otro format
 
 ## 3. Ciclo de vida de un ítem
 
-El status vive en el campo `status:` del frontmatter y **nunca** en el changelog.
+El status vive en el campo `status:` del frontmatter y **nunca** en el changelog. Las transiciones (`start`, `submit`, `unblock`, y certificación a `ready`) las ejecuta el script `scripts/gate-qa.mjs`.
 
 | Momento | Dónde se registra | Quién |
 | :--- | :--- | :--- |
 | Aparece un problema | Issue o ítem nuevo, `status: ideas` | cualquiera |
 | Pasa el **gate R1** | `status: draft` + ACs medibles | PM Orchestrator |
-| `doing` | frontmatter | Principal Engineer |
+| `doing` (`gate-qa.mjs start`) | frontmatter | Principal Engineer |
 | Se frena | `status: blocked` + `blocked_reason` | PO / Dev |
-| `review` | frontmatter | Principal Engineer |
-| `ready` | frontmatter + `gate:qa` en verde | **Solo QA Auditor** (T2) |
+| `review` (`gate-qa.mjs submit`) | frontmatter | Principal Engineer |
+| `ready` (`gate-qa.mjs <ID>`) | frontmatter + `gate:qa` en verde | **Solo Subagente QA Auditor** (T2) |
 | `done` | frontmatter + issue cerrado | Release Management, tras deploy real |
 | Entra en un release | `CHANGELOG.md`, bajo su ID | Release Management |
 
@@ -82,7 +82,7 @@ Reglas:
 1. `blocked_reason` es **obligatorio** y no vacío. Un bloqueo sin motivo escrito es una tarea abandonada, no una tarea bloqueada.
 2. Solo se asigna con `blocked_reason`; el campo es inválido en cualquier otro status.
 3. Volver a `doing` o `draft` requiere que el impedimento se haya resuelto **o** que sus `dependencies:` bloqueantes estén en `done` o hayan sido desvinculadas explícitamente del array.
-4. El desbloqueo no borra el `blocked_reason`: queda el registro histórico del impedimento.
+4. Al ejecutar `node scripts/gate-qa.mjs unblock <ID>`, el runner verifica las dependencias, mueve el status a `doing` (o `draft` con `--to draft`) y limpia `blocked_reason` del frontmatter (el historial del impedimento queda en Git / Implementation Notes).
 
 > Un ítem no entra a `doing` ni se certifica en `ready` mientras alguna de sus `dependencies:` no esté en `done`. El gate runner (`npm run gate:qa <ID>`) rechaza la certificación mecánicamente.
 
@@ -90,7 +90,7 @@ Reglas:
 
 ## 4.c Estado `dismissed`: descartar el ítem
 
-`dismissed` marca un ítem que **no va a existir**: la premisa era falsa, el alcance quedó absorbido por otro, o el PO decidió que no vale lo que cuesta. No es un bloqueo (que tiene salida prevista) ni un abandono (que se forgotó).
+`dismissed` marca un ítem que **no va a existir**: la premisa era falsa, el alcance quedó absorbido por otro, o el PO decidió que no vale lo que cuesta. No es un bloqueo (que tiene salida prevista) ni un abandono (que se olvidó).
 
 ```markdown
 ---
@@ -116,12 +116,12 @@ Reglas:
 3. Ningún ítem se marca `done` sin deploy real.
 4. Un ítem `ready` que recibe un fix post-QA vuelve a `doing` y pierde la certificación.
 5. Los ítems no completados en el timebox vuelven al pool conservando su refinamiento.
-6. Todo tech debt detectado en QA o retrospectiva genera un ítem nuevo.
+6. Todo tech debt detectado en QA o retrospectiva genera un ítem nuevo en `status: draft`.
 7. **Nada se anota en el changelog hasta que se publica.** Un ítem sin archivo en `backlog/tasks/` está perdido.
 8. `status: blocked` sin `blocked_reason` no vacío es un ítem inválido.
 9. `status: dismissed` sin `dismissed_reason` no vacío es un ítem inválido.
-9. Un ítem no entra a `doing` ni se certifica en `ready` con una `dependencies:` sin resolver en `done`.
-10. Un ítem no se descarta desde `ready`: un ítem certificado se entrega o vuelve a `doing`.
+10. Un ítem no entra a `doing` ni se certifica en `ready` con una `dependencies:` sin resolver en `done`.
+11. Un ítem no se descarta desde `ready`: un ítem certificado se entrega o vuelve a `doing`.
 
 ---
 

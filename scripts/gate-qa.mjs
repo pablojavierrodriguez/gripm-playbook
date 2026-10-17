@@ -243,6 +243,10 @@ export function inspectTask(task, tasks) {
     failures.push('dismissed_reason is set but status is not "dismissed"');
   }
 
+  if (frontmatter.priority && !['high', 'medium', 'low'].includes(frontmatter.priority)) {
+    failures.push(`invalid priority "${frontmatter.priority}"; allowed values are high, medium, low`);
+  }
+
   // PLAY-016: dependencies gate. An item cannot be certified on top of an
   // unfinished dependency.
   for (const dep of frontmatter.dependencies || []) {
@@ -289,6 +293,64 @@ export function inspectTask(task, tasks) {
   return failures;
 }
 
+/**
+ * Mutates the YAML frontmatter of a task markdown document deterministically.
+ * Used by the CLI transitions (`start`, `submit`, `unblock`, and T2 `certify`)
+ * so that status changes happen as the result of passing mechanical guards,
+ * rather than manual edits to the `.md` file.
+ */
+export function mutateTaskFrontmatter(content, { status, set = {}, remove = [] } = {}) {
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  const normalized = content.replace(/\r\n/g, '\n');
+  if (!normalized.startsWith('---\n')) return content;
+  const end = normalized.indexOf('\n---', 4);
+  if (end === -1) return content;
+
+  const removeSet = new Set(remove.map((k) => k.toLowerCase()));
+  const setEntries = new Map(Object.entries(set).map(([k, v]) => [k.toLowerCase(), { key: k, val: v }]));
+  const today = new Date().toISOString().slice(0, 10);
+
+  const lines = normalized.slice(4, end).split('\n');
+  const nextLines = [];
+  let statusUpdated = false;
+
+  for (const line of lines) {
+    const match = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
+    if (!match) {
+      nextLines.push(line);
+      continue;
+    }
+    const keyLower = match[1].toLowerCase();
+    if (removeSet.has(keyLower)) continue;
+    if (keyLower === 'status' && status) {
+      nextLines.push(`status: ${status}`);
+      statusUpdated = true;
+      continue;
+    }
+    if (keyLower === 'updated_date') {
+      nextLines.push(`updated_date: '${today}'`);
+      continue;
+    }
+    if (setEntries.has(keyLower)) {
+      const { key, val } = setEntries.get(keyLower);
+      nextLines.push(`${key}: "${val}"`);
+      setEntries.delete(keyLower);
+      continue;
+    }
+    nextLines.push(line);
+  }
+
+  if (status && !statusUpdated) {
+    nextLines.push(`status: ${status}`);
+  }
+  for (const { key, val } of setEntries.values()) {
+    nextLines.push(`${key}: "${val}"`);
+  }
+
+  const rebuilt = `---\n${nextLines.join('\n')}${normalized.slice(end)}`;
+  return eol === '\r\n' ? rebuilt.replace(/\n/g, '\r\n') : rebuilt;
+}
+
 const isColorSupported =
   !('NO_COLOR' in process.env) &&
   (process.env.FORCE_COLOR === '1' || (process.stdout?.isTTY && process.env.TERM !== 'dumb'));
@@ -307,10 +369,18 @@ function printHeader(title) {
 }
 
 export function unblockMain(argv) {
-  const target = argv.find((arg) => !arg.startsWith('--'));
-  if (!target) {
+  let target = null;
+  let targetStatus = 'doing';
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--to' && argv[i + 1]) {
+      targetStatus = argv[++i];
+    } else if (!argv[i].startsWith('--') && !target) {
+      target = argv[i];
+    }
+  }
+  if (!target || !['doing', 'draft'].includes(targetStatus)) {
     printHeader('QA Gate · unblock');
-    console.log('usage: node scripts/gate-qa.mjs unblock <TASK-ID | path/to/task.md>\n');
+    console.log('usage: node scripts/gate-qa.mjs unblock <TASK-ID | path/to/task.md> [--to doing|draft]\n');
     process.exit(2);
   }
 
@@ -347,9 +417,110 @@ export function unblockMain(argv) {
     process.exit(1);
   }
 
+  const updated = mutateTaskFrontmatter(content, { status: targetStatus, remove: ['blocked_reason'] });
+  fs.writeFileSync(taskPath, updated, 'utf8');
+
   console.log(`  ${c.bold('T_unblock guard:')}`);
   console.log(`    ${c.green('✔')} every dependency is done or unlinked`);
-  console.log(`\n  ${c.green('✔')} UNBLOCK ALLOWED - ${frontmatter.id} may move blocked → doing.\n`);
+  console.log(`\n  ${c.green('✔')} UNBLOCK ALLOWED - ${frontmatter.id} moved blocked → ${targetStatus}.\n`);
+  process.exit(0);
+}
+
+export function startMain(argv) {
+  let target = null;
+  let claimedBy = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--by' && argv[i + 1]) {
+      claimedBy = argv[++i];
+    } else if (!argv[i].startsWith('--') && !target) {
+      target = argv[i];
+    }
+  }
+  if (!target) {
+    printHeader('QA Gate · start (T0)');
+    console.log('usage: node scripts/gate-qa.mjs start <TASK-ID | path/to/task.md> [--by <provider:id>]\n');
+    process.exit(2);
+  }
+
+  printHeader('QA Gate · start (T0: draft → doing)');
+  const taskPath = resolveTaskPath(target);
+  if (!taskPath) {
+    console.log(`  ${c.red('✖')} no task found for "${target}" in backlog/tasks/\n`);
+    process.exit(1);
+  }
+
+  const content = fs.readFileSync(taskPath, 'utf8');
+  const frontmatter = readFrontmatter(content);
+  const { tasks, collisions } = loadTasks();
+  const failures = [];
+
+  if (!frontmatter || !frontmatter.id || !frontmatter.id.trim()) {
+    failures.push('the frontmatter declares no valid "id"');
+  }
+  if (frontmatter?.status !== 'draft') {
+    failures.push(`status is "${frontmatter?.status ?? '(missing)'}" but T0 only starts items in "draft"`);
+  }
+  const acs = readACs(content);
+  if (!acs || acs.length === 0) {
+    failures.push('Gate R1 failed: task has no acceptance criteria in <!-- AC:BEGIN --> / <!-- AC:END -->');
+  }
+  for (const dep of frontmatter?.dependencies || []) {
+    const resolved = tasks.get(dep);
+    if (!resolved) failures.push(`dependency "${dep}" does not exist in backlog/tasks/`);
+    else if (resolved.frontmatter.status !== 'done') {
+      failures.push(`dependency "${dep}" is "${resolved.frontmatter.status ?? '(missing)'}" (${resolved.file}) but must be "done"`);
+    }
+  }
+  collisions.forEach((col) => {
+    failures.push(`task id "${col.id}" is declared by two files: ${col.files.join(' and ')}`);
+  });
+
+  if (failures.length) {
+    for (const f of failures) console.log(`    ${c.red('✖')} ${f}`);
+    console.log(`\n  ${c.red('✖')} START REFUSED - ${frontmatter?.id ?? target} remains in "${frontmatter?.status ?? '(missing)'}".\n`);
+    process.exit(1);
+  }
+
+  const set = claimedBy ? { claimed_by: claimedBy } : {};
+  fs.writeFileSync(taskPath, mutateTaskFrontmatter(content, { status: 'doing', set }), 'utf8');
+  console.log(`  ${c.green('✔')} START ALLOWED - ${frontmatter.id} moved draft → doing.\n`);
+  process.exit(0);
+}
+
+export function submitMain(argv) {
+  const target = argv.find((arg) => !arg.startsWith('--'));
+  if (!target) {
+    printHeader('QA Gate · submit (T1)');
+    console.log('usage: node scripts/gate-qa.mjs submit <TASK-ID | path/to/task.md>\n');
+    process.exit(2);
+  }
+
+  printHeader('QA Gate · submit (T1: doing → review)');
+  const taskPath = resolveTaskPath(target);
+  if (!taskPath) {
+    console.log(`  ${c.red('✖')} no task found for "${target}" in backlog/tasks/\n`);
+    process.exit(1);
+  }
+
+  const content = fs.readFileSync(taskPath, 'utf8');
+  const frontmatter = readFrontmatter(content);
+  const { tasks, collisions } = loadTasks();
+  const failures = inspectTask({ content, frontmatter: { ...frontmatter, status: 'review' } }, tasks);
+  if (frontmatter?.status !== 'doing') {
+    failures.unshift(`status is "${frontmatter?.status ?? '(missing)'}" but T1 only submits items in "doing"`);
+  }
+  collisions.forEach((col) => {
+    failures.push(`task id "${col.id}" is declared by two files: ${col.files.join(' and ')}`);
+  });
+
+  if (failures.length) {
+    for (const f of failures) console.log(`    ${c.red('✖')} ${f}`);
+    console.log(`\n  ${c.red('✖')} SUBMIT REFUSED - ${frontmatter?.id ?? target} remains in "${frontmatter?.status ?? '(missing)'}".\n`);
+    process.exit(1);
+  }
+
+  fs.writeFileSync(taskPath, mutateTaskFrontmatter(content, { status: 'review' }), 'utf8');
+  console.log(`  ${c.green('✔')} SUBMIT ALLOWED - ${frontmatter.id} moved doing → review.\n`);
   process.exit(0);
 }
 
@@ -376,12 +547,13 @@ function readScripts(root = ROOT) {
  * `scripts/validate-repo.mjs`, so the two cannot drift apart silently.
  */
 const PYRAMID_STEPS = [
-  { id: 'validate', label: 'Repo consistency', script: 'validate', blocking: true },
+  { id: 'validate', label: 'Repo consistency / typecheck', script: 'validate', fallbackScripts: ['typecheck'], blocking: true },
   { id: 'test', label: 'Headless tests', script: 'test', blocking: true },
   { id: 'spec', label: 'Spec ↔ backlog consistency', script: 'gate:review', blocking: true },
   { id: 'audit:ux', label: 'Static UX audit', script: 'audit:ux:strict', blocking: true },
-  // This package ships documentation and a Node CLI; there is no production
-  // bundle to build. Declared optional deliberately, with the reason inline.
+  // When a project defines a "build" script, resolvePyramid runs it as a
+  // blocking step. When no "build" script exists (e.g. a pure CLI/docs repo),
+  // optional: true skips it instead of failing on a missing bundle step.
   { id: 'build', label: 'Production build', script: 'build', blocking: false, optional: true },
 ];
 
@@ -389,7 +561,11 @@ const PYRAMID_STEPS = [
 export function resolvePyramid(root = ROOT) {
   const scripts = readScripts(root);
   const has = (name) => Boolean(scripts[name]);
-  return PYRAMID_STEPS.map((step) => ({ ...step, available: has(step.script) }));
+  return PYRAMID_STEPS.map((step) => {
+    const candidates = [step.script, ...(step.fallbackScripts || [])];
+    const resolvedScript = candidates.find((name) => has(name)) ?? step.script;
+    return { ...step, script: resolvedScript, available: has(resolvedScript) };
+  });
 }
 
 function runStep(step, root) {
@@ -504,7 +680,8 @@ export function main(argv) {
   }
 
   if (ok) {
-    console.log(`  ${c.green('✔')} GATE PASSED - ${frontmatter.id} may be promoted review → ready.\n`);
+    fs.writeFileSync(taskPath, mutateTaskFrontmatter(content, { status: 'ready' }), 'utf8');
+    console.log(`  ${c.green('✔')} GATE PASSED - ${frontmatter.id} promoted review → ready (may be promoted).\n`);
     process.exit(0);
   }
 
@@ -519,8 +696,10 @@ export function main(argv) {
 const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invokedDirectly) {
   const args = process.argv.slice(2);
-  // `unblock` is a separate entry point so the T_unblock guard is evaluated as
-  // a real transition rather than appended to an already-failing list.
+  // `unblock`, `start`, and `submit` are separate entry points so transition
+  // guards execute and mutate the task file on disk only when satisfied.
   if (args[0] === 'unblock') unblockMain(args.slice(1));
+  else if (args[0] === 'start') startMain(args.slice(1));
+  else if (args[0] === 'submit') submitMain(args.slice(1));
   else main(args);
 }

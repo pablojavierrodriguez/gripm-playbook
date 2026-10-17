@@ -241,6 +241,7 @@ describe('gate-review-items (CI entry point)', () => {
     });
 
     let failed = false;
+    let output = '';
     try {
       execFileSync(process.execPath, [path.join(dir, 'scripts', 'gate-review-items.mjs')], {
         encoding: 'utf8',
@@ -248,7 +249,9 @@ describe('gate-review-items (CI entry point)', () => {
       });
     } catch (err) {
       failed = err.status !== 0;
+      output = `${err.stdout || ''}${err.stderr || ''}`;
     }
     assert.ok(failed, 'an unchecked acceptance criterion must break the CI gate');
+    assert.match(output, /acceptance criteria are still unchecked/, 'CI output must include the specific failure reason from gate-qa.mjs');
   });
 });

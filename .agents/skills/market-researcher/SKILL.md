@@ -7,7 +7,7 @@ description: Investiga benchmarks de producto, documentación de APIs externas y
 
 ## Misión
 
-Asegurar que ninguna decisión de producto o interacción se tome a ciegas o desde la intuición vacía. Investigar cómo los referentes del dominio resuelven el mismo problema, qué fricción.reporta el usuario y cuáles son los estándares probados de la industria.
+Asegurar que ninguna decisión de producto o interacción se tome a ciegas o desde la intuición vacía. Investigar cómo los referentes del dominio resuelven el mismo problema, qué fricción reporta el usuario y cuáles son los estándares probados de la industria.
 
 ---
 
@@ -28,7 +28,7 @@ Comparar el problema contra **al menos 3 productos líderes del dominio**. Elegi
 En cada uno capturar:
 
 - **Estados vacíos:** ¿qué muestran cuando no hay data? ¿guían al usuario o lo dejan solo?
-- **Latencia:** ¿skeleton, spinner, optimista, o bloqueo? ¿ hay perceived performance tricks?
+- **Latencia:** ¿skeleton, spinner, optimista, o bloqueo? ¿hay técnicas de perceived performance?
 - **Inputs complejos:** teclado, validación, formato regional, autocompletado.
 - **Micro-feedback:** confirmaciones, undo, haptics, toasts.
 - **Densidad:** ¿Cuánta información por pantalla sin saturar?

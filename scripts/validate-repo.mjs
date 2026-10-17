@@ -92,13 +92,6 @@ function checkManifest() {
   return manifest;
 }
 
-/**
- * Fails when the QA skill documents blocking steps the gate does not execute.
- * The gate is the only mechanism that can enforce "a step that did not run cannot
- * certify". If the skill declares five blocking steps and the runner knows four,
- * the gap is invisible to every agent reading the documentation — and it is how
- * a skipped step ends up supporting a promotion.
- */
 /** Maps the human labels used in the skill table to the ids used by the gate. */
 const PYRAMID_ALIASES = {
   typecheck: 'validate',
@@ -116,7 +109,7 @@ const PYRAMID_ALIASES = {
  *
  * The gate is the only mechanism that can enforce "a step that did not run cannot
  * certify". If the skill declares five blocking steps and the runner knows four,
- * the gap is invisible to every agent reading the documentation — and it is how
+ * the gap is invisible to every agent reading the documentation - and it is how
  * a skipped step ends up supporting a promotion.
  */
 function checkPyramidParity() {
@@ -249,7 +242,7 @@ function checkRuleParity() {
     if (!skill.includes(rule.title)) {
       fail('rules', `${rule.id} title mismatch. Catalog: "${rule.title}". Check the documented heading text.`);
     }
-    if (!rule.fix) fail('rules', `${rule.id} has no "fix" — the skill checklist depends on it`);
+    if (!rule.fix) fail('rules', `${rule.id} has no "fix" - the skill checklist depends on it`);
     if (!rule.signature) fail('rules', `${rule.id} has no "signature"`);
     if (!rule.impact) warn('rules', `${rule.id} has no "impact"`);
   }
@@ -285,7 +278,7 @@ function checkCorePurity() {
     const content = read(file);
     for (const token of FORBIDDEN_IN_CORE) {
       if (content.includes(token)) {
-        fail('core', `${file} references "${token}" — the core layer must stay stack and product agnostic. Move it to .agents/stacks/<tech>/ or genericise it.`);
+        fail('core', `${file} references "${token}" - the core layer must stay stack and product agnostic. Move it to .agents/stacks/<tech>/ or genericise it.`);
       }
     }
   }
@@ -387,7 +380,7 @@ function checkStatusVocabulary() {
 
   // Every canonical status must appear as a ROW in the state table, not merely
   // somewhere in the file. A substring test passes when the token survives
-  // anywhere — in a transition, an invariant or prose — even after the row that
+  // anywhere - in a transition, an invariant or prose - even after the row that
   // defines the status has been deleted.
   const tableRows = [...stateMachineText.matchAll(/^\|\s*\*\*[^|]+\*\*\s*\|\s*`([a-z]+)`\s*\|/gm)].map((m) => m[1]);
   if (!tableRows.length) {
@@ -442,7 +435,7 @@ function checkStatusVocabulary() {
   for (const doc of ['AGENTS.md', '.agents/TEAM_PLAYBOOK.md']) {
     if (!exists(doc)) continue;
     if (!read(doc).includes('STATE_MACHINE.md')) {
-      fail('status', `${doc} does not reference .agents/STATE_MACHINE.md — the state table must have a single source of truth`);
+      fail('status', `${doc} does not reference .agents/STATE_MACHINE.md - the state table must have a single source of truth`);
     }
   }
 }

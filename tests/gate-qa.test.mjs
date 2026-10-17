@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { inspectTask, loadTasks, readFrontmatter, resolvePyramid } from '../scripts/gate-qa.mjs';
+import { inspectTask, loadTasks, mutateTaskFrontmatter, readFrontmatter, resolvePyramid } from '../scripts/gate-qa.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GATE = path.join(ROOT, 'scripts', 'gate-qa.mjs');
@@ -537,6 +537,14 @@ describe('pyramid resolution', () => {
       assert.equal(steps.find((step) => step.id === id).available, true, `${id} should be available`);
     }
   });
+
+  test('resolves typecheck as a fallback when validate is absent in a consumer project', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-fallback-'));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ scripts: { typecheck: 'tsc --noEmit' } }));
+    const validateStep = resolvePyramid(dir).find((step) => step.id === 'validate');
+    assert.equal(validateStep.available, true);
+    assert.equal(validateStep.script, 'typecheck');
+  });
 });
 
 describe('gate cli', () => {
@@ -709,5 +717,96 @@ describe('real backlog', () => {
       if (task.frontmatter.status !== 'review') continue;
       assert.deepEqual(inspectTask(task, tasks), [], `${id} is in review but is not gate-ready`);
     }
+  });
+});
+
+describe('mechanical state transitions (T0, T1, T2, T_unblock)', () => {
+  test('rejects an invalid priority value in inspectTask', () => {
+    const { file } = makeTask();
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('priority: high', 'priority: urgent'));
+    const failures = inspectFile(file);
+    assert.ok(failures.some((f) => /invalid priority "urgent"/.test(f)));
+  });
+
+  test('mutateTaskFrontmatter updates status, removes keys, and sets new keys', () => {
+    const raw = '---\nid: PLAY-900\nstatus: blocked\nblocked_reason: "waiting"\n---\nBody\n';
+    const next = mutateTaskFrontmatter(raw, {
+      status: 'doing',
+      remove: ['blocked_reason'],
+      set: { claimed_by: 'antigravity:test-1' },
+    });
+    const fm = readFrontmatter(next);
+    assert.equal(fm.status, 'doing');
+    assert.equal(fm.blocked_reason, undefined);
+    assert.equal(fm.claimed_by, 'antigravity:test-1');
+  });
+
+  test('start (T0) moves a draft task to doing on disk and sets claimed_by', () => {
+    const { file } = makeTask({ status: 'draft' });
+    const { code, stdout } = runGate(['start', file, '--by', 'antigravity:dev-1']);
+    assert.equal(code, 0);
+    assert.match(stdout, /START ALLOWED/);
+    const fm = readFrontmatter(fs.readFileSync(file, 'utf8'));
+    assert.equal(fm.status, 'doing');
+    assert.equal(fm.claimed_by, 'antigravity:dev-1');
+  });
+
+  test('submit (T1) moves a doing task with checked ACs to review on disk', () => {
+    const { file } = makeTask({ status: 'doing', acs: ['- [x] #1 done', '- [x] #2 done'] });
+    const { code, stdout } = runGate(['submit', file]);
+    assert.equal(code, 0);
+    assert.match(stdout, /SUBMIT ALLOWED/);
+    const fm = readFrontmatter(fs.readFileSync(file, 'utf8'));
+    assert.equal(fm.status, 'review');
+  });
+
+  test('submit (T1) refuses to move a doing task when an AC is unchecked', () => {
+    const { file } = makeTask({ status: 'doing', acs: ['- [x] #1 done', '- [ ] #2 open'] });
+    const { code, stdout } = runGate(['submit', file]);
+    assert.equal(code, 1);
+    assert.match(stdout, /SUBMIT REFUSED/);
+    const fm = readFrontmatter(fs.readFileSync(file, 'utf8'));
+    assert.equal(fm.status, 'doing');
+  });
+
+  test('unblock (T_unblock) mutates status to doing and removes blocked_reason on disk', () => {
+    const { file } = makeTask({ status: 'blocked', extra: 'blocked_reason: "waiting on API"' });
+    const { code, stdout } = runGate(['unblock', file]);
+    assert.equal(code, 0);
+    assert.match(stdout, /UNBLOCK ALLOWED/);
+    const fm = readFrontmatter(fs.readFileSync(file, 'utf8'));
+    assert.equal(fm.status, 'doing');
+    assert.equal(fm.blocked_reason, undefined);
+  });
+
+  test('full gate certification (T2) mutates status to ready on disk', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-promote-'));
+    fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'backlog', 'tasks'), { recursive: true });
+    fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+    fs.writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({
+        name: 'repro',
+        scripts: {
+          validate: 'node -e "process.exit(0)"',
+          test: 'node -e "process.exit(0)"',
+          'gate:review': 'node -e "process.exit(0)"',
+          'audit:ux:strict': 'node -e "process.exit(0)"',
+        },
+      }),
+    );
+    const taskFile = path.join(dir, 'backlog', 'tasks', 'T.md');
+    fs.writeFileSync(
+      taskFile,
+      '---\nid: QA-TMP-2\nstatus: review\ndependencies: []\npriority: high\n---\n<!-- AC:BEGIN -->\n- [x] #1 a\n<!-- AC:END -->\n',
+    );
+
+    const stdout = execFileSync(process.execPath, [path.join(dir, 'scripts', 'gate-qa.mjs'), taskFile], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    assert.match(stdout, /GATE PASSED/);
+    assert.equal(readFrontmatter(fs.readFileSync(taskFile, 'utf8')).status, 'ready');
   });
 });

@@ -10,7 +10,7 @@ labels:
   - "state-machine"
   - "iacp"
 dependencies: []
-priority: urgent
+priority: high
 type: feature
 ---
 

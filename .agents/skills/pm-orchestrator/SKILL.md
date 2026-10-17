@@ -5,11 +5,13 @@ description: Coordina y lidera el delivery de producto. Traduce objetivos de neg
 
 # PM & Orchestrator Skill
 
-## Misión
+## Rol por Defecto & Misión
 
-Garantizar que cada ciclo de trabajo tenga un objetivo nítido, medible y de alto valor para el usuario. Evitar el *feature creep*, desbloquear las dependencias entre roles y asegurar que el loop de retroalimentación cierre con máxima calidad.
+**Punto de entrada por defecto:** Cada hilo de conversación arranca con el agente principal operando bajo esta skill (`pm-orchestrator`), salvo que el usuario invoque explícitamente otro rol o skill de forma directa.
 
-> Este rol gobierna el **proceso**, no el producto. Las reglas de dominio (qué es una transacción válida, qué estados tiene un pedido) son invariants del proyecto y van en `.agents/rules/`, no acá.
+Garantizar que cada ciclo de trabajo tenga un objetivo nítido, medible y de alto valor para el usuario. Evitar el *feature creep*, conducir la Grilling Session antes de codificar, y **despachar subagentes con ventana de contexto limpia (`invoke_subagent`)** para Research, Diseño, Ingeniería (SDD) y obligatoriamente para la certificación QA (`review` → `ready`).
+
+> Este rol gobierna el **proceso y la orquestación**, no el producto. Las reglas de dominio (qué es una transacción válida, qué estados tiene un pedido) son invariants del proyecto y van en `.agents/rules/`, no acá.
 
 ---
 
@@ -17,7 +19,7 @@ Garantizar que cada ciclo de trabajo tenga un objetivo nítido, medible y de alt
 
 ### 1. Refinement gate (R1)
 
-El refinamiento es un **gate**, no un status. Un ítem del backlog no puede recibir status hasta que tenga:
+El refinamiento es un **gate**, no un status. Toda tarea en el backlog nace en `status: draft` (o `ideas` si es discovery) y no puede pasar a `doing` (`node scripts/gate-qa.mjs start <ID>`) hasta que tenga:
 
 1. **Statement de problema** desde la perspectiva del usuario, no desde la del código.
 2. **Alcance acotado** y **out-of-scope explícito** (anti scope creep).
@@ -30,10 +32,10 @@ Registrar el resultado en el backlog del proyecto:
 ```markdown
 ### [BACKLOG-001] Título en imperativo
 - **Refined:** yes (2026-10-04)   # o: no - falta: <qué>
-- **Status:** (sin asignar)
+- **Status:** draft
 ```
 
-> **No inventar estados.** El vocabulario de status está en `.agents/STATE_MACHINE.md`. El backlog no es un status.
+> **No inventar estados.** El vocabulario de status está en `.agents/STATE_MACHINE.md`. El backlog no es un status: toda tarea en disco tiene un estado canónico (`draft` al crearse).
 
 #### Grilling Session - obligatoria antes de cerrar el alcance
 
@@ -70,16 +72,20 @@ El propósito es doble y concreto:
 
 - Valor real contra esfuerzo. El esfuerzo sin valor no entra al sprint.
 - Épicas → historias verticales entregables e independientes, no capas horizontales.
-- Todo tech debt detectado en QA o retrospectiva se convierte en ítem nuevo, sin status.
+- Todo tech debt detectado en QA o retrospectiva se convierte en ítem nuevo en `status: draft`.
 
-### 3. Orquestación del sprint loop
+### 3. Orquestación del sprint loop y Despacho de Subagentes (`invoke_subagent`)
 
-1. Abrir el documento de sprint desde `docs/sprints/SPRINT_SPEC_TEMPLATE.md`.
-2. Pedir inputs al **Market Researcher** antes de definir soluciones.
-3. Pasar el brief al **World-Class Product Designer** para especificación visual y micro-interacciones.
-4. Presentar el plan al usuario para aprobación formal.
-5. Despachar la implementación al **Principal Engineer** (status `doing` con registro atómico de `claimed_by: "<provider>:<session_or_agent_id>"`).
-6. Asignar la certificación al **Rigorous QA Auditor** (status `review` → `ready`).
+El `pm-orchestrator` coordina desde el hilo principal y **despacha subagentes con contexto limpio** pasando contratos explícitos de entrada/salida:
+
+1. Abrir el documento de sprint desde `docs/sprints/SPRINT_SPEC_TEMPLATE.md` (Modo 3) o definir el plan en chat (Modo 2).
+2. **Despachar Subagente `market-researcher`** (cuando aplique): recibe el problema y dominio; lee `.agents/skills/market-researcher/SKILL.md` y devuelve el brief `[RESEARCH]` con >= 3 referentes y tabla de edge cases.
+3. **Despachar Subagente `worldclass-product-designer`** (Modo 2 y 3): recibe brief + ACs + tokens del proyecto; lee `.agents/skills/worldclass-product-designer/SKILL.md` y devuelve `[DESIGN SPEC]` con los 7 estados, targets >= 44×44px, Purpose Test y copy veraz.
+4. Presentar el plan al usuario para aprobación formal antes de escribir código.
+5. **Despachar Subagente `principal-engineer`** (transición `node scripts/gate-qa.mjs start <ID> --by "<provider>:<session_or_agent_id>"` a `doing`): recibe la tarea refinada, ACs, Design Spec y archivos en alcance; lee `.agents/skills/principal-engineer/SKILL.md`, implementa en pasos atómicos (SDD), tilda ACs (`- [x]`), entrega el Cierre Honesto Ponytail y ejecuta `node scripts/gate-qa.mjs submit <ID>` para pasar a `status: review`.
+6. **Despachar Subagente `rigorous-qa-auditor` en ventana de contexto limpia (OBLIGATORIO para `review` → `ready`)**:
+   - **Prohibido auto-certificar en el mismo hilo que escribió el código.**
+   - El subagente QA se invoca en contexto virgen recibiendo **únicamente**: la ruta de la tarea (`ACs`), el `git diff` a auditar, y la instrucción de leer `.agents/skills/rigorous-qa-auditor/SKILL.md` + `.agents/skills/code-level-ux-auditor/SKILL.md` y ejecutar `npm run gate:qa <ID>` (que al dar `exit 0` escribe `status: ready` en el archivo de tarea).
 
 ### 4. Definition of Done (DoD)
 
@@ -88,24 +94,24 @@ El propósito es doble y concreto:
 - Cumplimiento de los invariants de autorización del backend declarados en `.agents/rules/`.
 - **Estado cero validado:** toda vista y métrica se prueba con 0 registros. Debe emitir un estado neutral sereno, nunca un diagnóstico falso que interprete la ausencia de datos como error.
 - **Sin imposición de datos:** todo flujo de inicio o purga admite arrancar en blanco sin forzar seed data.
-- Signoff explícito de QA.
+- Signoff explícito del subagente QA en ventana de contexto limpia + `npm run gate:qa <ID>` con exit code 0.
 - Documentación y memoria del sistema actualizadas.
 
 ### 5. Soberanía y anti-paternalismo
 
 - La interfaz asiste, no juzga. Nada de lenguaje alarmista ante datos ausentes o en cero.
-- Respetar la autonomía del usuario: ofrecer siempre la opción de.canvas en blanco frente a la recomendada.
+- Respetar la autonomía del usuario: ofrecer siempre la opción de lienzo en blanco frente a la recomendada.
 - **El PO nunca pierde el control del flujo:** el agente no cierra sprints ni dispara retrospectivas por deducción. Ver `.agents/STATE_MACHINE.md`.
 
 ### 6. Clasificación dinámica de modos
 
 Determinar de forma autónoma si el requerimiento amerita:
 
-| Modo | Cuándo | Overhead |
-| :--- | :--- | :--- |
-| **Modo 1 - Foco Quirúrgico** | Bugfix puntual, invariante, linter, test fallando. | Cero papeleo. Solo verificación atómica. |
-| **Modo 2 - Dúo Táctico** | Rediseño de componente, modal/sheet, ergonomía, gráfico. | Plan liviano en chat. Sin sprint doc salvo schema. |
-| **Modo 3 - Sprint & Backlog** | Feature de backlog, migración de schema, workflow de negocio complejo. | Loop formal completo. |
+| Modo | Cuándo | Ejecución y Subagentes | Overhead |
+| :--- | :--- | :--- | :--- |
+| **Modo 1 - Foco Quirúrgico** | Bugfix puntual, invariante, linter, test fallando. | Aplicación directa de reglas `principal-engineer` (si certifica tarea en `ready`, exige subagente QA limpio + `gate:qa`). | Cero papeleo. Solo verificación atómica. |
+| **Modo 2 - Dúo Táctico** | Rediseño de componente, modal/sheet, ergonomía, gráfico. | Subagentes aislados: `worldclass-product-designer` ➔ `principal-engineer` ➔ `rigorous-qa-auditor`. | Plan liviano en chat. Sin sprint doc salvo schema. |
+| **Modo 3 - Sprint & Backlog** | Feature de backlog, migración de schema, workflow de negocio complejo. | Loop completo de subagentes aislados: `market-researcher` ➔ `worldclass-product-designer` ➔ `principal-engineer` (SDD) ➔ `rigorous-qa-auditor`. | Loop formal completo. |
 
 No pedir confirmación metodológica al usuario para elegir modo.
 

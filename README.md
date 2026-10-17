@@ -20,17 +20,16 @@ This framework resolves it with a self-governing system that dynamically selects
 
 ---
 
-## 🧠 Under the Hood: "Agents" Are Skills, Not Swarms
+## 🧠 Under the Hood: Hub Orchestrator + Clean-Context Sub-Agents
 
-A widespread misconception is that a "multi-agent team" requires running 5 independent LLM background processes in an open-ended chat loop (CrewAI, AutoGen).
+A widespread misconception is that a "multi-agent team" requires either 5 uncoordinated background bots chatting in an open loop (CrewAI, AutoGen), or a single LLM thread pretending to wear 5 hats sequentially in the same context window.
 
-In real software engineering, autonomous background swarms fail for three reasons:
+Both extremes fail in real software engineering:
 
-1. **Git & state collisions.** Concurrent processes mutating the same codebase produce race conditions, overwritten code and corrupted branch history.
-2. **Context bloat & token explosion.** Inter-agent chatter inflates context windows and multiplies cost by 5 - 10x with high latency.
-3. **Hallucinatory feedback loops.** When one agent assumes an obsolete API, the next one validates it and builds on a false premise.
+1. **Git & state collisions (Swarms).** Concurrent uncoordinated processes mutating the same codebase produce race conditions, overwritten code and 5 - 10x token bloat.
+2. **Confirmation bias (Same-thread roleplay).** When the same context window that wrote the code pretends to be the QA Auditor two turns later, it inherits its own blind spots and rubber-stamps `ready`.
 
-### The architecture: role-swapping via progressive disclosure
+### The architecture: Hub Orchestrator (`pm-orchestrator`) + Isolated Sub-Agents (`invoke_subagent`)
 
 ```
                         ┌─────────────────────────────────────────┐
@@ -48,20 +47,20 @@ In real software engineering, autonomous background swarms fail for three reason
   • Sequential Git mutations      • Zero unrequested commits  • Micro-interactions
 ```
 
-- **The host agent** is the sole execution engine interacting with your codebase.
-- **Skills are contextual hats.** Each skill in `.agents/skills/` is a dense operational manual loaded only when needed, keeping context clean.
-- **Deterministic single thread for code.** Domain logic, schemas and Git mutations run in one sequential mind to prevent races.
-- **Sub-agents strictly for stateless work.** True parallelism is reserved for research and non-stateful verification.
+- **Default entry point (`pm-orchestrator`).** Unless you explicitly invoke another role directly, every conversation starts with the Orchestrator leading the Grilling Session and selecting the operating mode.
+- **Skills are isolated operational contracts.** Each skill in `.agents/skills/` is loaded into a fresh sub-agent context when dispatched via `invoke_subagent`, keeping the main thread clean.
+- **Sequential writer discipline.** Domain logic, schemas and Git mutations run sequentially (one active writer per scope, or isolated via `git worktree`) to prevent races.
+- **Blind QA certification in a virgin context.** Transition T2 (`review` → `ready`) **never** runs in the coder's thread: a clean-context `rigorous-qa-auditor` sub-agent receives only the task ACs and the `git diff`, runs `npm run gate:qa <ID>` (`exit 0`), and audits the diff without confirmation bias.
 
-### ⚖️ Swarms vs. this playbook
+### ⚖️ Swarms vs. Same-Thread Roleplay vs. This Playbook
 
-| Dimension | Autonomous swarms (CrewAI / AutoGen) | Agentic Team Playbook |
-| :--- | :--- | :--- |
-| **Execution engine** | Multiple uncoordinated bots | 1 host agent wearing role hats sequentially |
-| **Token economy** | 🔴 High (wasteful inter-agent chat) | 🟢 Surgical (progressive disclosure) |
-| **Git & file safety** | 🔴 Race conditions & merge conflicts | 🟢 Deterministic single-threaded mutations |
-| **Quality gate** | "LLM grading another LLM" | 🟢 **Mechanical** Verification Pyramid (`tsc`, tests, build) |
-| **Human governance** | 🔴 Opaque execution | 🟢 PO sovereignty over commits & releases |
+| Dimension | Uncoordinated Swarms | Same-Thread Roleplay | Gripm Playbook (Hub + Sub-Agents) |
+| :--- | :--- | :--- | :--- |
+| **Entry point** | Multiple uncoordinated bots | Generic assistant | **`pm-orchestrator` by default** |
+| **Context hygiene** | 🔴 High chatter bloat | 🟡 Degrades over long turns | 🟢 **Clean context window per sub-agent** |
+| **Git & file safety** | 🔴 Race conditions | 🟢 Single thread | 🟢 **Sequential SDD + worktree isolation** |
+| **QA independence** | 🟡 Ungrounded LLM chat | 🔴 **Zero (confirmation bias)** | 🟢 **Mechanical `gate:qa` + Blind QA sub-agent** |
+| **Human governance** | 🔴 Opaque execution | 🟢 Human in loop | 🟢 **PO sovereignty over scope, commits & releases** |
 
 ---
 
@@ -101,7 +100,7 @@ Full specification, with actors and guards: **[`.agents/STATE_MACHINE.md`](.agen
 [ 2. Research & Design ] (market-researcher + worldclass-product-designer)
               │
               ▼
-[ 3. Dev Execution ] (principal-engineer) ────────► status: (pool) → doing → review
+[ 3. Dev Execution ] (principal-engineer) ────────► status: draft → doing → review
               │                                                ▲         │
               │                                                └─blocked─┘
               ▼
@@ -113,11 +112,11 @@ Full specification, with actors and guards: **[`.agents/STATE_MACHINE.md`](.agen
 
 **The canonical status vocabulary lives in [`.agents/STATE_MACHINE.md`](.agents/STATE_MACHINE.md): `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`.**
 
-- **The backlog is a planning container, not a status.** An item with no status simply has not entered the flow.
-- **Refinement is an interactive gate (R1), not a state.** Requires a Grilling Session to resolve edge cases, fallbacks, empty states and tradeoffs before entering `doing`.
-- **`blocked` requires `blocked_reason`.** Halts WIP inflation; unblocking (`T_unblock`) requires resolving the impediment or dependencies and is verifiable with `node scripts/gate-qa.mjs unblock <ID>`.
+- **The backlog is a planning container, not a status.** Every item on disk starts in `draft` (or `ideas` for unrefined discovery); zero items exist without a status.
+- **Refinement is an interactive gate (R1), not a state.** Requires a Grilling Session to resolve edge cases, fallbacks, empty states and tradeoffs before entering `doing` (`node scripts/gate-qa.mjs start <ID>`).
+- **`blocked` requires `blocked_reason`.** Halts WIP inflation; unblocking (`T_unblock`) requires resolving the impediment or dependencies and is executed mechanically via `node scripts/gate-qa.mjs unblock <ID>`.
 - **`dismissed` requires `dismissed_reason`.** Formal decision that an item will not exist; items in `ready` are never dismissed.
-- **`ready` is the formal delivery of development.** Only the QA Auditor can move `review → ready` backed by `npm run gate:qa` (exit code 0); a developer never self-certifies.
+- **`ready` is the formal delivery of development.** Only the clean-context QA Auditor sub-agent can certify `review → ready`, where `npm run gate:qa <ID>` (exit code 0) mutates `status: ready` on disk; a developer never self-certifies.
 - **Fundamental invariant:** no item can exist in production that is not `done`, and no item can be marked `done` without an actual release deploy.
 
 **Sprints and releases are decoupled.** A release groups available `ready` items by delivered value, with or without an active sprint, historical or current.
@@ -397,10 +396,10 @@ npm run check:all    # validate + test
 **Agentic Team Playbook** es un framework de gobernanza y delivery ágil para assistants de IA:
 
 - **Autonomía sin burocracia:** clasificación dinámica entre *Foco Quirúrgico* (fixes directos), *Dúo Táctico* (UX + código) y *Sprint & Backlog Flow* (loop formal).
-- **Patrón Role-Swapping:** en lugar de enjambres que queman tokens y colisionan en Git, un único Host Agent adopta skills modulares bajo demanda. Subagentes paralelos solo para verificaciones sin estado. Aislamiento multi-agente mediante `git worktree` y protocolo sincrónico de Peer Discovery (`claimed_by`).
+- **Orquestador por defecto + Subagentes de Contexto Limpio:** cada conversación inicia por defecto con el `pm-orchestrator` (salvo invocación directa de otro rol), quien conduce la Grilling Session y despacha subagentes aislados (`invoke_subagent`) con contratos explícitos para Research, Diseño, Ingeniería (SDD) y QA. Aislamiento multi-agente mediante `git worktree` y protocolo sincrónico de Peer Discovery (`claimed_by`).
 - **Vocabulario canónico de estados:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`. **El backlog es el pool de planificación, no un status**, y el **refinamiento es un gate interactivo (R1)** (Grilling Session para despejar ambigüedades, apoyado en el glosario de dominio `DOMAIN.md`).
 - **Estados `blocked` y `dismissed`:** motivos obligatorios y no vacíos (`blocked_reason` / `dismissed_reason`). Resolución estricta de dependencias comprobable mecánicamente con `gate-qa.mjs unblock <ID>`.
-- **`ready` es la entrega formal del desarrollo.** Solo el QA Auditor mueve `review → ready` respaldado por exit code 0 de `npm run gate:qa`. Ningún developer se auto-certifica.
+- **`ready` es la entrega formal con Doble Compuerta:** solo un subagente `rigorous-qa-auditor` en **ventana de contexto limpia** mueve `review → ready`, respaldado por exit code 0 de `npm run gate:qa` y una auditoría ciega del `git diff` contra las ACs. El hilo que escribió el código jamás se auto-certifica.
 - **Disciplina senior (Ponytail):** diff mínimo viable, reutilización previa obligatoria, mapeo de blast radius y cierre honesto.
 - **Filtro Anti-Slop:** higiene de comentarios, prohibición de evasión de tipos (`as unknown as`), receta Oxlint y Purpose Test en diseño y copy.
 - **Invariante fundamental:** ningún ítem puede estar en producción sin estar en `done`, y marcar `done` sin deploy real es una mentira de estado.
