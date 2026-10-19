@@ -15,6 +15,10 @@
     "scripts/gate-qa.mjs",
     "scripts/check-loc.mjs",
     "scripts/ux-rules.json",
+    "scripts/lib/frontmatter.mjs",
+    "scripts/lib/terminal.mjs",
+    "scripts/lib/pyramid.mjs",
+    "scripts/lib/task-inspection.mjs",
     "docs/sprints/SPRINT_SPEC_TEMPLATE.md",
     "docs/DOMAIN_TEMPLATE.md"
   ],

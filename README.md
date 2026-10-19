@@ -289,7 +289,7 @@ npm run audit:ux:baseline                      # snapshot what was already revie
 
 **Every occurrence is reported, not one per file.** A codebase with 487 findings shows 487 - that is what a baseline is for. `audit-ux-baseline.json` records the observations already reviewed so a project can adopt the auditor without either silencing the gate or drowning in noise nobody will read. `ERROR` is never absorbed: a severity that breaks the build cannot be switched off by a file.
 
-**13 signatures:** `UX-001` decimal comma blocker · `UX-002` keyboard shortcuts on touch · `UX-003` drag/scroll collision · `UX-004` date localisation leak · `UX-005` autocapitalise trap · `UX-006` fixed bottom UI occlusion · `UX-007` horizontal crowding · `UX-008` micro-Jank · `UX-009` sub-44px target · `UX-010` unnamed icon button · `UX-011` arbitrary font size · `UX-012` no tactile feedback · `UX-013` missing tabular numerals.
+**15 signatures:** `UX-001` decimal comma blocker · `UX-002` keyboard shortcuts on touch · `UX-003` drag/scroll collision · `UX-004` date localisation leak · `UX-005` autocapitalise trap · `UX-006` fixed bottom UI occlusion · `UX-007` horizontal crowding · `UX-008` micro-Jank · `UX-009` sub-44px target · `UX-010` unnamed icon button · `UX-011` arbitrary font size · `UX-012` no tactile feedback · `UX-013` missing tabular numerals · `UX-014` anti-em-dash · `UX-015` viewport touch zoom lock.
 
 **Stack aware by construction.** Rules that depend on a library declare `requires.deps` and skip themselves when the dependency is absent, so a Go or Python project never gets React advice.
 

@@ -514,7 +514,7 @@ describe('programmatic API (PLAY-005)', () => {
     assert.equal(result.report.findings.length, 1, 'the local rule is reachable by id');
 
     // The canonical catalog is untouched and still complete.
-    assert.equal(ALL_IDS.length, 13);
+    assert.equal(ALL_IDS.length, 15);
     fs.rmSync(temp, { recursive: true, force: true });
   });
 
@@ -796,5 +796,102 @@ describe('canonical vs local findings & partial baseline (PLAY-009)', () => {
     assert.equal(localEntries.length, 2, 'local baseline entries must be updated');
 
     fs.rmSync(temp, { recursive: true, force: true });
+  });
+});
+
+describe('UX-014: anti-em-dash / anti-AI cliché detector', () => {
+  function auditSnippet(code) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ux-014-'));
+    fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'package.json'), '{"name":"test-ux014"}');
+    fs.writeFileSync(path.join(temp, 'src', 'Component.tsx'), code);
+    try {
+      const { auditProject } = requireCjs(AUDITOR);
+      const report = auditProject({ root: temp, useBaseline: false });
+      return report.findings.filter((f) => f.rule === 'UX-014');
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  }
+
+  test('detects em-dash in JSX text children', () => {
+    const findings = auditSnippet('export const A = () => <h1>Release — Notes</h1>;\n');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, 'UX-014');
+    assert.equal(findings[0].severity, 'WARNING');
+  });
+
+  test('detects en-dash in JSX text children', () => {
+    const findings = auditSnippet('export const A = () => <span>Option – Description</span>;\n');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, 'UX-014');
+    assert.equal(findings[0].severity, 'WARNING');
+  });
+
+  test('detects em-dash and en-dash in attributes', () => {
+    const emFindings = auditSnippet('export const A = () => <button title="Save — Exit">Save</button>;\n');
+    assert.equal(emFindings.length, 1);
+    assert.equal(emFindings[0].rule, 'UX-014');
+
+    const enFindings = auditSnippet('export const B = () => <input placeholder="Filter – Search" />;\n');
+    assert.equal(enFindings.length, 1);
+    assert.equal(enFindings[0].rule, 'UX-014');
+  });
+
+  test('clean text passes with standard hyphen', () => {
+    const findings = auditSnippet('export const A = () => <span>Release - Notes</span>;\nexport const B = () => <button title="Save - Exit">Save</button>;\n');
+    assert.equal(findings.length, 0);
+  });
+
+  test('inline suppression works for UX-014', () => {
+    const findings = auditSnippet('export const A = () => <span>Release — Notes</span>; // ux-audit-ignore UX-014\n');
+    assert.equal(findings.length, 0);
+  });
+});
+
+describe('UX-015: viewport touch zoom lock', () => {
+  function auditSnippet(code) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ux-015-'));
+    fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'package.json'), '{"name":"test-ux015"}');
+    fs.writeFileSync(path.join(temp, 'src', 'Component.tsx'), code);
+    try {
+      const { auditProject } = requireCjs(AUDITOR);
+      const report = auditProject({ root: temp, useBaseline: false });
+      return report.findings.filter((f) => f.rule === 'UX-015');
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  }
+
+  test('detects maximum-scale=1 in viewport meta', () => {
+    const findings = auditSnippet('export const Viewport = () => <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />;\n');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, 'UX-015');
+    assert.equal(findings[0].severity, 'WARNING');
+  });
+
+  test('detects user-scalable=no in viewport meta', () => {
+    const findings = auditSnippet('export const Viewport = () => <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />;\n');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, 'UX-015');
+    assert.equal(findings[0].severity, 'WARNING');
+  });
+
+  test('detects user-scalable=0 in viewport meta', () => {
+    const findings = auditSnippet('export const Viewport = () => <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />;\n');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, 'UX-015');
+    assert.equal(findings[0].severity, 'WARNING');
+  });
+
+  test('clean viewport passes (allows pinch-to-zoom)', () => {
+    const findings = auditSnippet('export const Viewport = () => <meta name="viewport" content="width=device-width, initial-scale=1" />;\nexport const Zoomable = () => <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />;\n');
+    assert.equal(findings.length, 0);
+  });
+
+  test('inline suppression works for UX-015', () => {
+    const findings = auditSnippet('export const Viewport = () => <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />; // ux-audit-ignore UX-015\n');
+    assert.equal(findings.length, 0);
   });
 });

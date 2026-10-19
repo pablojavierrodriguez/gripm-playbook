@@ -2,8 +2,8 @@ import { format } from 'date-fns';
 import { Reorder } from 'framer-motion';
 
 /**
- * Fixture that must trigger every one of the 13 catalogued signatures.
- * Each rule reports at most once per file, so this file yields 13 findings.
+ * Fixture that must trigger every one of the 15 catalogued signatures.
+ * Each rule reports at most once per file, so this file yields 15 findings.
  */
 export function Violations({ date, amount }) {
   return (
@@ -25,6 +25,8 @@ export function Violations({ date, amount }) {
         <Reorder.Group />
       </div>
       <b>{(amount).toLocaleString()}</b>
+      <span>Release — Notes</span>
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     </div>
   );
 }

@@ -151,6 +151,16 @@ Importar el módulo **no** corre una auditoría; solo ejecutarlo como binario lo
 - **Impacto:** los dígitos de ancho proporcional provocan micro-saltos horizontales al cambiar el valor.
 - **Corrección:** aplicar `tabular-nums` (o el token monoespaciado del proyecto) en toda columna numérica.
 
+### 14. [UX-014] · WARNING · Anti-em-dash / anti-AI cliché in UI or metadata
+- **Firma:** Em-dash (`—`) o en-dash (`–`) en textos de UI, títulos, opciones o metadatos de usuario en lugar del guión estándar (` - `).
+- **Impacto:** Cliché artificial de IA que degrada la artesanía del producto, produce inconsistencia tipográfica y viola la directiva global de guión estándar de AGENTS.md.
+- **Corrección:** Reemplazar em-dash (`—`) o en-dash (`–`) por guión estándar rodeado de espacios (` - `).
+
+### 15. [UX-015] · WARNING · Viewport touch zoom lock
+- **Firma:** `<meta name="viewport">` o configuración de viewport con `maximum-scale=1`, `user-scalable=no` o `user-scalable=0`.
+- **Impacto:** Bloquea el gesto de pellizco para zoom (pinch-to-zoom) en dispositivos móviles, degradando la accesibilidad para usuarios con baja visión y violando WCAG 1.4.4.
+- **Corrección:** Eliminar `maximum-scale=1` y `user-scalable=no` (o `user-scalable=0`) del viewport meta para permitir escalado táctil.
+
 ---
 
 ## ✅ Checklist de aceptación pre-merge
@@ -163,6 +173,8 @@ Importar el módulo **no** corre una auditoría; solo ejecutarlo como binario lo
 - [ ] ¿Las fechas con nombres de mes/día llevan locale explícito?
 - [ ] ¿Las cifras y columnas numéricas usan `tabular-nums`?
 - [ ] ¿Todo botón de icono tiene nombre accesible?
+- [ ] ¿Los textos de UI, títulos y metadatos usan guión estándar (' - ') y evitan em-dash ('—') o en-dash ('–')?
+- [ ] ¿El viewport móvil permite pellizco táctil sin bloquear zoom (sin 'maximum-scale=1' ni 'user-scalable=no')?
 - [ ] ¿La revisión manual detecta sobrecarga decorativa (gradientes y orbes de fondo, `backdrop-blur` apilado en varias superficies, sombras uniformemente grandes) que degrade el contraste del texto o aplane la jerarquía? Buscá el efecto acumulado sobre el texto y sobre los bordes de superficie, no la técnica aislada: el vicio aparece por repetición, y una técnica justificada en un plano se vuelve ruido en tres.
 - [ ] ¿`node scripts/audit-ux-code.cjs --strict` sale en verde?
 
