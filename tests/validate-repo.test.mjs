@@ -89,14 +89,14 @@ describe('manifest ⇄ documentation (PLAY-020 AC #2)', () => {
       fs.writeFileSync(path.join(root, '.playbook-manifest.json'), JSON.stringify(manifest, null, 2));
       // Name the same command three times in ONE document. Three documents
       // mentioning it is three defects; three mentions in one document is one.
-      const skill = path.join(root, '.agents', 'skills', 'rigorous-qa-auditor', 'SKILL.md');
+      const skill = path.join(root, '.agents', 'skills', 'qa-auditor', 'SKILL.md');
       fs.writeFileSync(skill, `${fs.readFileSync(skill, 'utf8')}\n\nnode scripts/gate-qa.mjs again\nnode scripts/gate-qa.mjs once more\n`);
     });
 
     const { stdout } = runValidator(dir);
     const forThisDoc = stdout
       .split('\n')
-      .filter((l) => l.includes('rigorous-qa-auditor') && l.includes('does not install'));
+      .filter((l) => l.includes('qa-auditor') && l.includes('does not install'));
     assert.equal(forThisDoc.length, 1, 'a command named three times in one document is one defect');
   });
 });
@@ -146,7 +146,7 @@ describe('pyramid parity (PLAY-015 AC #1)', () => {
 
     const { code, stdout } = runValidator(dir);
     assert.notEqual(code, 0, 'a documented blocking step the gate cannot run is a silent hole');
-    assert.match(stdout, /declares "Consistencia spec ↔ backlog" as blocking/);
+    assert.match(stdout, /declares "Spec - backlog consistency" as blocking/);
   });
 
   test('control: the shipped repo really does execute every blocking step', () => {

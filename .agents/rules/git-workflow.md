@@ -27,57 +27,57 @@ Strict rules governing Git operations to prevent unintentional code loss or vagu
 ## Multi-Agent Parallelism via git worktree
 
 > [!CAUTION]
-> **Nunca hacer `git checkout` en un repositorio compartido mientras otro agente trabaja.** El working tree y `.git/HEAD` son estado de sistema de archivos compartido, no por sesión. Un `checkout` de un agente cambia la rama del otro **en silencio, mientras escribe**.
+> **Never run `git checkout` in a shared repository while another agent is working.** The working tree and `.git/HEAD` represent shared filesystem state, not per-session isolation. A `checkout` run by one agent silently switches the other agent's branch **while it is actively writing**.
 
-Los dos fallos que produce:
+The two failure modes this causes:
 
-1. **Commits en la rama equivocada.** El agente A corre `git commit` después de que B cambió de rama, y sus cambios quedan asentados sobre el trabajo de B.
-2. **Cambios no stageados bloquean o corrompen el checkout del otro.**
+1. **Commits on the wrong branch.** Agent A runs `git commit` after Agent B switched branches, landing A's changes on top of B's work.
+2. **Unstaged changes blocking or corrupting the other agent's checkout.**
 
-### Regla y Protocolo de Descubrimiento Previo (Pre-Flight Concurrency Probe)
+### Rule & Discovery Protocol (Pre-Flight Concurrency Probe)
 
-Antes de ejecutar cualquier comando de Git o modificar archivos:
-1. **Probe Sincrónico:** El agente inspecciona el backlog (`status: doing`) y `git status --porcelain`. Si detecta un ítem en `doing` con `claimed_by` distinto de su propia identidad namespaced (`<provider>:<id>`), **descubre dinámicamente que hay un par activo**.
-2. **Salvaguarda de Árbol Compartido:** Queda terminantemente prohibido ejecutar `git checkout .`, `git restore .` o `git clean`. El agente asume que los cambios no commiteados pertenecen a su colega.
-3. **Handshake Autónomo & Protocolo Cross-Harness:**
-   - **Intra-harness (mismo runtime, ej: `antigravity:`):** Emite un `send_message` al `claimed_by` de la tarea activa para coordinar o consensuar prioridades.
-   - **Cross-harness (distinto proveedor, ej: `cursor:`, `claude-code:`, `human:`):** Respeta el lease sin intentar RPC inviable, notifica en chat al usuario y procede directo al aislamiento en worktree.
-4. **Aislamiento en Worktree:** Cuando dos o más agentes operan en simultáneo sobre el mismo repositorio, **cada agente o tarea paralela trabaja en su propio worktree**. Ningún agente cambia de rama en el working tree principal.
+Before running any Git command or modifying files:
+1. **Synchronous Probe:** The agent inspects the backlog (`status: doing`) and runs `git status --porcelain`. If it detects an item in `doing` with a `claimed_by` different from its own namespaced identity (`<provider>:<id>`), it **dynamically discovers an active peer**.
+2. **Shared Tree Safeguard:** Prohibited to run `git checkout .`, `git restore .`, or `git clean`. The agent assumes uncommitted changes belong to its peer.
+3. **Autonomous Handshake & Cross-Harness Protocol:**
+   - **Intra-Harness (same runtime, e.g., `antigravity:`):** Issues a `send_message` to the `claimed_by` recipient of the active task to coordinate priorities.
+   - **Cross-Harness (different provider, e.g., `cursor:`, `claude-code:`, `human:`):** Respects the lease without attempting unviable RPC calls, notifies the user in chat, and proceeds directly to worktree isolation.
+4. **Worktree Isolation:** When two or more agents operate simultaneously on the same repository, **each agent or parallel task operates in its own worktree**. No agent changes branches in the primary working tree.
 
-### Receta
+### Recipe
 
 ```bash
-# crear el worktree aislado y su rama en un solo comando
+# create isolated worktree and its branch in a single command
 git worktree add -b <branch> ../<repo>-<task>
 
-# trabajar ahí dentro
+# navigate into worktree
 cd ../<repo>-<task>
-# ... la tarea completa, con su propia rama y su propio working tree
+# ... complete task with its own branch and isolated working tree ...
 
-# consolidar los cambios ANTES de retirar el worktree
-# (desde el worktree principal, con la integración en curso)
-git fetch . <branch>:dev          # integra en dev sin cambiar de rama
+# consolidate changes BEFORE removing the worktree
+# (executed from main worktree, with integration in flight)
+git fetch . <branch>:dev          # integrates into dev without branch switching
 git worktree remove ../<repo>-<task>
 ```
 
 > [!CAUTION]
-> **`-b` no es opcional.** `git worktree add ../<repo>-<task> <branch>` falla con `fatal: invalid reference` si la rama todavía no existe, y crearla exige `git checkout -b` en el working tree principal - la operación exacta que esta regla prohíbe. La receta de aislamiento no se puede seguir sin violar la regla que sirve.
+> **`-b` is not optional.** `git worktree add ../<repo>-<task> <branch>` fails with `fatal: invalid reference` if the branch does not already exist, and creating it requires `git checkout -b` in the primary working tree - the exact operation this rule forbids. The isolation recipe cannot be followed without violating the rule it serves.
 >
-> La consolidación usa `git fetch . <branch>:dev` **precisamente para no hacer `git checkout`**: `git checkout dev && git merge <branch>` contradice la prohibición de cambiar de rama en el worktree principal.
+> Consolidation uses `git fetch . <branch>:dev` **precisely to avoid `git checkout`**: running `git checkout dev && git merge <branch>` contradicts the prohibition against switching branches in the primary working tree.
 
-Auditoría y limpieza:
+Audit & cleanup:
 
 ```bash
-git worktree list                 # qué worktrees están vivos
-git worktree prune                # limpiar referencias de worktrees ya borrados a mano
+git worktree list                 # inspect active worktrees
+git worktree prune                # clean references to manually deleted worktrees
 ```
 
-### Reglas de convivencia
+### Coexistence Rules
 
-- **Una rama por worktree.** Git no permite que dos worktrees compartan el mismo branch: es una restricción del diseño, no una preferencia.
-- **El worktree principal se queda en `dev`.** Es el punto de integración. Los agentes no hacen checkout ahí.
-- **`git worktree remove` no borra cambios sin commitear.** Si el agente terminó sin consolidar, remové el worktree a mano solo si verificaste que no hay trabajo perdido.
-- **Sub-agentes en paralelo:** si varios sub-agentes van a tocar archivos superpuestos, cada uno va en su worktree. El aislamiento de working tree **no** aísla líneas en conflicto: dos agentes que editan el mismo archivo se mergearán igual y entrarán en conflicto. Ver `.agents/TEAM_PLAYBOOK.md`.
+- **One branch per worktree.** Git does not permit two worktrees to share the same branch: this is a core design constraint, not a preference.
+- **The primary worktree stays on `dev`.** It serves as the integration trunk. Agents do not check out branches there.
+- **`git worktree remove` does not delete uncommitted changes.** If an agent terminates without consolidating, manually remove the worktree only after verifying no uncommitted work is lost.
+- **Parallel sub-agents:** if multiple sub-agents touch overlapping files, each operates in its own worktree. Working tree isolation **does not** isolate conflicting lines: two agents editing the same file will still conflict upon merge. See `.agents/TEAM_PLAYBOOK.md`.
 
 ---
 

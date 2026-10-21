@@ -10,16 +10,6 @@
  * - Framework layer (synced):   .agents/**, scripts/**, docs/sprints/**
  * - Project layer (preserved):  AGENTS.md, docs/BACKLOG.md, application code
  *
- * Safety principles
- *   1. Reproducible: syncs from a pinned git ref, not from a moving branch.
- *   2. Non-destructive: a file a human owns is NEVER silently overwritten. It is
- *      recorded as a customization in the lockfile and protected on every
- *      subsequent run until --force.
- *   3. Evidence-based: when there is no lockfile baseline, the sync asks the
- *      upstream history whether the local content is a published revision. An
- *      older canonical file is moved forward; only genuinely modified files are
- *      held back.
- *
  * Usage:
  *   node scripts/sync-playbook.mjs [options]
  *
@@ -31,12 +21,10 @@
  *   --stack <name>     Also install an optional stack pack (repeatable)
  *   --list-stacks      List available stack packs and exit
  *   --init-agents      Create AGENTS.md from the template when absent
- *   --adopt            Keep every differing file as-is and record it as the
- *                      baseline to track. Nothing is overwritten.
+ *   --adopt            Keep every differing file as-is and record it as baseline
  *   --dry-run          Report what would change, write nothing
  *   --force            Overwrite customised files
- *   --no-history       Skip the upstream provenance lookup (faster, protects
- *                      anything unrecognised without checking)
+ *   --no-history       Skip the upstream provenance lookup
  *   --yes              Never prompt
  *   --no-manifest      Do not write the lockfile
  *   --help             Show usage
@@ -46,18 +34,30 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { c, promptConfirm } from './lib/terminal.mjs';
+import {
+  HISTORY_BUDGET,
+  makeBudget,
+  fetchRemoteFile,
+  resolveRef,
+  findCanonicalProvenance,
+} from './lib/provenance.mjs';
+import {
+  LOCK_PATH,
+  sha256,
+  classifyLocalFile,
+  findOrphanedFiles,
+  readLock,
+  planFiles,
+} from './lib/sync-classifier.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const DEFAULT_REMOTE = 'pablojavierrodriguez/gripm-playbook';
-const DEFAULT_BRANCH = 'main';
 const MANIFEST_PATH = '.playbook-manifest.json';
-const LOCK_PATH = '.playbook-lock.json';
-const FETCH_TIMEOUT_MS = 15_000;
-const FETCH_RETRIES = 3;
+
+export { findCanonicalProvenance, classifyLocalFile, findOrphanedFiles };
 
 /**
  * Fallback used only when the remote manifest cannot be fetched.
@@ -69,14 +69,23 @@ export const FALLBACK_CORE_FILES = [
   '.agents/rules/git-workflow.md',
   '.agents/skills/pm-orchestrator/SKILL.md',
   '.agents/skills/market-researcher/SKILL.md',
-  '.agents/skills/worldclass-product-designer/SKILL.md',
+  '.agents/skills/product-designer/SKILL.md',
   '.agents/skills/principal-engineer/SKILL.md',
-  '.agents/skills/rigorous-qa-auditor/SKILL.md',
+  '.agents/skills/qa-auditor/SKILL.md',
   '.agents/skills/code-level-ux-auditor/SKILL.md',
   'scripts/audit-ux-code.cjs',
   'scripts/gate-qa.mjs',
   'scripts/check-loc.mjs',
   'scripts/ux-rules.json',
+  'scripts/sync-playbook.mjs',
+  'scripts/init.mjs',
+  'scripts/lib/frontmatter.mjs',
+  'scripts/lib/terminal.mjs',
+  'scripts/lib/adapters.mjs',
+  'scripts/lib/pyramid.mjs',
+  'scripts/lib/task-inspection.mjs',
+  'scripts/lib/provenance.mjs',
+  'scripts/lib/sync-classifier.mjs',
   'docs/sprints/SPRINT_SPEC_TEMPLATE.md',
   'docs/DOMAIN_TEMPLATE.md',
 ];
@@ -98,78 +107,6 @@ export const FALLBACK_STACKS = {
   ],
 };
 
-// ---------------------------------------------------------------------------
-// infra
-// ---------------------------------------------------------------------------
-
-const isColorSupported = !process.env.NO_COLOR && (Boolean(process.stdout.isTTY) || Boolean(process.env.FORCE_COLOR));
-const c = {
-  bold: (s) => (isColorSupported ? `\x1b[1m${s}\x1b[0m` : s),
-  dim: (s) => (isColorSupported ? `\x1b[2m${s}\x1b[0m` : s),
-  green: (s) => (isColorSupported ? `\x1b[32m${s}\x1b[0m` : s),
-  cyan: (s) => (isColorSupported ? `\x1b[36m${s}\x1b[0m` : s),
-  yellow: (s) => (isColorSupported ? `\x1b[33m${s}\x1b[0m` : s),
-  red: (s) => (isColorSupported ? `\x1b[31m${s}\x1b[0m` : s),
-};
-
-const sha256 = (content) => crypto.createHash('sha256').update(content).digest('hex');
-
-async function fetchText(url, { retries = FETCH_RETRIES } = {}) {
-  let lastError;
-
-  for (let attempt = 1; attempt <= retries; attempt += 1) {
-    try {
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        headers: { 'user-agent': 'gripm-playbook-sync' },
-      });
-      if (res.status === 404) return { notFound: true, content: null };
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      return { notFound: false, content: await res.text() };
-    } catch (err) {
-      lastError = err;
-      if (attempt < retries) {
-        const backoff = 300 * 2 ** (attempt - 1);
-        await new Promise((resolve) => { setTimeout(resolve, backoff); });
-      }
-    }
-  }
-
-  throw new Error(`${url} unreachable after ${retries} attempts: ${lastError.message}`);
-}
-
-const rawUrl = (remote, ref, file) =>
-  `https://raw.githubusercontent.com/${remote}/${ref}/${file}`;
-
-async function fetchRemoteFile(remote, ref, file, sourceDir = null) {
-  if (sourceDir) {
-    const absPath = path.join(sourceDir, file);
-    if (!fs.existsSync(absPath)) return null;
-    return fs.readFileSync(absPath, 'utf8');
-  }
-  const { notFound, content } = await fetchText(rawUrl(remote, ref, file));
-  return notFound ? null : content;
-}
-
-async function resolveRef(remote, requested) {
-  if (requested) return { ref: requested, pinned: true };
-  const api = `https://api.github.com/repos/${remote}/releases/latest`;
-  try {
-    const { content } = await fetchText(api, { retries: 2 });
-    if (content) {
-      const release = JSON.parse(content);
-      if (release.tag_name) return { ref: release.tag_name, pinned: true };
-    }
-  } catch {
-    // fall through to the branch default
-  }
-  return { ref: DEFAULT_BRANCH, pinned: false };
-}
-
-// ---------------------------------------------------------------------------
-// manifest
-// ---------------------------------------------------------------------------
-
 async function loadManifest(remote, ref, sourceDir = null) {
   const content = await fetchRemoteFile(remote, ref, MANIFEST_PATH, sourceDir);
   if (!content) return null;
@@ -181,30 +118,6 @@ async function loadManifest(remote, ref, sourceDir = null) {
     return null;
   }
 }
-
-function planFiles(manifest, stacks) {
-  const core = manifest ? manifest.core : FALLBACK_CORE_FILES;
-  const stackSource = manifest && manifest.stacks ? manifest.stacks : FALLBACK_STACKS;
-
-  const files = [...core];
-  const unknown = [];
-
-  for (const name of stacks) {
-    const pack = stackSource[name];
-    if (!pack) {
-      unknown.push(name);
-      continue;
-    }
-    const packFiles = Array.isArray(pack) ? pack : (pack?.files ?? []);
-    files.push(...packFiles);
-  }
-
-  return { files, stackSource, unknown };
-}
-
-// ---------------------------------------------------------------------------
-// sync
-// ---------------------------------------------------------------------------
 
 function printBanner(targetRepo, remote, ref, pinned, stacks) {
   const upstreamDisplay = `${remote}@${ref}${pinned ? '' : ' (unpinned)'}`;
@@ -219,157 +132,15 @@ function printBanner(targetRepo, remote, ref, pinned, stacks) {
 `);
 }
 
-function readLock(targetRepo) {
-  const lockPath = path.join(targetRepo, LOCK_PATH);
-  const empty = { playbook: null, ref: null, version: null, files: {}, customizations: [] };
-  if (!fs.existsSync(lockPath)) return empty;
-  try {
-    const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-    return {
-      playbook: lock.playbook || null,
-      ref: lock.ref || null,
-      version: lock.version || null,
-      files: lock.files || {},
-      customizations: Array.isArray(lock.customizations) ? lock.customizations : [],
-    };
-  } catch {
-    return empty;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// canonicity
-//
-// "Is this local file an older published version, or did a human edit it?"
-//
-// Answering that requires provenance, not just a hash comparison against the
-// current ref. When a project has no lockfile yet - the first sync after
-// installing the framework by hand - every file that differs from upstream
-// looks identical: a v1 skill that nobody touched and a skill someone heavily
-// edited both raise the same flag.
-//
-// The upstream commit history for the path is the only available evidence, so
-// the sync asks it: if the local content matches any published revision of that
-// path, it is canonical and safe to move forward. If it matches none, it is a
-// local modification and is protected.
-// ---------------------------------------------------------------------------
-
-const HISTORY_LIMIT = 25;
-const HISTORY_BUDGET = 40;
-
-function makeBudget(limit) {
-  let left = limit;
-  return {
-    take() {
-      if (left <= 0) return false;
-      left -= 1;
-      return true;
-    },
-    get remaining() { return left; },
-  };
-}
-
-async function listFileHistory(remote, filePath, limit) {
-  const url = `https://api.github.com/repos/${remote}/commits?path=${encodeURIComponent(filePath)}&per_page=${limit}`;
-  try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: { 'user-agent': 'gripm-playbook-sync', accept: 'application/vnd.github+json' },
-    });
-    if (!res.ok) return null;
-    const commits = await res.json();
-    return Array.isArray(commits) ? commits.map((commit) => commit.sha) : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * @returns {Promise<{status:'canonical'|'custom'|'unknown', sha?:string}>}
- */
-export async function findCanonicalProvenance(remote, filePath, localContent, budget = makeBudget(HISTORY_BUDGET)) {
-  const revisions = await listFileHistory(remote, filePath, HISTORY_LIMIT);
-  if (!revisions) return { status: 'unknown', reason: 'history unavailable' };
-
-  for (const sha of revisions) {
-    if (!budget.take()) return { status: 'unknown', reason: 'history budget exhausted' };
-    let content = null;
-    try {
-      content = await fetchRemoteFile(remote, sha, filePath);
-    } catch {
-      continue;
-    }
-    if (content !== null && content === localContent) return { status: 'canonical', sha };
-  }
-
-  return { status: 'custom' };
-}
-
-/**
- * Pure decision table, exported for testing.
- *
- * 'managed'       → safe to move to the upstream revision
- * 'customization' → a human owns this file; never touch it without --force
- * 'unknown'       → no baseline yet, provenance must be resolved upstream
- */
-export function classifyLocalFile({ localHash, knownHash, wasCustomization }) {
-  if (wasCustomization) return 'customization';
-  if (knownHash && knownHash === localHash) return 'managed';
-  if (knownHash) return 'customization';
-  return 'unknown';
-}
-
-/** Files that belong to the framework but are no longer part of the plan. */
-export function findOrphanedFiles(targetRepo, plannedFiles, lockFiles = null) {
-  const agentsRoot = path.join(targetRepo, '.agents');
-  if (!fs.existsSync(agentsRoot)) return [];
-
-  const planned = new Set(plannedFiles);
-  const orphans = [];
-
-  const walk = (dir) => {
-    let entries;
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-        continue;
-      }
-      if (!entry.name.endsWith('.md')) continue;
-      const rel = path.relative(targetRepo, full).split(path.sep).join('/');
-      if (lockFiles && typeof lockFiles === 'object' && Object.keys(lockFiles).length > 0) {
-        if (lockFiles[rel] && !planned.has(rel)) orphans.push(rel);
-      } else {
-        if (!planned.has(rel)) orphans.push(rel);
-      }
-    }
-  };
-
-  walk(agentsRoot);
-  return orphans;
-}
-
-function prompt(question) {
-  return new Promise((resolve) => {
-    if (!process.stdin.isTTY) {
-      resolve(false);
-      return;
-    }
-    process.stdout.write(`${question} [y/N] `);
-    process.stdin.once('data', (data) => {
-      resolve(/^y(es)?$/i.test(data.toString().trim()));
-    });
-  });
-}
-
 export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) {
-  const isLocalSource = !!options.source || (options.remote && fs.existsSync(options.remote) && fs.statSync(options.remote).isDirectory());
-  const localSourceDir = options.source ? path.resolve(options.source) : (isLocalSource ? path.resolve(options.remote) : null);
+  const isLocalSource =
+    !!options.source ||
+    (options.remote && fs.existsSync(options.remote) && fs.statSync(options.remote).isDirectory());
+  const localSourceDir = options.source
+    ? path.resolve(options.source)
+    : isLocalSource
+      ? path.resolve(options.remote)
+      : null;
   const remote = localSourceDir || options.remote || DEFAULT_REMOTE;
   const requestedRef = options.tag || options.branch;
   const stacks = options.stacks || [];
@@ -389,7 +160,12 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
     console.log(`  ${c.yellow('▲')}  ${c.yellow('Could not read the remote manifest; falling back to the built-in core list.')}\n`);
   }
 
-  const { files, stackSource, unknown } = planFiles(manifest, stacks);
+  const { files, stackSource, unknown } = planFiles(
+    manifest,
+    stacks,
+    FALLBACK_CORE_FILES,
+    FALLBACK_STACKS,
+  );
 
   for (const name of unknown) {
     console.error(`  ${c.red('✖')}  ${c.red(`Unknown stack pack "${name}". Available: ${Object.keys(stackSource).join(', ')}`)}`);
@@ -405,8 +181,13 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
   const budget = makeBudget(HISTORY_BUDGET);
 
   const stats = {
-    created: 0, updated: 0, unchanged: 0, adopted: 0,
-    protected: 0, recognizedCanonical: 0, missingUpstream: 0,
+    created: 0,
+    updated: 0,
+    unchanged: 0,
+    adopted: 0,
+    protected: 0,
+    recognizedCanonical: 0,
+    missingUpstream: 0,
   };
   const protectedFiles = [];
   const backupRoot = path.join(targetRepo, '.playbook-backups');
@@ -452,17 +233,12 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
       continue;
     }
 
-    // The file differs from upstream. Is it an older canonical revision, or
-    // did a human edit it?
     let classification = classifyLocalFile({
       localHash,
       knownHash: lock.files[relativePath],
       wasCustomization: lock.customizations.includes(relativePath),
     });
 
-    // --adopt means "keep what I have, and start tracking it". Nothing that
-    // differs is touched, so there is no reason to spend requests on
-    // provenance.
     if (adopt && classification !== 'managed' && !force) {
       nextLockFiles[relativePath] = localHash;
       nextCustomizations.delete(relativePath);
@@ -478,7 +254,6 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
         classification = 'managed';
         stats.recognizedCanonical += 1;
       } else {
-        // 'custom' and 'unknown' both fail safe: never touch it silently.
         classification = 'customization';
       }
     } else if (classification === 'unknown') {
@@ -490,18 +265,19 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
       nextCustomizations.add(relativePath);
       nextLockFiles[relativePath] = localHash;
 
-      const detail = provenance && provenance.reason
-        ? provenance.reason
-        : provenance && provenance.status === 'custom'
-          ? 'no published revision matches'
-          : 'local edits';
+      const detail =
+        provenance && provenance.reason
+          ? provenance.reason
+          : provenance && provenance.status === 'custom'
+            ? 'no published revision matches'
+            : 'local edits';
       console.log(`  ${c.yellow('▲')} ${c.yellow('protected'.padEnd(10))} ${relativePath} ${c.dim(`(${detail} - tracked as a customization)`)}`);
       stats.protected += 1;
       continue;
     }
 
     if (!assumeYes && !isDryRun && !force) {
-      const ok = await prompt(`  Overwrite locally modified ${relativePath}?`);
+      const ok = await promptConfirm(`Overwrite locally modified ${relativePath}?`);
       if (!ok) {
         protectedFiles.push(relativePath);
         nextCustomizations.add(relativePath);
@@ -519,19 +295,20 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
       fs.writeFileSync(targetFile, remoteContent, 'utf8');
     }
 
-    // The human's version is being replaced, so it is no longer a customization.
     nextCustomizations.delete(relativePath);
 
-    const note = provenance && provenance.status === 'canonical'
-      ? ' (recognized as an older canonical revision)'
-      : classification === 'customization' ? ' (local edits backed up)' : '';
+    const note =
+      provenance && provenance.status === 'canonical'
+        ? ' (recognized as an older canonical revision)'
+        : classification === 'customization'
+          ? ' (local edits backed up)'
+          : '';
 
     console.log(`  ${c.cyan('✔')} ${c.cyan('updated'.padEnd(10))} ${relativePath}${note ? c.dim(note) : ''}`);
     stats.updated += 1;
     nextLockFiles[relativePath] = remoteHash;
   }
 
-  // --- Project layer: AGENTS.md is never overwritten -----------------------
   const agentsMdPath = path.join(targetRepo, 'AGENTS.md');
   if (fs.existsSync(agentsMdPath)) {
     console.log(`  ${c.dim('•')} ${c.dim('preserved'.padEnd(10))} AGENTS.md ${c.dim('(project-specific config left untouched)')}`);
@@ -550,7 +327,6 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
     console.log(`  ${c.dim('ℹ')} ${c.dim('skipped'.padEnd(10))} AGENTS.md not found and --init-agents was not passed.`);
   }
 
-  // --- Lockfile ------------------------------------------------------------
   if (writeManifest && !isDryRun && !unknown.length) {
     const lockPayload = {
       $comment: 'Generated by @gripm/playbook. Do not edit by hand.',
@@ -623,9 +399,8 @@ async function listStacks(remote, sourceDir = null) {
   ${c.dim('➜')}  ${c.dim('Upstream:')}  ${c.cyan(`${remote}@${ref}`)}
 `);
   for (const [name, pack] of Object.entries(source)) {
-    const packFiles = Array.isArray(pack) ? pack : (pack?.files ?? []);
-    const skills = packFiles.filter((f) => f.endsWith('SKILL.md'))
-      .map((f) => path.basename(path.dirname(f)));
+    const packFiles = Array.isArray(pack) ? pack : pack?.files ?? [];
+    const skills = packFiles.filter((f) => f.endsWith('SKILL.md')).map((f) => path.basename(path.dirname(f)));
     console.log(`  • ${c.bold(name.padEnd(10))} ${skills.join(', ') || c.dim('(no skills)')}`);
   }
   console.log(`
@@ -634,16 +409,22 @@ async function listStacks(remote, sourceDir = null) {
 `);
 }
 
-// ---------------------------------------------------------------------------
-// CLI
-// ---------------------------------------------------------------------------
-
 function parseArgs(argv) {
   const opts = {
-    repo: process.cwd(), source: null, tag: null, remote: DEFAULT_REMOTE, stacks: [],
-    initAgents: false, dryRun: false, force: false, yes: false,
-    manifest: true, adopt: false, history: true,
-    listStacks: false, help: false,
+    repo: process.cwd(),
+    source: null,
+    tag: null,
+    remote: DEFAULT_REMOTE,
+    stacks: [],
+    initAgents: false,
+    dryRun: false,
+    force: false,
+    yes: false,
+    manifest: true,
+    adopt: false,
+    history: true,
+    listStacks: false,
+    help: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -676,25 +457,40 @@ function parseArgs(argv) {
 }
 
 function printUsage() {
-  console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0]
-    .replace(/^\/\*\*?/, '')
-    .replace(/^ \* ?/gm, ''));
+  console.log(
+    fs
+      .readFileSync(__filename, 'utf8')
+      .split('*/')[0]
+      .replace(/^\/\*\*?/, '')
+      .replace(/^ \* ?/gm, ''),
+  );
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
-  const opts = parseArgs(process.argv.slice(2));
+  const [subcommand, ...rest] = process.argv.slice(2);
 
-  if (opts.help) {
-    printUsage();
-  } else if (opts.listStacks) {
-    listStacks(opts.remote, opts.source).catch((err) => {
-      console.error('Fatal:', err.message);
-      process.exit(2);
-    });
+  if (subcommand === 'init') {
+    import('./init.mjs')
+      .then((module) => module.runInit(rest))
+      .catch((err) => {
+        console.error('Fatal:', err.message);
+        process.exit(2);
+      });
   } else {
-    runPlaybookSync(opts.repo, opts).catch((err) => {
-      console.error('Fatal:', err.message);
-      process.exit(2);
-    });
+    const opts = parseArgs(process.argv.slice(2));
+
+    if (opts.help) {
+      printUsage();
+    } else if (opts.listStacks) {
+      listStacks(opts.remote, opts.source).catch((err) => {
+        console.error('Fatal:', err.message);
+        process.exit(2);
+      });
+    } else {
+      runPlaybookSync(opts.repo, opts).catch((err) => {
+        console.error('Fatal:', err.message);
+        process.exit(2);
+      });
+    }
   }
 }

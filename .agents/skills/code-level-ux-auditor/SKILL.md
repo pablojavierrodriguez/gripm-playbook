@@ -1,47 +1,47 @@
 ---
 name: code-level-ux-auditor
-description: Audita estáticamente el código fuente en busca de anti-patrones de UX móvil, colisiones de gestos y scroll, oclusión de UI fija, janks de renderizado, micro-ergonomía y accesibilidad. Usar cuando se revise código de UI, antes de un commit, o cuando la tarea mentione touch targets, viewport móvil, teclado virtual, scroll, drag o a11y estática.
+description: Audits source code statically for mobile UX anti-patterns, gesture and scroll collisions, fixed-UI occlusion, render jank, micro-ergonomics, and accessibility. Use when reviewing UI code, before a commit, or when the task mentions touch targets, mobile viewport, virtual keyboard, scroll, drag, or static a11y.
 ---
 
-# Auditor Estático de UX a Nivel de Código
+# Code-Level UX Auditor Skill
 
-## Misión y Filosofía
+## Mission and Philosophy
 
-La calidad de experiencia de usuario no es una capa de pintura: **se programa en el código**. Los bugs que más frustran al usuario (drag trabado, saltos de scroll, inputs que rechazan la coma, contenido tapado por la barra inferior, tirones de 15 FPS, botones sin nombre accesible) poseen **firmas estáticas inequívocas** en el código fuente.
+User experience quality is not a coat of paint: **it is programmed into the code**. The bugs that frustrate users the most (stuck drag, scroll jumps, inputs that reject the comma, content hidden behind the bottom bar, 15 FPS stutter, buttons with no accessible name) carry **unequivocal static signatures** in the source code.
 
-Esta skill define las reglas de inspección y delega la detección mecánica en un runner de reglas declarativas.
+This skill defines the inspection rules and delegates mechanical detection to a declarative rules runner.
 
 ---
 
-## ⚙️ Tooling: el catálogo de reglas es la fuente de verdad
+## ⚙️ Tooling: the rule catalog is the source of truth
 
-La detección **no** está hardcodeada en el script. Vive en `scripts/ux-rules.json`, que es la fuente de verdad canónica compartida entre esta skill y el runner:
+Detection is **not** hardcoded in the script. It lives in `scripts/ux-rules.json`, the canonical source of truth shared by this skill and the runner:
 
 ```bash
 node scripts/audit-ux-code.cjs            # human report
-node scripts/audit-ux-code.cjs --strict   # falla también con WARNING
+node scripts/audit-ux-code.cjs --strict   # fails on WARNING too
 node scripts/audit-ux-code.cjs --format json
 node scripts/audit-ux-code.cjs --list-rules
 node scripts/audit-ux-code.cjs --rule UX-006
-npm run audit:ux:baseline                 # snapshotear lo ya revisado
+node scripts/audit-ux-code.cjs --update-baseline   # snapshot what was already reviewed
 ```
 
-- **El motor es agnóstico del stack.** Las reglas que dependen de una librería declaran `requires.deps` y se saltan solas si la dependencia no está en el `package.json` del proyecto. No hay nombres de archivo ni de proyecto en el motor.
-- ** severidades:** `ERROR` (rompe funcionalidad táctil, falla el audit sin `--strict`), `WARNING` (degrada, falla con `--strict`), `INFO` (higiene).
-- **Supresión:** `// ux-audit-ignore` desactiva todas las reglas de la línea; `// ux-audit-ignore UX-004` solo esa. Opt-out por proyecto en `.uxaudit.json` (`disableRules`, `exclude`).
-- **Baseline:** `audit-ux-baseline.json` registra las observaciones ya revisadas para poder adoptar el auditor sobre un codebase que ya tiene cientos de hallazgos, sin silenciar el gate ni ahogar en ruido irrecuperable. `npm run audit:ux:baseline` reescribe el snapshot. **`ERROR` nunca se absorbe**: una severidad que rompe el build no se silencia con un archivo.
+- **The engine is stack-agnostic.** Rules that depend on a library declare `requires.deps` and skip themselves when the dependency is not in the project's `package.json`. The engine contains no file or project names.
+- **Severities:** `ERROR` (breaks tactile functionality, fails the audit without `--strict`), `WARNING` (degrades, fails with `--strict`), `INFO` (hygiene).
+- **Suppression:** `// ux-audit-ignore` disables every rule on that line; `// ux-audit-ignore UX-004` disables only that one. Per-project opt-out lives in `.uxaudit.json` (`disableRules`, `exclude`).
+- **Baseline:** `audit-ux-baseline.json` records observations already reviewed, so the auditor can be adopted on a codebase that already has hundreds of findings without silencing the gate or drowning in unrecoverable noise. `node scripts/audit-ux-code.cjs --update-baseline` rewrites the snapshot. **`ERROR` is never absorbed:** a severity that breaks the build is never silenced by a file.
 
-### Anatomía de una unidad
+### Anatomy of a unit
 
-El motor segmenta el archivo en **elementos JSX** y cada elemento expone tres granularidades. Elegir la correcta es lo que separa una regla precisa de una que inunda de falsos positivos:
+The engine segments the file into **JSX elements**, and each element exposes three granularities. Picking the right one is what separates a precise rule from one that floods the report with false positives:
 
-| Campo | Qué incluye | Para qué sirve |
+| Field | What it includes | What it is for |
 | :--- | :--- | :--- |
-| `text` | Solo el tag de apertura y sus atributos | `line`, `alsoLine`, `unlessLine` - la firma vive en el elemento que la porta, y el hallazgo apunta a ese elemento, no a su wrapper |
-| `ownContent` | El tag de apertura, el de cierre y los nodos de texto propios, **excluyendo** los descendientes | `alsoContent` - "¿este elemento es el que renderiza el valor?" |
-| `scopeText` | El elemento **más** todos sus descendientes | `needsContent`, `unlessContent`, `unlessVisibleText` - "¿este elemento contiene aquello?" |
+| `text` | Only the opening tag and its attributes | `line`, `alsoLine`, `unlessLine` - the signature lives on the element that carries it, and the finding points at that element, not its wrapper |
+| `ownContent` | The opening tag, the closing tag, and its own text nodes, **excluding** descendants | `alsoContent` - "is this element the one rendering the value?" |
+| `scopeText` | The element **plus** all of its descendants | `needsContent`, `unlessContent`, `unlessVisibleText` - "does this element contain that?" |
 
-Ejemplo que separa las dos últimas:
+Example that separates the last two:
 
 ```tsx
 <div className="card">
@@ -49,122 +49,134 @@ Ejemplo que separa las dos últimas:
 </div>
 ```
 
-Sobre el `<div>`: `needsContent: ["MMMM"]` matchea (el `<span>` es descendiente suyo), pero `alsoContent: ["MMMM"]` **no** - el `MMMM` vive dentro del hijo, no en el contenido propio del div. Sobre el `<span>` ambos matchean.
+On the `<div>`, `needsContent: ["MMMM"]` matches (the `<span>` is its descendant), but `alsoContent: ["MMMM"]` does **not** - the `MMMM` lives inside the child, not in the div's own content. On the `<span>`, both match.
 
-Esa distinción es la que hace que `UX-004` reporte el `<span>` que renderiza la fecha y no el `<div>` que lo envuelve.
+That distinction is why `UX-004` reports the `<span>` that renders the date rather than the `<div>` wrapping it.
 
-- `unlessVisibleText: true` silencia la regla cuando el elemento renderiza texto visible. Ninguna lista de tokens puede expresar eso, y es lo que separa un botón etiquetado de uno icon-only: `<button><span>Guardar</span></button>` es accesible sin ningún atributo `aria-*`.
-- `onlyFile` es el contrapositivo de `unlessFile`: corre la regla **solo** si el path contiene alguno de los tokens. Sin él, una regla acotada por contexto (`truncate` dentro de un diálogo) no es declarable, porque un filtro de archivo solo puede apagar una regla, nunca encenderla.
+- `unlessVisibleText: true` suppresses the rule when the element renders visible text. No token list can express that, and it is what separates a labelled button from an icon-only one: `<button><span>Save</span></button>` is accessible with no `aria-*` attribute at all.
+- `onlyFile` is the counterpart of `unlessFile`: the rule runs **only** when the path contains one of the tokens. Without it, a context-scoped rule (`truncate` inside a dialog) cannot be declared, because a file filter can only turn a rule off, never on.
 
-### Reglas propias del proyecto
+### Project-specific rules
 
-Un proyecto que necesita firmas propias **no bifurca el motor**. Declara un catálogo suyo en `.uxaudit.json` y sus reglas corren junto a las canónicas:
+A project that needs its own signatures **does not fork the engine**. It declares its own catalog in `.uxaudit.json` and its rules run alongside the canonical ones:
 
 ```json
 { "src": "src", "rules": "audit-ux.local-rules.json" }
 ```
 
 > [!CAUTION]
-> **`UX-NNN` está reservado** para `scripts/ux-rules.json`. Un catálogo local que use ese patrón se rechaza con error. Es lo que garantiza que un `UX-009` signifique lo mismo en todos los consumidores: cuando un proyecto leía su propio `UX-009` como "touch target" mientras el skill documentaba otra cosa, el catálogo dejó de ser confiable. Elegí otro prefijo.
+> **`UX-NNN` is reserved** for `scripts/ux-rules.json`. A local catalog using that pattern is rejected with an error. This is what guarantees that a `UX-009` means the same thing in every consumer: when a project read its own `UX-009` as "touch target" while the skill documented something else, the catalog stopped being trustworthy. Pick a different prefix.
 
-Para lo que el catálogo declarativo no alcanza, importá el motor en vez de copiarlo:
+For what the declarative catalog cannot reach, import the engine instead of copying it:
 
 ```js
 const { auditProject } = require('@gripm/playbook/scripts/audit-ux-code.cjs');
 const { findings, summary } = auditProject({ root: process.cwd() });
 ```
 
-Importar el módulo **no** corre una auditoría; solo ejecutarlo como binario lo hace. `auditProject` devuelve `{ rulesVersion, srcDir, summary, findings, unreadable, absorbed }` y no imprime ni sale, así que el consumidor maneja la presentación.
+Importing the module does **not** run an audit; only executing it as a binary does. `auditProject` returns `{ rulesVersion, srcDir, summary, findings, unreadable, absorbed }` and neither prints nor exits, so the consumer owns presentation.
 
 > [!IMPORTANT]
-> **Regla de manutenção:** si agregás una firma nueva, su `id` debe existir en **ambos** lados (`ux-rules.json` y esta tabla) con el mismo título y severidad. `UX-001..UX-008` son IDs históricos: **nunca se renumeran**. Las firmas nuevas se agregan desde `UX-009`.
+> **Maintenance rule:** if you add a new signature, its `id` must exist on **both** sides (`ux-rules.json` and this table) with the same title and severity. `UX-001..UX-008` are historical IDs: **never renumber them**. New signatures are added starting from `UX-009`.
 
 ---
 
-## 📋 Catálogo canónico de firmas
+## 📋 Canonical signature catalog
 
 ### 1. [UX-001] · ERROR · Regional decimal comma blocker (input[type=number])
-- **Firma:** `<input type="number">` para capturar valores numéricos con decimales.
-- **Impacto:** En teclados móviles de LATAM el pad numérico muchas veces solo muestra `,` y desactiva `.`, pero el estándar HTML5 `type="number"` rechaza la coma en WebKit/Blink: valor vacío o error silencioso.
-- **Corrección:** `inputMode="decimal"` con helpers bidireccionales de formato/parseo por locale.
+- **Signature:** `<input type="number">` used to capture decimal numeric values.
+- **Impact:** On LATAM mobile keyboards the numeric pad often shows only `,` and hides `.`, while the HTML5 `type="number"` standard rejects the comma in WebKit/Blink: empty value or silent error.
+- **Fix:** `inputMode="decimal"` with bidirectional locale-aware format/parse helpers.
 
 ### 2. [UX-002] · INFO · Physical keyboard shortcuts leaking into touch layouts
-- **Firma:** chips `<kbd>`, el glifo `⌘` o textos `Ctrl+` sin ocultado responsivo.
-- **Impacto:** En smartphone no existe teclado físico ni tecla Command; esos elementos contaminan headers y barras de acción móviles.
-- **Corrección:** envolver en `hidden sm:inline-flex` o condicionar con `useIsMobile()`.
+- **Signature:** `<kbd>` chips, the `⌘` glyph, or `Ctrl+` labels without responsive hiding.
+- **Impact:** On a smartphone there is no physical keyboard and no Command key; these elements pollute headers and mobile action bars.
+- **Fix:** wrap in `hidden sm:inline-flex` or gate with `useIsMobile()`.
 
 ### 3. [UX-003] · WARNING · Drag gesture colliding with a scroll container
-- **Firma:** `<Reorder.Group>` o `drag="y"` dentro de un contenedor `overflow-y-auto` sin compensar scroll.
-- **Impacto:** el navegador interpreta el movimiento vertical como scroll nativo y dispara `pointercancel`, congelando el drag a mitad de camino. Además el scroll previo desincroniza las coordenadas y los ítems saltan.
-- **Corrección:** Pointer Events nativos con `setPointerCapture`, transformaciones GPU, detección del scroll parent y auto-scroll en bordes. Mantener siempre controles accesibles de subir/bajar.
-- **Gating:** requiere `framer-motion` / `motion`.
+- **Signature:** `<Reorder.Group>` or `drag="y"` inside an `overflow-y-auto` container without compensating scroll.
+- **Impact:** The browser interprets vertical movement as native scroll and fires `pointercancel`, freezing the drag halfway. Previous scrolling also desynchronizes coordinates, so the items jump.
+- **Fix:** native Pointer Events with `setPointerCapture`, GPU transforms, parent-scroll detection, and edge auto-scroll. Always keep accessible up/down controls.
+- **Gating:** requires `framer-motion` / `motion`.
 
 ### 4. [UX-004] · WARNING · Temporal localisation leak (month/day names without locale)
-- **Firma:** `format(date, "MMMM yyyy")` o `format(date, "EEEE")` sin argumento de locale.
-- **Impacto:** UI mezclada ("January 2026", "Monday") dentro de un producto ya localizado.
-- **Corrección:** importar el locale y pasarlo: `format(date, 'MMMM yyyy', { locale: activeLocale })`.
-- **Gating:** requiere `date-fns`.
+- **Signature:** `format(date, "MMMM yyyy")` or `format(date, "EEEE")` with no locale argument.
+- **Impact:** Mixed UI ("January 2026", "Monday") inside an otherwise localised product.
+- **Fix:** import the locale and pass it: `format(date, 'MMMM yyyy', { locale: activeLocale })`.
+- **Gating:** requires `date-fns`.
 
 ### 5. [UX-005] · ERROR · Autocapitalise / autocorrect trap on identity inputs
-- **Firma:** `<input type="email">` sin `autoCapitalize="none"` ni normalización de valor.
-- **Impacto:** los teclados iOS/Android fuerzan mayúscula inicial o agregan un espacio al final tras el autofill, provocando el error recurrente de credenciales inválidas.
-- **Corrección:** `inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}` y normalizar con `.trim().toLowerCase()`.
+- **Signature:** `<input type="email">` without `autoCapitalize="none"` or value normalisation.
+- **Impact:** iOS/Android keyboards force an initial capital or append a trailing space after autofill, causing the recurring invalid-credentials error.
+- **Fix:** `inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false}` plus normalising with `.trim().toLowerCase()`.
 
 ### 6. [UX-006] · WARNING · Fixed bottom UI occluding scrollable content
-- **Firma:** vistas con scroll padding `pb-16` / `pb-20` / `pb-24` mientras hay una barra inferior fija o un FAB, en lugar de `pb-32` + `safe-area-inset-bottom`.
-- **Impacto:** las últimas filas de la lista quedan físicamente tapadas y son inalcanzables.
-- **Corrección:** `pb-32` (o una variable CSS derivada del alto de la barra) más `env(safe-area-inset-bottom)` en el contenedor de scroll.
+- **Signature:** scrolling views with `pb-16` / `pb-20` / `pb-24` while a fixed bottom bar or FAB is present, instead of `pb-32` + `safe-area-inset-bottom`.
+- **Impact:** The last rows of the list are physically covered and unreachable.
+- **Fix:** `pb-32` (or a CSS variable derived from the bar height) plus `env(safe-area-inset-bottom)` on the scroll container.
 
 ### 7. [UX-007] · INFO · Horizontal crowding on mobile cards (< 640px)
-- **Firma:** fila `flex ... justify-between` que empaqueta 3 o más nodos complejos (icono + etiqueta + estado + badge + valor) sin `truncate` ni wrap.
-- **Impacto:** títulos largos se superponen o empujan el valor fuera del viewport de 375px.
-- **Corrección:** invariante de dos niveles - fila 1 identidad y valor, fila 2 contexto/chips. `min-w-0` en las columnas hijas y acciones secundarias colapsadas en un menú.
+- **Signature:** a `flex ... justify-between` row packing 3 or more complex nodes (icon + label + status + badge + value) with no `truncate` and no wrap.
+- **Impact:** Long titles overlap or push the value outside a 375px viewport.
+- **Fix:** two-level invariant - row 1 identity and value, row 2 context/chips. `min-w-0` on child columns and secondary actions collapsed into a menu.
 
 ### 8. [UX-008] · WARNING · Micro-Jank: synchronous I/O or heavy compute per frame
-- **Firma:** escrituras en `localStorage`/`sessionStorage`, `JSON.stringify` o `fetch()` dentro de handlers `onScroll`, `onPointerMove`, `onTouchMove`, `onDrag`, `onWheel` o `requestAnimationFrame`.
-- **Impacto:** caída de 60 a menos de 15 FPS, lag perceptible durante la interacción táctil.
-- **Corrección:** mantener el estado del gesto en memoria y persistir con debounce al soltar.
-- **Nota:** detección heurística; revisar cada hallazgo manualmente.
+- **Signature:** writes to `localStorage`/`sessionStorage`, `JSON.stringify`, or `fetch()` inside `onScroll`, `onPointerMove`, `onTouchMove`, `onDrag`, `onWheel`, or `requestAnimationFrame` handlers.
+- **Impact:** Frame rate drops from 60 to under 15 FPS, with perceptible lag during touch interaction.
+- **Fix:** keep gesture state in memory and persist with debounce on release.
+- **Note:** heuristic detection; review every finding manually.
 
 ### 9. [UX-009] · WARNING · Sub-44px touch target
-- **Firma:** elemento interactivo con tamaño explícito menor a 36px (`h-5..h-8`, `w-5..w-8`, `size-6..size-8`) sin padding, `hitSlop` ni `min-*` compensatorio.
-- **Impacto:** por debajo de ~36px el target queda short del mínimo de accesibilidad 44×44px y causa mis-taps.
-- **Corrección:** `min-h-[44px] min-w-[44px]`, padding, o `hitSlop` de al menos 8px por eje.
+- **Signature:** an interactive element with an explicit size under 36px (`h-5..h-8`, `w-5..w-8`, `size-6..size-8`) with no padding, `hitSlop`, or compensating `min-*`.
+- **Impact:** Below ~36px the target falls short of the 44×44px accessibility minimum and causes mis-taps.
+- **Fix:** `min-h-[44px] min-w-[44px]`, padding, or `hitSlop` of at least 8px per axis.
 
 ### 10. [UX-010] · WARNING · Icon-only button without an accessible name
-- **Firma:** botón que renderiza solo un icono, sin `aria-label`, `title` ni texto visualmente oculto.
-- **Impacto:** el lector de pantalla anuncia un botón sin nombre; el control queda inutilizable.
-- **Corrección:** `aria-label` (preferido) o un span `sr-only`.
+- **Signature:** a button rendering only an icon, with no `aria-label`, `title`, or visually hidden text.
+- **Impact:** The screen reader announces an unnamed button; the control is unusable.
+- **Fix:** `aria-label` (preferred) or an `sr-only` span.
 
 ### 11. [UX-011] · INFO · Arbitrary font size outside the canonical type scale
-- **Firma:** `text-[Npx]` con un valor fuera de la escala del design system.
-- **Impacto:** deriva tipográfica - dos componentes renderizan el mismo tamaño semántico con valores distintos.
-- **Corrección:** usar la escala canónica (`text-xs`, `text-sm`, `text-base`, `text-lg`) o promover el valor a token documentado.
+- **Signature:** `text-[Npx]` with a value outside the design system scale.
+- **Impact:** Typographic drift - two components render the same semantic size at different values.
+- **Fix:** use the canonical scale (`text-xs`, `text-sm`, `text-base`, `text-lg`) or promote the value to a documented token.
 
 ### 12. [UX-012] · INFO · Clickable element without tactile feedback
-- **Firma:** elemento con `onClick` y `cursor-pointer` sin transición de estado `active`/`hover`.
-- **Impacto:** en touch no existe hover, así que el usuario no tiene ninguna confirmación de que el tap registró.
-- **Corrección:** agregar estado active (`active:scale-[0.98]`, `active:bg-secondary`), idealmente con `transition`.
+- **Signature:** an element with `onClick` and `cursor-pointer` but no `active`/`hover` state transition.
+- **Impact:** Touch has no hover, so the user gets no confirmation that the tap registered.
+- **Fix:** add an active state (`active:scale-[0.98]`, `active:bg-secondary`), ideally with `transition`.
 
 ### 13. [UX-013] · INFO · Numeric value without tabular numerals
-- **Firma:** cifras o métricas renderizadas por un formateador (`toLocaleString`, `Intl.NumberFormat`, formateador numérico) sin `tabular-nums` ni fuente monoespaciada de datos.
-- **Impacto:** los dígitos de ancho proporcional provocan micro-saltos horizontales al cambiar el valor.
-- **Corrección:** aplicar `tabular-nums` (o el token monoespaciado del proyecto) en toda columna numérica.
+- **Signature:** figures or metrics rendered by a formatter (`toLocaleString`, `Intl.NumberFormat`, numeric formatter) without `tabular-nums` or a data monospaced face.
+- **Impact:** Proportional-width digits cause horizontal micro-jumps when the value changes.
+- **Fix:** apply `tabular-nums` (or the project's monospaced token) to every numeric column.
+
+### 14. [UX-014] · WARNING · Anti-em-dash / anti-AI cliché in UI or metadata
+- **Signature:** An em-dash (`—`) or en-dash (`–`) in UI text, titles, options, or user-facing metadata instead of the standard hyphen (` - `).
+- **Impact:** An artificial AI cliché that degrades product craftsmanship, creates typographic inconsistency, and violates the global standard-hyphen directive in AGENTS.md.
+- **Fix:** Replace the em-dash (`—`) or en-dash (`–`) with a standard hyphen surrounded by spaces (` - `).
+
+### 15. [UX-015] · WARNING · Viewport touch zoom lock
+- **Signature:** `<meta name="viewport">` or viewport configuration with `maximum-scale=1`, `user-scalable=no`, or `user-scalable=0`.
+- **Impact:** Blocks the pinch-to-zoom gesture on mobile devices, degrading accessibility for users with low vision and violating WCAG 1.4.4.
+- **Fix:** Remove `maximum-scale=1` and `user-scalable=no` (or `user-scalable=0`) from the viewport meta to allow touch scaling.
 
 ---
 
-## ✅ Checklist de aceptación pre-merge
+## ✅ Pre-merge acceptance checklist
 
-- [ ] ¿Los inputs de texto/email tienen `autoCapitalize` y sanitización?
-- [ ] ¿Los inputs numéricos usan `inputMode="decimal"` y parseo por locale?
-- [ ] ¿El contenedor scrolleable tiene despeje suficiente contra la UI fija inferior (`pb-32` + safe area)?
-- [ ] ¿Los elementos interactivos tienen un target efectivo de 44×44px?
-- [ ] ¿Si hay drag, se ejecuta con `setPointerCapture` y aceleración GPU?
-- [ ] ¿Las fechas con nombres de mes/día llevan locale explícito?
-- [ ] ¿Las cifras y columnas numéricas usan `tabular-nums`?
-- [ ] ¿Todo botón de icono tiene nombre accesible?
-- [ ] ¿La revisión manual detecta sobrecarga decorativa (gradientes y orbes de fondo, `backdrop-blur` apilado en varias superficies, sombras uniformemente grandes) que degrade el contraste del texto o aplane la jerarquía? Buscá el efecto acumulado sobre el texto y sobre los bordes de superficie, no la técnica aislada: el vicio aparece por repetición, y una técnica justificada en un plano se vuelve ruido en tres.
-- [ ] ¿`node scripts/audit-ux-code.cjs --strict` sale en verde?
+- [ ] Do text/email inputs have `autoCapitalize` and sanitisation?
+- [ ] Do numeric inputs use `inputMode="decimal"` and locale-aware parsing?
+- [ ] Does the scrollable container have enough clearance against fixed bottom UI (`pb-32` + safe area)?
+- [ ] Do interactive elements have an effective 44×44px target?
+- [ ] If there is drag, does it run with `setPointerCapture` and GPU acceleration?
+- [ ] Do dates with month/day names carry an explicit locale?
+- [ ] Do figures and numeric columns use `tabular-nums`?
+- [ ] Does every icon-only button have an accessible name?
+- [ ] Do UI text, titles, and metadata use the standard hyphen (` - `) and avoid em-dash (`—`) or en-dash (`–`)?
+- [ ] Does the mobile viewport allow pinch zoom without locking it (no `maximum-scale=1` nor `user-scalable=no`)?
+- [ ] Does the manual review catch decorative overload (background gradients and orbs, stacked `backdrop-blur` across several surfaces, uniformly large shadows) that degrades text contrast or flattens visual hierarchy? Look for the cumulative effect on text and surface edges, not the isolated technique: the vice appears through repetition, and a technique justified on one plane becomes noise across three.
+- [ ] Does `node scripts/audit-ux-code.cjs --strict` exit green?
 
 > [!NOTE]
-> La sobrecarga decorativa **no tiene firma mecánica**: el mismo `backdrop-blur` es correcto en un sheet y es slop en cinco. Es un ítem de revisión manual, no un finding del runner. Si algún día se vuelve declarable, su firma debe agregarse primero a `scripts/ux-rules.json` y recién después documentarse acá.
+> Decorative overload **has no mechanical signature**: the same `backdrop-blur` is correct in one sheet and slop in five. It is a manual-review item, not a runner finding. If it ever becomes declarable, its signature must be added to `scripts/ux-rules.json` first and only then documented here.

@@ -1,60 +1,60 @@
 ---
 name: market-researcher
-description: Investiga benchmarks de producto, documentación de APIs externas y estándares del dominio para fundamentar decisiones de UX e ingeniería. Compara contra al menos 3 productos líderes, identifica anti-patrones y edge cases, y entrega un brief accionable. Usar antes de definir una solución o cuando falte criterio sobre un flujo complejo.
+description: Researches product benchmarks, external API documentation, and domain standards to ground UX and engineering decisions. Compares against at least 3 leading products, identifies anti-patterns and edge cases, and delivers an actionable brief. Use before defining a solution or when judgment on a complex flow is lacking.
 ---
 
 # Market & UX Researcher Skill
 
-## Misión
+## Mission
 
-Asegurar que ninguna decisión de producto o interacción se tome a ciegas o desde la intuición vacía. Investigar cómo los referentes del dominio resuelven el mismo problema, qué fricción reporta el usuario y cuáles son los estándares probados de la industria.
+Ensure that no product decision or interaction is made blind or from gut instinct alone. Research how domain leaders solve the same problem, what friction users report, and what the proven industry standards are.
 
 ---
 
-## Proceso
+## Process
 
-### 1. Benchmark de referentes
+### 1. Reference Benchmark
 
-Comparar el problema contra **al menos 3 productos líderes del dominio**. Elegir por cercanía de problema, no por fama de marca:
+Compare the problem against **at least 3 leading products in the domain**. Select by problem proximity, not brand fame:
 
-| Tipo de producto | Ejemplos de referencia |
+| Product type | Reference examples |
 | :--- | :--- |
-| Productividad / herramientas | Linear, Notion, Obsidian |
+| Productivity / tools | Linear, Notion, Obsidian |
 | Developer tools | GitHub, Vercel, Stripe Dashboard |
-| Fintech / finanzas personales | Monzo, Revolut, Copilot Money |
+| Fintech / personal finance | Monzo, Revolut, Copilot Money |
 | E-commerce | Shopify, Mercado Libre, Amazon |
-| Salud / regulación | Dominio-específico |
+| Health / regulated domains | Domain-specific |
 
-En cada uno capturar:
+For each, capture:
 
-- **Estados vacíos:** ¿qué muestran cuando no hay data? ¿guían al usuario o lo dejan solo?
-- **Latencia:** ¿skeleton, spinner, optimista, o bloqueo? ¿hay técnicas de perceived performance?
-- **Inputs complejos:** teclado, validación, formato regional, autocompletado.
-- **Micro-feedback:** confirmaciones, undo, haptics, toasts.
-- **Densidad:** ¿Cuánta información por pantalla sin saturar?
+- **Empty states:** what do they show when there is no data? Do they guide the user or leave them alone?
+- **Latency:** skeleton, spinner, optimistic, or blocking? Are perceived-performance techniques in use?
+- **Complex inputs:** keyboard, validation, regional format, autocomplete.
+- **Micro-feedback:** confirmations, undo, haptics, toasts.
+- **Density:** how much information per screen without overloading?
 
-### 2. Edge cases del dominio
+### 2. Domain Edge Cases
 
-Anticipar límites **antes** de que los reporten los usuarios. Las familias que aparecen en casi cualquier dominio:
+Anticipate limits **before** users report them. The families that appear in nearly every domain:
 
-| Familia | Ejemplos |
+| Family | Examples |
 | :--- | :--- |
-| **Volumen** | Cero, uno, muchos, demasiados para renderizar. |
-| **Unidad y formato** | Múltiples monedas/unidades/zonas horarias; separadores decimales regionales. |
-| **Ciclo temporal** | Fecha de corte vs. fecha de vencimiento; proyecciones; qué pasa al cambiar de mes. |
-| **Relaciones** | Eliminar o editar algo referenciado por otro ítem. |
-| **Parcialidad** | Cancelaciones parciales, importes o entregas parciales, estado parcial. |
-| **Concurrencia** | Dos sesiones editando lo mismo; doble submit. |
-| **Restricciones de acceso** | El usuario puede ver pero no editar; datos de otro tenant. |
+| **Volume** | Zero, one, many, too many to render. |
+| **Unit and format** | Multiple currencies / units / timezones; regional decimal separators. |
+| **Temporal cycle** | Cutoff date vs. due date; projections; what happens when the month changes. |
+| **Relationships** | Deleting or editing something referenced by another item. |
+| **Partiality** | Partial cancellations, partial amounts or deliveries, partial status. |
+| **Concurrency** | Two sessions editing the same thing; double submit. |
+| **Access restrictions** | The user can view but not edit; another tenant's data. |
 
-### 3. Salida documentada
+### 3. Documented Output
 
-Producir un brief conciso en la sección `[RESEARCH]` de la sprint spec:
+Produce a concise brief in the `[RESEARCH]` section of the sprint spec:
 
-- **References analyzed:** enlaces concretos. "Miré 3 apps" sin enlace no es research.
-- **Prominent interaction patterns:** el patrón reusable, no el nombre de la app.
-- **Domain edge cases & risks:** tabla de la sección 2, filtrada a los que aplican a **este** ítem.
-- **Recommendations:** una decisión concreta por edge case, para el Diseñador y el Ingeniero.
+- **References analyzed:** concrete links. "I looked at 3 apps" without a link is not research.
+- **Prominent interaction patterns:** the reusable pattern, not the app name.
+- **Domain edge cases & risks:** table from section 2, filtered to those that apply to **this** item.
+- **Recommendations:** one concrete decision per edge case, for the Designer and the Engineer.
 
 > [!NOTE]
-> El research **acota**, no reemplaza el criterio. Si los referentes discrepan entre sí, ese conflicto es un hallazgo válido: documentá las dos opciones y la decisión junto con el tradeoff.
+> Research **constrains**; it does not replace judgment. If the references disagree with each other, that conflict is a valid finding: document both options and the decision alongside the trade-off.

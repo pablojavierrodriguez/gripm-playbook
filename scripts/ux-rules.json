@@ -213,6 +213,45 @@
         "window": 3
       },
       "message": "Numeric value without tabular-nums / monospace data font. May cause horizontal text jitter."
+    },
+    {
+      "id": "UX-014",
+      "title": "Anti-em-dash / anti-AI cliché in UI or metadata",
+      "severity": "WARNING",
+      "signature": "Em-dash (—) or en-dash (–) rendered in UI text, titles, select options or metadata instead of standard hyphen.",
+      "impact": "Artificial AI cliché that degrades product craftsmanship, creates typographic inconsistency, and violates the global hyphen directive.",
+      "fix": "Replace em-dash (—) and en-dash (–) with standard hyphen surrounded by spaces (' - ').",
+      "check": {
+        "line": ["\u2014", "\u2013"],
+        "alsoContent": ["\u2014", "\u2013"]
+      },
+      "message": "Em-dash or en-dash detected in UI or metadata. Use standard hyphen (' - ') per AGENTS.md craftsmanship rules."
+    },
+    {
+      "id": "UX-015",
+      "title": "Viewport touch zoom lock",
+      "severity": "WARNING",
+      "signature": "<meta name=\"viewport\"> or viewport configuration locking zoom with maximum-scale=1 or user-scalable=no/0.",
+      "impact": "Prevents pinch-to-zoom on mobile devices, degrading accessibility for low-vision users and violating WCAG 1.4.4.",
+      "fix": "Remove maximum-scale=1 and user-scalable=no/0 from the viewport meta tag to allow pinch-to-zoom.",
+      "check": {
+        "line": [
+          "maximum-scale=1",
+          "maximum-scale = 1",
+          "user-scalable=no",
+          "user-scalable=0",
+          "user-scalable = no",
+          "user-scalable = 0",
+          "userScalable: false",
+          "maximumScale: 1"
+        ],
+        "alsoContent": [
+          "maximum-scale=1",
+          "user-scalable=no",
+          "user-scalable=0"
+        ]
+      },
+      "message": "Viewport zoom lock detected (maximum-scale=1 or user-scalable=no/0). Allow mobile pinch-to-zoom for accessibility."
     }
   ]
 }

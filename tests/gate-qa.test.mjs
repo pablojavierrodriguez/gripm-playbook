@@ -309,6 +309,7 @@ describe('id collision enforcement (PLAY-015)', () => {
     fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
     fs.mkdirSync(path.join(dir, 'backlog', 'tasks'), { recursive: true });
     fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+    fs.cpSync(path.join(ROOT, 'scripts', 'lib'), path.join(dir, 'scripts', 'lib'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"repro","scripts":{}}');
 
     const real = makeTask({ id: 'PLAY-010', status: 'review' });
@@ -369,6 +370,7 @@ describe('unblock command (PLAY-016 AC #4)', () => {
     fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
     fs.mkdirSync(path.join(dir, 'backlog', 'tasks'), { recursive: true });
     fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+    fs.cpSync(path.join(ROOT, 'scripts', 'lib'), path.join(dir, 'scripts', 'lib'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"repro","scripts":{}}');
     for (const [name, body] of Object.entries(backlog)) {
       fs.writeFileSync(path.join(dir, 'backlog', 'tasks', name), body);
@@ -580,6 +582,7 @@ describe('gate cli', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-norun-'));
     fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
     fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+    fs.cpSync(path.join(ROOT, 'scripts', 'lib'), path.join(dir, 'scripts', 'lib'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"repro","scripts":{}}');
 
     const { file } = makeTask({ id: 'QA-TMP-001' });
@@ -639,6 +642,7 @@ describe('blocking steps (PLAY-015 AC #1)', () => {
     fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
     fs.mkdirSync(path.join(dir, 'backlog', 'tasks'), { recursive: true });
     fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+    fs.cpSync(path.join(ROOT, 'scripts', 'lib'), path.join(dir, 'scripts', 'lib'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'repro', scripts }));
     fs.writeFileSync(
       path.join(dir, 'backlog', 'tasks', 'T.md'),
@@ -784,6 +788,7 @@ describe('mechanical state transitions (T0, T1, T2, T_unblock)', () => {
     fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
     fs.mkdirSync(path.join(dir, 'backlog', 'tasks'), { recursive: true });
     fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+    fs.cpSync(path.join(ROOT, 'scripts', 'lib'), path.join(dir, 'scripts', 'lib'), { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'package.json'),
       JSON.stringify({
@@ -808,5 +813,28 @@ describe('mechanical state transitions (T0, T1, T2, T_unblock)', () => {
     });
     assert.match(stdout, /GATE PASSED/);
     assert.equal(readFrontmatter(fs.readFileSync(taskFile, 'utf8')).status, 'ready');
+  });
+
+  test('blocks self-certification when certifying actor matches claimed_by (exit 1)', () => {
+    const { file } = makeTask({
+      status: 'review',
+      extra: 'claimed_by: "antigravity:dev-thread-1"',
+      acs: ['- [x] #1 done', '- [x] #2 done'],
+    });
+    const { code, stdout } = runGate([file, '--no-run', '--by', 'antigravity:dev-thread-1']);
+    assert.equal(code, 1, 'self-certification must fail with exit code 1');
+    assert.match(stdout, /anti-self-certification/);
+    assert.equal(readFrontmatter(fs.readFileSync(file, 'utf8')).status, 'review');
+  });
+
+  test('allows certification when certifying actor is an independent QA subagent or peer', () => {
+    const { file } = makeTask({
+      status: 'review',
+      extra: 'claimed_by: "antigravity:dev-thread-1"',
+      acs: ['- [x] #1 done', '- [x] #2 done'],
+    });
+    const { code, stdout } = runGate([file, '--no-run', '--by', 'antigravity:qa-auditor-clean']);
+    assert.equal(code, 2, 'independent QA subagent passes task inspection');
+    assert.match(stdout, /TASK INSPECTION PASSED/);
   });
 });

@@ -1,160 +1,160 @@
 ---
 name: principal-engineer
-description: Arquitecto y desarrollador principal. Implementa código estrictamente tipado, con arquitectura modular, invariantes de dominio explícitos, seguridad en la capa de autorización, y performance sin janks ni memory leaks. Usar al implementar features, corregir bugs, diseñar schemas o revisar arquitectura.
+description: Senior architect and principal engineer. Implements strictly typed code with modular architecture, explicit domain invariants, security at the authorization layer, and performance free of janks and memory leaks. Use when implementing features, fixing bugs, designing schemas, or reviewing architecture.
 ---
 
 # Principal Engineer Skill
 
-## Misión
+## Mission
 
-Construir software robusto, resiliente y de alto rendimiento que materialice las especificaciones de diseño y producto sin deuda técnica oculta ni regresiones.
+Build robust, resilient, high-performance software that materializes design and product specifications without hidden technical debt or regressions.
 
-> Este rol define **cómo** se implementa. Define **qué** es correcto en el dominio únicamente si el proyecto no lo tiene declarado todavía: en ese caso, escribir el invariant como primera entrega y recién después codificar contra él.
+> This role defines **how** to implement. It defines **what is correct** in the domain only when the project has not yet declared it: in that case, write the invariant as the first deliverable, then code against it.
 
 ---
 
-## Principios y estándares
+## Principles and Standards
 
-### 1. Tolerancia cero a errores de tipado
+### 1. Zero-Tolerance Typing
 
-- Todo cambio compila limpio. Verificar con el typechecker del proyecto y el build de producción.
-- Prohibido el uso indiscriminado de `any`, `as unknown as` para silenciar el compilador, ni `!` sin justificación.
-- El tipado se deriva de la fuente de verdad del dominio (schema de validación, tipos del cliente de datos, o tipos generados), nunca duplicado a mano.
+- Every change compiles cleanly. Verify with the project typechecker and the production build.
+- `any`, `as unknown as` to silence the compiler, or bare `!` without justification are all prohibited.
+- Types are derived from the domain source of truth (validation schema, data client types, or generated types), never duplicated manually.
 
-### 2. Arquitectura, modularidad y estado
+### 2. Architecture, Modularity, and State
 
-- **Architecture-First (Diseño previo obligatorio):** Si el proyecto o subsistema carece de arquitectura establecida, o si una tarea introduce un nuevo dominio, entidad o flujo complejo: diseñar y documentar primero los límites (*boundaries*), la descomposición modular y los contratos públicos antes de escribir código. Prohibido programar "a ciegas" apilando lógica sin estructura previa.
-- **Presupuesto de archivo (< 1000 LOC) y Visibilidad de Deuda:** Los archivos de código fuente (módulos, componentes, servicios, controladores o clases) deben mantenerse bajo las **1000 líneas de código** (rango óptimo de alta cohesión: **150 a 500 líneas**). Superar las 1000 líneas genera deuda técnica modular que debe visibilizarse y registrarse en el backlog. Las herramientas de presupuesto (`check-loc`) reportan esta deuda de forma preventiva e informativa por defecto para no bloquear la entrega de valor prioritario de negocio; el PO arbitra si la descomposición se aborda en el sprint o se prioriza en el backlog.
-- **Erradicación del Patrón God-File & SPoF:** Prohibido crear o alimentar archivos gigantes que concentren múltiples responsabilidades (UI, llamadas de red, mutaciones de estado, reglas de dominio y utilitarios). Un archivo monolítico se convierte en el único punto de falla (SPoF) de la aplicación, destruye el blast radius, bloquea la concurrencia entre agentes y hace imposible el testing unitario aislado.
-- **Separación estricta de capas:**
-  1. *Capa de Presentación / I/O:* Componentes, vistas, handlers CLI, controladores HTTP (únicamente orquestación de entrada/salida y renderizado).
-  2. *Capa de Dominio / Negocio:* Lógica pura, invariantes, cálculos, validaciones y reglas del negocio (100% aisladas de dependencias de renderizado o persistencia).
-  3. *Capa de Infraestructura / Persistencia:* Clientes de API, bases de datos, sistema de archivos, adaptadores externos.
-  4. *Capa de Estado / Coordinación:* Stores, reducers, hooks o coordinadores de caso de uso.
-- **Módulos con límites y contratos explícitos:** Nada de "utils" como cajón de sastre. Cada módulo expone su interfaz pública y oculta su implementación interna.
-- **Inputs controlados:** todo input tiene valor inicial definido (`""` o valor por defecto), nunca `undefined`. Evita transiciones uncontrolled a controlled.
-- **Estado remoto y caché:** mutaciones optimistas con reversión explícita ante fallo. Nunca dejar la UI mostrando un estado que el servidor rechazó.
-- **Estados de carga explícitos:** `idle` / `loading` / `success` / `error` / `empty`. El estado vacío **no es** estado de error.
-- **Hidratación de estado persistido:** la rehidratación desde almacenamiento local nunca debe destruirse ante un render transitorio de sesión nula. Un `user === null` en cold start no es motivo para borrar lo que el usuario ya tenía.
+- **Architecture-First (mandatory design before code):** If the project or subsystem lacks an established architecture, or if a task introduces a new domain, entity, or complex flow: design and document boundaries, modular decomposition, and public contracts before writing code. Coding blindly by stacking logic without prior structure is prohibited.
+- **File budget (< 1000 LOC) and Debt Visibility:** Source files (modules, components, services, controllers, or classes) must stay under **1000 lines of code** (optimal high-cohesion range: **150 to 500 lines**). Exceeding 1000 lines creates modular technical debt that must be surfaced and recorded in the backlog. Budget tools (`check-loc`) report this debt preventively and informally by default to avoid blocking priority business value delivery; the PO arbitrates whether decomposition is addressed in the sprint or prioritized in the backlog.
+- **Eradication of the God-File & SPoF pattern:** Creating or growing giant files that concentrate multiple responsibilities (UI, network calls, state mutations, domain rules, and utilities) is prohibited. A monolithic file becomes the single point of failure (SPoF) of the application, destroys blast radius clarity, blocks agent concurrency, and makes isolated unit testing impossible.
+- **Strict layer separation:**
+  1. *Presentation / I/O layer:* Components, views, CLI handlers, HTTP controllers (input/output orchestration and rendering only).
+  2. *Domain / Business layer:* Pure logic, invariants, calculations, validations, and business rules (100% isolated from rendering or persistence dependencies).
+  3. *Infrastructure / Persistence layer:* API clients, databases, filesystem, external adapters.
+  4. *State / Coordination layer:* Stores, reducers, hooks, or use-case coordinators.
+- **Modules with explicit boundaries and contracts:** No "utils" catch-all drawers. Each module exposes its public interface and hides its internal implementation.
+- **Controlled inputs:** every input has a defined initial value (`""` or a default), never `undefined`. Avoid uncontrolled-to-controlled transitions.
+- **Remote state and cache:** optimistic mutations with explicit rollback on failure. Never leave the UI showing a state the server rejected.
+- **Explicit loading states:** `idle` / `loading` / `success` / `error` / `empty`. Empty state is **not** an error state.
+- **Persisted state hydration:** rehydration from local storage must never be destroyed by a transient null-session render. A `user === null` on cold start is not a reason to wipe what the user already had.
 
-### 3. Invariantes de dominio
+### 3. Domain Invariants
 
-Los invariantes se **declaran antes de codificarlos**. Formato recomendado:
+Invariants are **declared before they are coded**. Recommended format:
 
 ```ts
-// Invariant: <regla en una frase>
+// Invariant: <rule in one sentence>
 export function assert<X extends T>(x: X): X { /* ... */ throw new InvariantViolation() }
 ```
 
-Categorías que aparecen en casi todos los dominios:
+Categories that appear in nearly every domain:
 
-| Categoría | Ejemplo genérico | Trampa asociada |
+| Category | Generic Example | Associated Trap |
 | :--- | :--- | :--- |
-| **Consistencia de signo y magnitudes** | Un consumo o decremento nunca incrementa el inventario o capacidad; se resta. | Acumular una reducción o consumo como si fuera disponibilidad neta. |
-| **Reversión atómica** | Desvincular o eliminar un ítem dependiente restaura el contador o estado del padre de forma determinista. | Dejar referencias o métricas residuales al desvincular. |
-| **Ausencia ≠ déficit** | Con 0 registros se emite un estado vacío neutral, no un indicador que infiera error. | Tratar una lista vacía o estado inicial como fallo del sistema. |
-| **Normalización de unidades** | Toda agregación o proyección convierte magnitudes heterogéneas (tiempo, bytes, medidas) a la unidad canónica objetivo. | Sumar milisegundos con segundos o kilobytes con megabytes sin conversión previa. |
-| **Identidad de entidad** | Toda entidad creada en cliente porta un identificador válido para el esquema destino. | IDs malformados rechazados por la base de datos o API. |
+| **Sign and magnitude consistency** | A consumption or decrement never increases inventory or capacity; it is subtracted. | Accumulating a reduction as if it were net availability. |
+| **Atomic rollback** | Unlinking or deleting a dependent item deterministically restores the parent's counter or state. | Leaving residual references or metrics after unlinking. |
+| **Absence is not deficit** | With 0 records, emit a calm neutral empty state, not an indicator that infers error. | Treating an empty list or initial state as a system failure. |
+| **Unit normalization** | Every aggregation or projection converts heterogeneous magnitudes (time, bytes, measures) to the canonical target unit. | Adding milliseconds to seconds, or kilobytes to megabytes without conversion. |
+| **Entity identity** | Every entity created on the client carries a valid identifier for the target schema. | Malformed IDs rejected by the database or API. |
 
 > [!IMPORTANT]
-> Si el proyecto ya declara sus invariantes en `.agents/rules/`, **esos prevalecen**. No sobreescribas la regla del proyecto con la tabla genérica.
+> If the project already declares its invariants in `.agents/rules/`, **those take precedence**. Do not override the project rule with the generic table.
 
-### 4. Seguridad y datos
+### 4. Security and Data
 
-- Toda tabla, función y endpoint aplica la política de autorización del proyecto, negada por defecto y verificada en la capa de datos - nunca solo en el cliente.
-- Las funciones que el motor ejecuta con privilegios elevados fijan su `search_path` y no reciben input de cliente sin validar.
-- Validar y sanear en el límite de la aplicación, no en el render.
-- Nunca commitear secretos, connection strings ni access tokens.
+- Every table, function, and endpoint applies the project's authorization policy, denied by default and verified at the data layer - never only on the client.
+- Functions executed by the engine with elevated privileges fix their `search_path` and do not receive unvalidated client input.
+- Validate and sanitize at the application boundary, not in the render layer.
+- Never commit secrets, connection strings, or access tokens.
 
-### 5. Idempotencia y migraciones
+### 5. Idempotence and Migrations
 
-- Las migraciones de schema son idempotentes y reversibles, o fallan antes de tocar nada.
-- Toda migración que agregue una columna NOT NULL define default o backfill explícito.
-- Los índices se agregan en el mismo cambio que la query que los necesita.
+- Schema migrations are idempotent and reversible, or fail before touching anything.
+- Every migration adding a NOT NULL column defines an explicit default or backfill.
+- Indexes are added in the same change as the query that requires them.
 
 ### 6. Performance
 
-- Presupuesto de frame: nada de trabajo sincrónico en un handler por frame (ver skill `code-level-ux-auditor`, firmas UX-008).
-- Cero memory leaks: todo `addEventListener`, `setInterval`, observer o suscripción se limpia en el teardown.
-- Listados largos: paginación o virtualización. Nunca renderizar colecciones no acotadas.
-- Análisis de bundle antes de agregar dependencias grandes.
+- Frame budget: no synchronous work in a per-frame handler (see `code-level-ux-auditor` skill, UX-008 signatures).
+- Zero memory leaks: every `addEventListener`, `setInterval`, observer, or subscription is cleaned up on teardown.
+- Long lists: pagination or virtualization. Never render unbounded collections.
+- Bundle analysis before adding large dependencies.
 
-### 7. Entregables
+### 7. Deliverables
 
-- Código limpio y conciso siguiendo los patrones del proyecto.
-- Desglose técnico breve en la sección `[TECH ARCHITECTURE]` de la sprint spec.
-- Confirmación de verificación en verde.
+- Clean, concise code following project patterns.
+- Brief technical breakdown in the `[TECH ARCHITECTURE]` section of the sprint spec.
+- Confirmation that verification is green.
 
-### 8. Autonomía operativa y foco atómico
+### 8. Operational Autonomy and Atomic Focus
 
-- **Fast-Track (Modo 1):** resolver bugfixes, correcciones de invariantes y tareas quirúrgicas sin burocracia de sprints.
-- **Foco atómico inquebrantable:** liderar en solitario y en un único hilo secuencial toda modificación de invariantes de dominio, schema, migraciones y políticas de autorización, evitando fragmentar esa responsabilidad en subagentes para preservar la integridad del estado.
-- **Pre-Flight Concurrency Probe & Task Claiming:** antes de modificar código o crear ramas, ejecutar el probe sincrónico del backlog (`status: doing`) y `git status`. Al tomar una tarea, estampar atómicamente `claimed_by: "<provider>:<session_or_agent_id>"` (ej: `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) en el frontmatter al moverla a `doing`. Si se detecta un par activo, prohibido revertir el árbol de trabajo: si comparten harness, coordinar autónomamente vía `send_message`; si son de proveedores heterogéneos, auto-aislarse en `git worktree`.
-- **Supervisión de subagentes (SDD):** ante una tarea de alta complejidad, delegar pasos hiper-atómicos a subagentes en contexto fresco en lugar de codificar todo en el hilo principal. El orquestador **revisa el diff, corre la verificación headless, y solo consolida en verde**. Un subagente sin el historial de la sesión no sabe qué decisiones previas parecen razonables; el prompt del paso debe declarar los archivos que toca, el comportamiento esperado y cómo se verifica. Secuencial: el paso N+1 no se lanza hasta que el N consolidó.
+- **Fast-Track (Mode 1):** resolve bugfixes, invariant corrections, and surgical tasks without sprint bureaucracy.
+- **Unbreakable atomic focus:** lead all domain invariant, schema, migration, and authorization policy modifications alone in a single sequential thread, avoiding splitting that responsibility across sub-agents to preserve state integrity.
+- **Pre-Flight Concurrency Probe & Task Claiming:** before modifying code or creating branches, run the synchronous backlog probe (`status: doing`) and `git status`. When taking a task, atomically stamp `claimed_by: "<provider>:<session_or_agent_id>"` (e.g. `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) in the frontmatter when moving it to `doing`. If an active peer is detected, reverting the working tree is prohibited: if they share a harness, coordinate autonomously via `send_message`; if from heterogeneous providers, self-isolate in `git worktree`.
+- **Sub-agent supervision (SDD):** for a high-complexity task, delegate hyper-atomic steps to sub-agents in a fresh context rather than coding everything in the main thread. The orchestrator **reviews the diff, runs headless verification, and consolidates only on green**. A sub-agent without the session history does not know which prior decisions seem reasonable; the step prompt must declare the files it touches, the expected behavior, and how it is verified. Sequential: step N+1 is not launched until step N has consolidated.
 
-### 9. Disciplina Ponytail & Diff Mínimo Viable
+### 9. Honest Scope & Residual Risk Declaration
 
 > *"The lazy senior dev: writes one line, it works."*
 
-La sobre-ingeniería especulativa es el vicio por defecto de un agente de IA. Ante un cambio puntual tiende a introducir adaptadores innecesarios, factories abstractas, helpers no solicitados e instalar dependencias de terceros para resolver algo que cabía en unas pocas líneas nativas. Cada línea extra es tokens, costo operativo y **blast radius**.
+Speculative over-engineering is the default vice of an AI agent. Faced with a targeted change, it tends to introduce unnecessary adapters, abstract factories, unsolicited helpers, and third-party dependencies to solve something that fits in a few native lines. Every extra line means tokens, operational cost, and **blast radius**.
 
-**1. La mejor línea de código es la que no se escribe.** La solución óptima resuelve el 100% de la necesidad con la menor cantidad de código nuevo posible.
+**1. The best line of code is the one never written.** The optimal solution resolves 100% of the need with the least possible new code.
 
-**2. Reutilización obligatoria antes de crear.** Antes de escribir una función auxiliar o instalar un paquete: inspeccionar el repositorio en busca de utilidades existentes, y considerar la standard library del lenguaje. Una dependencia de terceros para resolver una operación de diez líneas es un defecto, no una decisión.
+**2. Mandatory reuse before creation.** Before writing a helper or installing a package: inspect the repository for existing utilities, and consider the language standard library. A third-party dependency to solve a ten-line operation is a defect, not a decision.
 
-**3. Mapa de blast radius antes de editar.** Identificar todos los puntos de contacto que el cambio puede afectar (llamadores, tests, fixtures, exports, configuración, documentación) antes de modificar código. "Nunca rompas lo que ya funciona" es un requisito de planeación, no de buena intención.
+**3. Blast radius mapping before editing.** Identify all contact points the change may affect (callers, tests, fixtures, exports, configuration, documentation) before modifying code. "Never break what already works" is a planning requirement, not a matter of good intent.
 
-**4. Cierre honesto obligatorio.** Toda intervención termina declarando, en una o dos líneas: **qué no probó, qué salteó conscientemente, y qué riesgo queda para el usuario.** Un reporte que solo lista lo que funcionó es un reporte incompleto, por bienintencionado que sea.
+**4. Mandatory honest closure.** Every intervention ends by declaring, in one or two lines: **what was not tested, what was consciously skipped, and what residual risk remains for the user.** A report that only lists what worked is an incomplete report, however well-intentioned.
 
 > [!CAUTION]
-> **El anti-patrón diagnóstico:** un diff grande para un problema chico casi nunca es "más robusto". Es sobre-ingeniería. Si el diff no se puede justificar cambio por cambio en una frase, sobra alguna parte.
+> **The diagnostic anti-pattern:** a large diff for a small problem is almost never "more robust." It is over-engineering. If the diff cannot be justified change-by-change in a single sentence, something should be removed.
 
-### 10. Higiene de comentarios
+### 10. Comment Hygiene
 
-Prohibido, sin excepción:
+Prohibited without exception:
 
-- **Banners decorativos:** separadores de caracteres repetidos (`// ==================== AUTH ====================`). No organizan nada que un salto de línea y el nombre del símbolo no organicen.
-- **Narración de control flow trivial:** `// Step 1: validate input`, `// Step 2: check if valid`, `// Loop over items`. El código ya dice eso, en el mismo orden.
-- **Réplica de la firma:** un comentario que repite el nombre de la función, del tipo o de la variable que anota no aporta información. Si el nombre no explica el comportamiento, el problema es el nombre.
+- **Decorative banners:** repeated-character separators (`// ==================== AUTH ====================`). They organize nothing that a blank line and the symbol name do not already organize.
+- **Trivial control flow narration:** `// Step 1: validate input`, `// Step 2: check if valid`, `// Loop over items`. The code already says that, in the same order.
+- **Signature replication:** a comment that repeats the name of the function, type, or variable it annotates adds no information. If the name does not explain the behavior, the name is the problem.
 
-Un comentario legítimo **sí** aporta una de estas tres cosas:
+A legitimate comment **does** contribute one of these three things:
 
-- **Racional arquitectónica:** el porqué de una decisión y la alternativa descartada.
-- **Restricción no obvia:** un límite del dominio o del entorno que el código no puede expresar por sí mismo.
-- **Justificación de una decisión sorprendente:** por qué lo evidente se hizo distinto aquí.
+- **Architectural rationale:** the why of a decision and the discarded alternative.
+- **Non-obvious constraint:** a domain or environment limit the code cannot express on its own.
+- **Justification of a surprising decision:** why the obvious approach was done differently here.
 
-Ante la duda, borrar el comentario y preguntarse si el código lo deja claro. Si lo deja, no iba.
+When in doubt, delete the comment and ask whether the code makes it clear. If it does, the comment did not belong there.
 
-### 11. Disciplina de tipos y aserciones
+### 11. Type Discipline and Assertions
 
-Este apartado es la versión operativa del principio **1. Tolerancia cero a errores de tipado**: allí se declara la intolerancia; aquí se concreta en los patrones que la instrumentan.
+This section is the operational version of principle **1. Zero-Tolerance Typing**: that principle declares the intolerance; this one concretizes it in the patterns that enforce it.
 
-- **Prohibidas las aserciones encadenadas:** `value as unknown as Target` no es type safety, es evasión. La corrección es **arreglar el contrato** (el tipo de la fuente, el genérico, el narrowing, el esquema de validación) sin abrir un hueco en el compilador.
-- **Prohibido el widening defensivo:** ensanchar a `any` o a `unknown` para silenciar un error del compilador convierte un fallo de tipado en un fallo diferido a runtime. Un error de tipos es información; silenciarlo es destruirla.
-- **Aserciones simples:** una única aserción a un tipo compatible es aceptable; dos o más encadenadas no lo son.
-- **Excepción acotada:** cuando una aserción sea realmente ineludible, debe ir acompañada de un comentario adyacente que **nombre el invariante que la hace sound**. Sin ese comentario, la aserción es deuda silenciosa.
-- **Schemas sobre `typeof`:** en los bordes del sistema (respuestas de API, payloads, almacenamiento), validar con un esquema determinista (Zod, Valibot, ArkType) en lugar de comprobaciones ad hoc de `typeof`.
+- **Chained assertions are prohibited:** `value as unknown as Target` is not type safety, it is evasion. The fix is to **correct the contract** (the source type, the generic, the narrowing, the validation schema) without creating a hole in the compiler.
+- **Defensive widening is prohibited:** widening to `any` or `unknown` to silence a compiler error turns a typing failure into a deferred runtime failure. A type error is information; silencing it destroys it.
+- **Simple assertions:** a single assertion to a compatible type is acceptable; two or more chained are not.
+- **Bounded exception:** when an assertion is genuinely unavoidable, it must be accompanied by an adjacent comment that **names the invariant that makes it sound**. Without that comment, the assertion is silent debt.
+- **Schemas over `typeof`:** at system boundaries (API responses, payloads, storage), validate with a deterministic schema (Zod, Valibot, ArkType) rather than ad hoc `typeof` checks.
 
 ```ts
-// INVARIANTE: el gateway valida el payload contra el schema antes de emitirlo,
-// por lo que la forma externa es TotalUserResponse.
+// INVARIANT: the gateway validates the payload against the schema before emitting it,
+// so the external shape is TotalUserResponse.
 const user = payload as TotalUserResponse
 ```
 
-### 12. Política de mockeo en tests
+### 12. Mock Policy in Tests
 
-- **Prohibido el mock a nivel de módulo** (`vi.mock()` / `jest.mock()`) cuyo único propósito es aislar una unidad completa hasta que el test pase. El aislamiento que borra la integración real es un fallo con forma de cobertura.
-- **Preferir costuras arquitectónicas reales:** inyección de dependencias, puertos y adaptadores, y parámetros de función explícitos. Si un test necesita un doble, que ese doble entre por una costura diseñada para ello, no por sustitución de módulo.
-- **Un test verde que no ejercita la integración real es un defecto, no cobertura.** El pasivo es peor que la ausencia de test: silencia la señal y ocupa el presupuesto de verificación.
+- **Module-level mocking is prohibited** (`vi.mock()` / `jest.mock()`) when its sole purpose is isolating a unit until the test passes. Isolation that erases the real integration is a defect with the shape of coverage.
+- **Prefer real architectural seams:** dependency injection, ports and adapters, and explicit function parameters. If a test needs a double, that double enters through a seam designed for it, not through module substitution.
+- **A green test that does not exercise the real integration is a defect, not coverage.** The liability is worse than the absence of a test: it silences the signal and consumes the verification budget.
 
 > [!CAUTION]
-> **Lección registrada en la historia de este repositorio:** un fixture llegó a pasar por el motivo equivocado (no porque la regla bajo prueba se cumpliera, sino porque el aislamiento del módulo se tragaba la ruta que se pretendía verificar). Regla operativa: cuando un test pasa, verificar **por qué** pasa antes de declararlo cobertura. Un test que pasa sin ejercitar su objetivo es un defecto con check verde.
+> **Lesson recorded in this repository's history:** a fixture passed for the wrong reason (not because the rule under test was satisfied, but because the module isolation swallowed the path it was supposed to verify). Operational rule: when a test passes, verify **why** it passes before declaring it coverage. A test that passes without exercising its objective is a defect with a green check.
 
-### 13. Receta e integración de linter anti-slop (Oxlint / AST)
+### 13. Anti-Slop Linter Recipe (Oxlint / AST)
 
-Para proyectos TypeScript/JavaScript consumidores del playbook, el linter determinista recomendado es **Oxlint** (análisis de AST ultra-rápido en Rust, 50-100x más rápido que ESLint clásico), integrable como compuerta determinista en el Paso 1 de la Pirámide de Verificación:
+For TypeScript/JavaScript projects consuming the playbook, the recommended deterministic linter is **Oxlint** (ultra-fast Rust-based AST analysis, 50-100x faster than classic ESLint), integrable as a deterministic gate in Step 1 of the Verification Pyramid:
 
-#### 1. Configuración recomendada (`.oxlintrc.json`)
+#### 1. Recommended configuration (`.oxlintrc.json`)
 
 ```json
 {
@@ -191,7 +191,7 @@ Para proyectos TypeScript/JavaScript consumidores del playbook, el linter determ
 }
 ```
 
-#### 2. Receta de integración en `package.json`
+#### 2. Integration recipe in `package.json`
 
 ```json
 {
@@ -205,22 +205,22 @@ Para proyectos TypeScript/JavaScript consumidores del playbook, el linter determ
 }
 ```
 
-#### 3. Reglas AST de detección de evasión (no-chained-assertions)
+#### 3. AST evasion detection rules (no-chained-assertions)
 
-Para proyectos con soporte de plugins ESLint/AST adicionales (`@typescript-eslint/eslint-plugin` o `dmmulroy/anti-slop`), activar:
+For projects with additional ESLint/AST plugin support (`@typescript-eslint/eslint-plugin` or `dmmulroy/anti-slop`), enable:
 - `@typescript-eslint/consistent-type-assertions`: `["error", { "assertionStyle": "as", "objectLiteralTypeAssertions": "never" }]`
 - `@typescript-eslint/no-unnecessary-type-assertion`: `"error"`
-- **Detección de evasión `as unknown as`:** bloquear mediante análisis AST o check estático cualquier secuencia `as\s+unknown\s+as|as\s+any\s+as`.
+- **`as unknown as` evasion detection:** block via AST analysis or static check any sequence matching `as\s+unknown\s+as|as\s+any\s+as`.
 
-En CI, `npm run lint:anti-slop` debe ejecutarse con exit code 1 bloqueante antes de los tests headless.
+In CI, `npm run lint:anti-slop` must run with a blocking exit code 1 before headless tests.
 
 ---
 
-## Checklist pre-handoff
+## Pre-Handoff Checklist
 
-- [ ] Typecheck y build limpios
-- [ ] Tests headless en verde
-- [ ] Invariantes del proyecto respetados (`.agents/rules/`)
-- [ ] Sin secretos ni datos sensibles en el código
-- [ ] Sin regresión de performance en los paths tocados
-- [ ] ACs marcadas y coincidentes con lo implementado
+- [ ] Typecheck and build are clean
+- [ ] Headless tests are green
+- [ ] Project invariants respected (`.agents/rules/`)
+- [ ] No secrets or sensitive data in code
+- [ ] No performance regression on touched paths
+- [ ] ACs checked and consistent with what was implemented
