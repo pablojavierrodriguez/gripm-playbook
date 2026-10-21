@@ -41,4 +41,17 @@ Depende de PLAY-030 porque el demo debe grabar el CLI y el quickstart finales: g
 3. Insertarlo en el README con ancho acotado y texto alternativo.
 4. Documentar la regeneracion junto al tape, no en el README.
 5. Correr `npm run check:all`.
+
+## Spike de viabilidad (bloqueante, resuelto como NO viable en esta maquina)
+
+Se verifico la disponibilidad de `vhs` (Charm) antes de comprometer la implementacion, como exige el plan. Resultado en esta maquina (Windows, Node v24.21.0, npm 11.19.0):
+
+- `vhs`: **no esta en el PATH**.
+- `charm`: **no disponible**.
+- `go` (requisito de instalacion de vhs): **no disponible**.
+- `ffmpeg` (requisito de render): **no disponible**.
+
+Ninguna de las cuatro herramientas esta presente. Ejecutar PLAY-031 tal como esta definida exige instalar el toolchain completo de sistema (go + ffmpeg + charm/vhs), lo que es una decision de entorno, no de codigo.
+
+**Decision del PO:** se pausa este item y se deja en `draft`. El hallazgo queda registrado para que la reanudacion no repita el spike. La reanudacion requiere primero autorizacion para instalar el toolchain, o un rescoping del item a un hook visual que no dependa de `vhs`.
 <!-- SECTION:PLAN:END -->

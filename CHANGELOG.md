@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.6.0] - 2026-10-21
+
+`PLAY-026` · `PLAY-027` · `PLAY-028` · `PLAY-029` · `PLAY-030` · `PLAY-032`
+
+### Added
+
+- **Zero-Friction Onboarding CLI and Multi-Harness Adapters** (`PLAY-030`). New `scripts/init.mjs` wizard, exposed as `npx @gripm/playbook init`, `npm run init`, and the `sync-playbook.mjs init` subcommand. Detects the consumer stack from `package.json`, parametrizes `AGENTS.md` (project name, stack, language) only while it is still the base template, and generates thin harness adapters that point back to `AGENTS.md` as the canonical source: `.cursor/rules/*.mdc` for Cursor and `CLAUDE.md` for Claude Code. A hand-edited `AGENTS.md` is preserved even under `--force`. Writes the Gripm Board `.gripm/config.json` unless `--no-board`. New shared prompt helpers in `scripts/lib/terminal.mjs` (`promptText`, `promptConfirm`, `promptSelect`, `promptMultiSelect`) fall back to defaults without a TTY, so the wizard never blocks CI.
+- **Anti-Self-Certification Gate and Actor Resolution** (`PLAY-028`). `scripts/gate-qa.mjs` now resolves the acting identity hierarchically (`--by`/`--as` flags, `GRIPM_ACTOR`/`QA_ACTOR`/`CLAIMED_BY` env vars, harness session vars, `human:<user>` fallback) and refuses to promote `review` -> `ready` when that actor matches the task's registered `claimed_by`, emitting an `anti-self-certification` diagnostic and preserving `review` on disk.
+- **UX Signatures UX-014 and UX-015** (`PLAY-027`). The canonical rule catalog grows from 13 to 15 static UX signatures: `UX-014` flags em-dash and en-dash characters in JSX text nodes and UI/metadata attributes, enforcing the standard hyphen rule; `UX-015` flags viewport configurations that lock out pinch-to-zoom (`maximum-scale=1`, `user-scalable=no`, `user-scalable=0`, `userScalable: false`), violating WCAG 1.4.4.
+
+### Changed
+
+- **Modular Refactor of Core Scripts Under the 500 LOC Ceiling** (`PLAY-026`). `gate-qa.mjs`, `sync-playbook.mjs` and `validate-repo.mjs` were decomposed into high-cohesion submodules under `scripts/lib/` (`frontmatter.mjs`, `terminal.mjs`, `pyramid.mjs`, `task-inspection.mjs`, `provenance.mjs`, `sync-classifier.mjs`, `catalog-validator.mjs`, `doc-checks.mjs`), keeping 100% backward compatibility in the CLI and programmatic API. Runtime submodules required by `gate-qa.mjs` are registered in `.playbook-manifest.json` and `FALLBACK_CORE_FILES` so consumer installs receive a working dependency closure.
+- **Editorial Refactoring and Technical English Standardization** (`PLAY-029`). Core governance documents, skills and templates were standardized to technical English. Skills renamed: `worldclass-product-designer` -> `product-designer`, `rigorous-qa-auditor` -> `qa-auditor`; consumers re-syncing will see the new directories, and the old ones are reported as orphans rather than deleted. `validate-repo.mjs` now accepts both the English pyramid labels and the legacy Spanish wording.
+- **Board Mention in the README** (`PLAY-032`). A single optional-companion tip pointing to `gripm` as a visual board over the same `backlog/tasks/*.md` files; the README stays focused on the playbook itself.
+
+---
+
 ## [2.5.0] - 2026-10-17
 
 `PLAY-008` · `PLAY-009` · `PLAY-024` · `PLAY-025`
@@ -222,7 +240,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Configured for npm publication under `@gripm/playbook` supporting `npx @gripm/playbook sync`.
 
-[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.6.0
+[2.5.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.5.0
+[2.4.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.4.0
 [2.3.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.3.0
 [2.2.2]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.2.2
 [2.2.1]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.2.1
