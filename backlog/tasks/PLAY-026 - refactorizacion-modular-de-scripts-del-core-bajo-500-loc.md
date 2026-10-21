@@ -1,9 +1,9 @@
 ---
 id: PLAY-026
 title: "Refactorizacion modular de scripts del core bajo umbral preventivo de 500 LOC (scripts/lib)"
-status: ready
+status: done
 created_date: '2026-10-17'
-updated_date: '2026-10-18'
+updated_date: '2026-10-21'
 claimed_by: "antigravity:0bf9c7fc-c9b7-49a2-8842-d45ec85d64b0"
 labels:
   - "architecture"

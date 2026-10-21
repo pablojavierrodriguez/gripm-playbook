@@ -1,9 +1,9 @@
 ---
 id: PLAY-027
 title: "Expansion del motor de auditoria UX con firmas canonicas UX-014 y UX-015"
-status: ready
+status: done
 created_date: '2026-10-17'
-updated_date: '2026-10-18'
+updated_date: '2026-10-21'
 claimed_by: "antigravity:0bf9c7fc-c9b7-49a2-8842-d45ec85d64b0"
 labels:
   - "ux-audit"

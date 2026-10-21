@@ -1,9 +1,9 @@
 ---
 id: PLAY-029
 title: "Editorial Refactoring and Technical English Standardization for Core and Skills"
-status: ready
+status: done
 created_date: '2026-10-20'
-updated_date: '2026-10-20'
+updated_date: '2026-10-21'
 labels: []
 dependencies: []
 priority: high

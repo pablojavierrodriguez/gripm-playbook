@@ -1,7 +1,7 @@
 ---
 id: PLAY-031
 title: "Diagrama del loop de entrega en el primer fold del README (sin vhs)"
-status: ready
+status: done
 created_date: '2026-10-21'
 updated_date: '2026-10-21'
 labels:

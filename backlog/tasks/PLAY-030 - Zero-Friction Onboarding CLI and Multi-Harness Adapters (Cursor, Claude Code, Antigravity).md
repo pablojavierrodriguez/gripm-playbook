@@ -1,7 +1,7 @@
 ---
 id: PLAY-030
 title: "Zero-Friction Onboarding CLI and Multi-Harness Adapters (Cursor, Claude Code, Antigravity)"
-status: ready
+status: done
 created_date: '2026-10-20'
 updated_date: '2026-10-21'
 labels:

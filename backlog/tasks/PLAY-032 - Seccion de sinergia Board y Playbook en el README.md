@@ -1,7 +1,7 @@
 ---
 id: PLAY-032
 title: "Mencion breve de gripm Board como complemento en el README"
-status: ready
+status: done
 created_date: '2026-10-21'
 updated_date: '2026-10-21'
 labels:
