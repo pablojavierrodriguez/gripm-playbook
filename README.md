@@ -400,6 +400,9 @@ npm run check:all    # validate + check:loc + test
 > [!IMPORTANT]
 > The changelog is a release log, not a work log. An item that has not shipped belongs in `backlog/tasks/`. `## [Unreleased]` stays empty on purpose.
 
+> [!TIP]
+> Prefer a visual board? [`gripm`](https://github.com/pablojavierrodriguez/gripm) is the optional companion that reads the same `backlog/tasks/*.md` files in a browser. The two projects are independent; this framework runs fine without it.
+
 ---
 
 ## 🌐 Framework Summary

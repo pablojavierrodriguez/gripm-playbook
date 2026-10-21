@@ -42,7 +42,7 @@ Contexto que la vuelve real: el backlog de este repo y `docs/BACKLOG.md` se escr
 
 ---
 
-### 🚀 Ready for Deploy (5)
+### 🚀 Ready for Deploy (6)
 
 #### [PLAY-026] Refactorizacion modular de scripts del core bajo umbral preventivo de 500 LOC (scripts/lib)
 - **Prioridad**: `high` | **Tipo**: `refactor`
@@ -135,7 +135,21 @@ Historial: creada el 2026-10-20 por una sesion que se interrumpio por cuota, sin
 
 ---
 
-### 📋 Backlog / Draft (2)
+#### [PLAY-032] Mencion breve de gripm Board como complemento en el README
+- **Prioridad**: `medium` | **Tipo**: `improvement`
+
+El README no menciona `gripm` en ninguna linea. Quien aterriza aqui no tiene por que saber que existe un board visual que lee el mismo backlog. Se agrega **una sola linea** de mencion, como complemento opcional.
+
+**Rescoping decidido por el PO durante la implementacion.** El alcance original pedia una seccion completa con tabla comparando ambos proyectos y explicando la integracion. El PO lo rechazo: el README del playbook debe concentrarse en el playbook, sin enroscarse, y `gripm` solo vale como una mencion de complemento. La seccion grande se elimino y se dejo un unico tip. El PO dejo ademas claro que este repo no debe ir al repo de `gripm` a investigar: el foco es el playbook.
+
+**Criterios de Aceptación:**
+- [x] #1 El README menciona `gripm` como board visual opcional que lee el mismo backlog, en una sola linea (un tip), sin seccion ni tabla comparativa.
+- [x] #2 La mencion no califica a ninguno de los dos proyectos de confuso ni establece una comparacion extensa; el texto se mantiene breve.
+- [x] #3 `npm run check:all` pasa con 0 errores y el unico link agregado (a `https://github.com/pablojavierrodriguez/gripm`) es externo, por lo que no introduce rutas relativas que el validador tenga que resolver.
+
+---
+
+### 📋 Backlog / Draft (1)
 
 #### [PLAY-031] Demo en terminal (GIF/VHS) en el primer fold del README
 - **Prioridad**: `medium` | **Tipo**: `improvement`
@@ -150,21 +164,6 @@ Depende de PLAY-030 porque el demo debe grabar el CLI y el quickstart finales: g
 - [ ] #3 El demo usa unicamente comandos que existen en este repo y salidas reales: sin terminal ficticia ni output maquetado.
 - [ ] #4 Queda documentado el comando exacto para regenerar el render cuando cambie el CLI o la salida de los scripts.
 - [ ] #5 `npm run check:all` pasa con 0 errores (el asset no debe romper link checks ni limits de LOC).
-
----
-
-#### [PLAY-032] Seccion de sinergia Board (Cockpit) y Playbook en el README
-- **Prioridad**: `medium` | **Tipo**: `improvement`
-
-El README del playbook no contiene la palabra "Board" ni "Cockpit" en ninguna linea: un lector nuevo no puede saber que `gripm` (el producto) y `@gripm/playbook` (el engine) son dos proyectos que conviven, ni como se relacionan. El plan original de "golden repo" tenia un paso entero dedicado a esto y quedo sin registrar.
-
-Depende de PLAY-030 porque ambas tareas tocan el README y PLAY-030 reestructura su cabecera: secuencializar evita conflicto sobre el mismo archivo.
-
-**Criterios de Aceptación:**
-- [ ] #1 El README contiene una seccion o tabla que define ambos proyectos por separado: `gripm` (Board / Cockpit: interfaz web y servidor MCP local para gestionar backlog y sprints en Markdown) y `@gripm/playbook` (Engine: metodologia, reglas de git, roles y gates mecanicos de calidad).
-- [ ] #2 La seccion explica el camino de integracion (el board administra los items, el motor ejecuta los gates de entrega) y enlaza a ambos repos.
-- [ ] #3 Ninguna afirmacion del texto es no verificable contra el codigo de ambos repos; la terminologia usada coincide con la que cada repo usa para si mismo.
-- [ ] #4 `npm run check:all` pasa con 0 errores y todos los links relativos agregados resuelven.
 
 ---
 
