@@ -39,15 +39,15 @@ Covers 13 static signatures: decimal comma blocker, keyboard shortcuts on touch,
 
 If the project does not have the script (framework not installed), manually audit the signatures in the `code-level-ux-auditor` skill.
 
-### Double Gate: `npm run gate:qa` + Blind Diff Audit
+### Double Gate: `node scripts/gate-qa.mjs` + Blind Diff Audit
 
 > [!CAUTION]
 > **Neither prose nor same-thread roleplay constitutes a gate.** An agent asked to "act as QA Auditor" in the same thread that wrote the code ticks the ACs by inertia and justifies its own shortcuts. That is why T2 requires **both conditions**:
-> 1. **Mechanical Gate:** `npm run gate:qa TASK-ID` with **exit code 0**.
+> 1. **Mechanical Gate:** `node scripts/gate-qa.mjs TASK-ID` with **exit code 0**.
 > 2. **Semantic Gate in Clean Context:** an isolated `qa-auditor` sub-agent inspects the `git diff` against each AC marked `- [x]`, verifying that the implementation is real, without unjustified `as unknown as`, without global `vi.mock()` that fakes coverage, with strict modularity (files < 1000 LOC, no cross-layer coupling in God-Files), and satisfying all 7 mandatory headless audits.
 
 ```bash
-npm run gate:qa TASK-ID                     # full gate (promotes review → ready on disk if exit 0)
+node scripts/gate-qa.mjs TASK-ID                     # full gate (promotes review → ready on disk if exit 0)
 node scripts/gate-qa.mjs TASK-ID --no-run   # inspection only; exits with 2, never certifies or mutates the file
 node scripts/gate-qa.mjs start TASK-ID      # transition T0: draft → doing (verifies Gate R1 + dependencies)
 node scripts/gate-qa.mjs submit TASK-ID     # transition T1: doing → review (verifies marked ACs + dependencies)

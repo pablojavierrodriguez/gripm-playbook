@@ -87,7 +87,7 @@ The `pm-orchestrator` coordinates from the host thread and **dispatches clean-co
 5. **Dispatch `principal-engineer` Sub-Agent** (transition `node scripts/gate-qa.mjs start <ID> --by "<provider>:<session_or_agent_id>"` to `doing`): `TypeName: "self"` (full write and command permissions); receives refined task, ACs, Design Spec, and scoped files; reads `.agents/skills/principal-engineer/SKILL.md`, implements in atomic steps (SDD), checks ACs (`- [x]`), delivers Honest Scope & Residual Risk Declaration, and runs `node scripts/gate-qa.mjs submit <ID>` to transition to `status: review`.
 6. **Dispatch `qa-auditor` Sub-Agent in Clean Context Window (MANDATORY for `review` → `ready`)**:
    - **Prohibited to self-certify in the coding thread.**
-   - The QA sub-agent is invoked with a fresh context (`TypeName: "self"`, contract-bounded: zero source code edits) receiving **strictly**: task file path (`ACs`), the `git diff` to audit, and instructions to read `.agents/skills/qa-auditor/SKILL.md` + `.agents/skills/code-level-ux-auditor/SKILL.md` and execute `npm run gate:qa <ID>` (which upon `exit 0` writes `status: ready` to the task file on disk).
+   - The QA sub-agent is invoked with a fresh context (`TypeName: "self"`, contract-bounded: zero source code edits) receiving **strictly**: task file path (`ACs`), the `git diff` to audit, and instructions to read `.agents/skills/qa-auditor/SKILL.md` + `.agents/skills/code-level-ux-auditor/SKILL.md` and execute `node scripts/gate-qa.mjs <ID>` (which upon `exit 0` writes `status: ready` to the task file on disk).
 
 ### 4. Definition of Done (DoD)
 
@@ -97,7 +97,7 @@ The `pm-orchestrator` coordinates from the host thread and **dispatches clean-co
 - **Validated Zero State:** every view and metric is tested with 0 records. It must emit a serene neutral state, never false alarms interpreting absent data as system errors.
 - **Modularity & File Budget:** no created or modified source code file reaches or exceeds 1000 lines of code, with cleanly decoupled layers (zero God-Files).
 - **No Forced Seed Data:** all initial setup or wipe routines support starting with an empty canvas without forcing mock data.
-- Explicit sign-off from the clean-context QA sub-agent + `npm run gate:qa <ID>` with exit code 0.
+- Explicit sign-off from the clean-context QA sub-agent + `node scripts/gate-qa.mjs <ID>` with exit code 0.
 - Documentation and architectural records updated.
 
 ### 5. Sovereignty & Anti-Paternalism

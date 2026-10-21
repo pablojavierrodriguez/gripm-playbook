@@ -23,13 +23,13 @@ node scripts/audit-ux-code.cjs --strict   # fails on WARNING too
 node scripts/audit-ux-code.cjs --format json
 node scripts/audit-ux-code.cjs --list-rules
 node scripts/audit-ux-code.cjs --rule UX-006
-npm run audit:ux:baseline                 # snapshot what was already reviewed
+node scripts/audit-ux-code.cjs --update-baseline   # snapshot what was already reviewed
 ```
 
 - **The engine is stack-agnostic.** Rules that depend on a library declare `requires.deps` and skip themselves when the dependency is not in the project's `package.json`. The engine contains no file or project names.
 - **Severities:** `ERROR` (breaks tactile functionality, fails the audit without `--strict`), `WARNING` (degrades, fails with `--strict`), `INFO` (hygiene).
 - **Suppression:** `// ux-audit-ignore` disables every rule on that line; `// ux-audit-ignore UX-004` disables only that one. Per-project opt-out lives in `.uxaudit.json` (`disableRules`, `exclude`).
-- **Baseline:** `audit-ux-baseline.json` records observations already reviewed, so the auditor can be adopted on a codebase that already has hundreds of findings without silencing the gate or drowning in unrecoverable noise. `npm run audit:ux:baseline` rewrites the snapshot. **`ERROR` is never absorbed:** a severity that breaks the build is never silenced by a file.
+- **Baseline:** `audit-ux-baseline.json` records observations already reviewed, so the auditor can be adopted on a codebase that already has hundreds of findings without silencing the gate or drowning in unrecoverable noise. `node scripts/audit-ux-code.cjs --update-baseline` rewrites the snapshot. **`ERROR` is never absorbed:** a severity that breaks the build is never silenced by a file.
 
 ### Anatomy of a unit
 

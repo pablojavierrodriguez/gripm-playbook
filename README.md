@@ -50,7 +50,23 @@ Both extremes fail in real software engineering:
 - **Default entry point (`pm-orchestrator`).** Unless you explicitly invoke another role directly, every conversation starts with the Orchestrator leading the Structured Refinement Gate and selecting the operating mode.
 - **Skills are isolated operational contracts.** Each skill in `.agents/skills/` is loaded into a fresh sub-agent context when dispatched via `invoke_subagent`, keeping the main thread clean.
 - **Sequential writer discipline.** Domain logic, schemas and Git mutations run sequentially (one active writer per scope, or isolated via `git worktree`) to prevent races.
-- **Blind QA certification in a virgin context.** Transition T2 (`review` → `ready`) **never** runs in the coder's thread: a clean-context `qa-auditor` sub-agent receives only the task ACs and the `git diff`, runs `npm run gate:qa <ID>` (`exit 0`), and audits the diff without confirmation bias.
+- **Blind QA certification in a virgin context.** Transition T2 (`review` → `ready`) **never** runs in the coder's thread: a clean-context `qa-auditor` sub-agent receives only the task ACs and the `git diff`, runs `node scripts/gate-qa.mjs <ID>` (`exit 0`), and audits the diff without confirmation bias.
+
+### 📦 The Delivery Loop
+
+```
+  ┌───────┐   ┌───────┐   ┌────────┐   ┌───────┐   ┌──────┐
+  │ draft │ → │ doing │ → │ review │ → │ ready │ → │ done │
+  └───────┘   └───────┘   └────────┘   └───────┘   └──────┘
+               ▲              │
+         T1: dev    │ T2: gate:qa
+         submits    │ isolated
+          ACs       │ clean-context
+                    │ QA sub-agent
+                    │ (never self-certifies)
+```
+
+Resalta el gate ciego: el que escribió el código nunca se certifica a sí mismo.
 
 ### ⚖️ Swarms vs. Same-Thread Roleplay vs. This Playbook
 
@@ -104,7 +120,7 @@ Full specification, with actors and guards: **[`.agents/STATE_MACHINE.md`](.agen
               │                                                ▲         │
               │                                                └─blocked─┘
               ▼
-[ 4. QA Certification ] (qa-auditor) ────► status: review → ready   ← formal handover (npm run gate:qa)
+[ 4. QA Certification ] (qa-auditor) ────► status: review → ready   ← formal handover (node scripts/gate-qa.mjs)
               │
               ▼
 [ 5. Release & Prod ] (PO + Delivery Lead) ───────► status: ready → done     ← after a real deploy
@@ -116,7 +132,7 @@ Full specification, with actors and guards: **[`.agents/STATE_MACHINE.md`](.agen
 - **Refinement is an interactive gate (R1), not a state.** Requires a Structured Refinement Gate to resolve edge cases, fallbacks, empty states and tradeoffs before entering `doing` (`node scripts/gate-qa.mjs start <ID>`).
 - **`blocked` requires `blocked_reason`.** Halts WIP inflation; unblocking (`T_unblock`) requires resolving the impediment or dependencies and is executed mechanically via `node scripts/gate-qa.mjs unblock <ID>`.
 - **`dismissed` requires `dismissed_reason`.** Formal decision that an item will not exist; items in `ready` are never dismissed.
-- **`ready` is the formal delivery of development.** Only the clean-context QA Auditor sub-agent can certify `review → ready`, where `npm run gate:qa <ID>` (exit code 0) mutates `status: ready` on disk; a developer never self-certifies.
+- **`ready` is the formal delivery of development.** Only the clean-context QA Auditor sub-agent can certify `review → ready`, where `node scripts/gate-qa.mjs <ID>` (exit code 0) mutates `status: ready` on disk; a developer never self-certifies.
 - **Fundamental invariant:** no item can exist in production that is not `done`, and no item can be marked `done` without an actual release deploy.
 
 **Sprints and releases are decoupled.** A release groups available `ready` items by delivered value, with or without an active sprint, historical or current.
@@ -273,7 +289,7 @@ Validate every change in strict order. Each step is cheaper than the next.
 6. ⚠️  real browser (conditional)      ONLY for static-undeducible CSS/layout, or on explicit request
 ```
 
-### Executable QA Gate - `npm run gate:qa <ID>`
+### Executable QA Gate - `node scripts/gate-qa.mjs <ID>`
 
 Prose assertions are not gates. Transition T2 (`review` → `ready`) is enforced mechanically by `scripts/gate-qa.mjs`:
 - Verifies task frontmatter, completed acceptance criteria (`- [x]`), dependencies resolution in `done`, and valid `blocked_reason`/`dismissed_reason`.
@@ -413,7 +429,7 @@ npm run check:all    # validate + check:loc + test
 - **Hub Orchestrator + Clean-Context Sub-Agents:** every conversation starts with `pm-orchestrator` by default (unless another role is explicitly invoked), who conducts the Structured Refinement Gate and dispatches isolated sub-agents (`invoke_subagent`) with explicit contracts for Research, Design, Engineering (SDD) and QA. Multi-agent isolation via `git worktree` and synchronous Peer Discovery protocol (`claimed_by`).
 - **Canonical status vocabulary:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`. **The backlog is the planning pool, not a status**, and **refinement is an interactive gate (R1)** that clears edge cases, fallbacks, and tradeoffs before entering `doing`.
 - **`blocked` and `dismissed` require mandatory, non-empty reasons** (`blocked_reason` / `dismissed_reason`). Strict dependency resolution enforced mechanically via `gate-qa.mjs unblock <ID>`.
-- **`ready` is the formal developer delivery gate:** only a `qa-auditor` sub-agent running in a **clean context window** moves `review → ready`, backed by exit code 0 from `npm run gate:qa` and a blind audit of the `git diff` against the ACs. The thread that wrote the code never self-certifies.
+- **`ready` is the formal developer delivery gate:** only a `qa-auditor` sub-agent running in a **clean context window** moves `review → ready`, backed by exit code 0 from `node scripts/gate-qa.mjs` and a blind audit of the `git diff` against the ACs. The thread that wrote the code never self-certifies.
 - **Senior engineering discipline:** minimum viable diff, mandatory reuse of existing utilities, blast radius mapping before every edit, and Honest Scope & Residual Risk Declaration at the close of every intervention.
 - **Anti-Slop filter:** comment hygiene, prohibition of type escape patterns (`as unknown as`), Oxlint recipe, and Purpose Test on design and copy.
 - **Fundamental invariant:** no item can exist in production without being in `done`, and marking `done` without an actual deploy is a state lie.

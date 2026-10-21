@@ -11,13 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.6.0] - 2026-10-21
 
-`PLAY-026` · `PLAY-027` · `PLAY-028` · `PLAY-029` · `PLAY-030` · `PLAY-032`
+`PLAY-026` · `PLAY-027` · `PLAY-028` · `PLAY-029` · `PLAY-030` · `PLAY-031` · `PLAY-032` · `PLAY-034`
 
 ### Added
 
 - **Zero-Friction Onboarding CLI and Multi-Harness Adapters** (`PLAY-030`). New `scripts/init.mjs` wizard, exposed as `npx @gripm/playbook init`, `npm run init`, and the `sync-playbook.mjs init` subcommand. Detects the consumer stack from `package.json`, parametrizes `AGENTS.md` (project name, stack, language) only while it is still the base template, and generates thin harness adapters that point back to `AGENTS.md` as the canonical source: `.cursor/rules/*.mdc` for Cursor and `CLAUDE.md` for Claude Code. A hand-edited `AGENTS.md` is preserved even under `--force`. Writes the Gripm Board `.gripm/config.json` unless `--no-board`. New shared prompt helpers in `scripts/lib/terminal.mjs` (`promptText`, `promptConfirm`, `promptSelect`, `promptMultiSelect`) fall back to defaults without a TTY, so the wizard never blocks CI.
 - **Anti-Self-Certification Gate and Actor Resolution** (`PLAY-028`). `scripts/gate-qa.mjs` now resolves the acting identity hierarchically (`--by`/`--as` flags, `GRIPM_ACTOR`/`QA_ACTOR`/`CLAIMED_BY` env vars, harness session vars, `human:<user>` fallback) and refuses to promote `review` -> `ready` when that actor matches the task's registered `claimed_by`, emitting an `anti-self-certification` diagnostic and preserving `review` on disk.
 - **UX Signatures UX-014 and UX-015** (`PLAY-027`). The canonical rule catalog grows from 13 to 15 static UX signatures: `UX-014` flags em-dash and en-dash characters in JSX text nodes and UI/metadata attributes, enforcing the standard hyphen rule; `UX-015` flags viewport configurations that lock out pinch-to-zoom (`maximum-scale=1`, `user-scalable=no`, `user-scalable=0`, `userScalable: false`), violating WCAG 1.4.4.
+- **Delivery Loop Diagram in README** (`PLAY-031`). ASCII diagrama estático en el primer fold que muestra el ciclo de vida de un backlog item desde `draft` hasta `done`, destacando el gate ciego de QA como paso crítico entre `review` y `ready`. No depende de herramienta externa (vhs/ffmpeg/gif no disponibles en la máquina), solo diagramado ASCII. Acompaña al diagrama de arquitectura "Hub Orchestrator + Sub-Agentes" y precede a la matriz de decisiones operativas.
+- **QA Ciega y Anti-Self-Certification** (`PLAY-034`). `gate-qa.mjs` certifica items en `ready` mediante QA en contexto aislado por sub-agente, con invariante state-machine L77 (`ready` inmutable; fix post-QA invalida certificación y regresa a `doing`). 10 ACs validadas, hallazgos reportados en AC#10 (`npm run validate`, `lint:anti-slop`, `gate:review`, `check:all` decisiones pendientes del PO). Sustitución de 16 scripts `gate:qa` y `audit:ux` baseline por forma `node scripts/...`.
 
 ### Changed
 

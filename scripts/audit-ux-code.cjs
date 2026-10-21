@@ -1006,7 +1006,7 @@ function loadBaseline(root = ROOT) {
     if (parsed.version !== BASELINE_VERSION) {
       console.warn(
         `  ${c.yellow('▲')} Baseline is v${parsed.version}, this auditor expects v${BASELINE_VERSION}. ` +
-        `Regenerate it with: npm run audit:ux -- --update-baseline`,
+        `Regenerate it with: node scripts/audit-ux-code.cjs --update-baseline`,
       );
       return { version: BASELINE_VERSION, entries: {} };
     }
@@ -1201,7 +1201,7 @@ function main() {
       });
     } else if (!opts.quiet) {
       console.log(`\n  ${c.green('✔')} Baseline written: ${BASELINE_NAME} (${total} observation(s), ${Object.keys(entries).length} unique signature(s)).`);
-      console.log(`    ${c.dim('Run `npm run audit:ux` again to see only what is new.')}\n`);
+      console.log(`    ${c.dim('Run `node scripts/audit-ux-code.cjs` again to see only what is new.')}\n`);
     }
     return;
   }
