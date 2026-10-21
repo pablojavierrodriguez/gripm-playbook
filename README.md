@@ -66,7 +66,7 @@ Both extremes fail in real software engineering:
                     │ (never self-certifies)
 ```
 
-Resalta el gate ciego: el que escribió el código nunca se certifica a sí mismo.
+Highlights the blind gate: the agent that wrote the code never certifies itself.
 
 ### ⚖️ Swarms vs. Same-Thread Roleplay vs. This Playbook
 

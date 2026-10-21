@@ -35,7 +35,7 @@ Execute **in strict order**. Each step is cheaper than the next; skipping one is
 node scripts/audit-ux-code.cjs --strict
 ```
 
-Covers 13 static signatures: decimal comma blocker, keyboard shortcuts on touch, drag/scroll collision, time localization leak, autocapitalize trap, fixed-UI occlusion, horizontal crowding, micro-jank, touch targets, icon buttons without accessible name, typographic scale, tactile feedback, and tabular numerals.
+Covers 15 static signatures: decimal comma blocker, keyboard shortcuts on touch, drag/scroll collision, time localization leak, autocapitalize trap, fixed-UI occlusion, horizontal crowding, micro-jank, touch targets, icon buttons without accessible name, typographic scale, tactile feedback, tabular numerals, anti-em-dash / anti-AI cliché (UX-014), and viewport touch zoom lock (UX-015).
 
 If the project does not have the script (framework not installed), manually audit the signatures in the `code-level-ux-auditor` skill.
 
