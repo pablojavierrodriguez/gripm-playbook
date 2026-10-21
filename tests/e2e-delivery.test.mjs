@@ -245,8 +245,8 @@ describe('Tier 1: Feature Coverage (F1 - F13)', () => {
 
     test('F3-3: SKILL.md pre-merge checklist includes verification points', () => {
       const skill = fs.readFileSync(SKILL_DOC_PATH, 'utf8');
-      assert.match(skill, /##\s*✅\s*Checklist de aceptación pre-merge/, 'Checklist section must exist');
-      assert.ok(skill.includes('UX-014') || skill.includes('guión estándar') || skill.includes('em-dash'));
+      assert.match(skill, /##\s*✅\s*Pre-merge acceptance checklist/, 'Checklist section must exist');
+      assert.ok(skill.includes('UX-014') || skill.includes('standard hyphen') || skill.includes('em-dash'));
     });
 
     test('F3-4: README.md or catalog references 15 signatures', () => {
@@ -2031,5 +2031,245 @@ describe('Tier 4: Real-World Application Scenarios', () => {
     const rulesRes = runCmd(AUDITOR_BIN, ['--list-rules']);
     assert.equal(rulesRes.status, 0);
     assert.match(rulesRes.stdout, /15 signatures/);
+  });
+});
+
+// ============================================================================
+// TIER 5: ZERO-FRICTION ONBOARDING INIT (PLAY-030)
+// ============================================================================
+
+describe('Tier 5: Zero-Friction Onboarding Init (PLAY-030)', () => {
+  const INIT_BIN = path.join(SCRIPTS_DIR, 'init.mjs');
+
+  /**
+   * Runs the wizard against a throwaway repo, syncing from this very checkout
+   * (--source) so the whole flow is offline and deterministic.
+   */
+  function initSandbox(files = {}, args = []) {
+    const dir = createSandbox('e2e-init-');
+    for (const [rel, content] of Object.entries(files)) createFile(dir, rel, content);
+    const res = runCmd(INIT_BIN, ['--repo', dir, '--source', ROOT, '--yes', ...args]);
+    return { dir, ...res };
+  }
+
+  const AGENTS_IN = (dir) => fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8');
+
+  test('F14-1: init.mjs and its modules are registered in the manifest, with fallback parity', () => {
+    const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+
+    for (const file of ['scripts/init.mjs', 'scripts/sync-playbook.mjs', 'scripts/lib/adapters.mjs']) {
+      assert.ok(manifest.core.includes(file), `${file} is missing from manifest.core`);
+      assert.ok(fs.existsSync(path.join(ROOT, file)), `${file} is missing on disk`);
+    }
+
+    // validate-repo enforces manifest <-> FALLBACK_CORE_FILES membership both ways.
+    const res = runCmd(VALIDATE_BIN);
+    assert.equal(res.status, 0, res.output);
+  });
+
+  test('F14-2: init --yes auto-detects the stack and parametrizes AGENTS.md (AC #2, #4)', () => {
+    const pkg = JSON.stringify({
+      name: 'acme-app',
+      dependencies: { react: '^18.2.0', 'react-dom': '^18.2.0', zod: '^3.22.0', 'react-hook-form': '^7.50.0' },
+      devDependencies: { tailwindcss: '^3.4.0', vitest: '^1.4.0' },
+    });
+
+    // No --stack and no --name: every answer comes from detection.
+    const { dir, status, output } = initSandbox({ 'package.json': pkg });
+    assert.equal(status, 0, output);
+
+    const agents = AGENTS_IN(dir);
+    assert.match(agents, /^# Global Agent Instructions - acme-app$/m, 'title not parametrized');
+    assert.match(agents, /- \*\*Frontend:\*\* React$/m);
+    assert.match(agents, /- \*\*Styling:\*\* Tailwind CSS$/m);
+    assert.match(agents, /- \*\*Testing:\*\* Vitest$/m);
+    assert.match(agents, /- \*\*Forms & Validation:\*\* React Hook Form \+ Zod$/m);
+
+    // No template guidance survives parametrization.
+    assert.ok(!agents.includes('replace with project-specific choices'), 'stack guidance left behind');
+    assert.ok(!agents.includes('(or configured framework)'), 'frontend guidance left behind');
+    assert.ok(!agents.includes('(or configured backend)'), 'backend guidance left behind');
+    assert.ok(!agents.includes('(or project-configured language)'), 'language guidance left behind');
+
+    // The pack was installed from detection alone, and unsignalled packs were not.
+    assert.ok(fs.existsSync(path.join(dir, '.agents/stacks/react/STACK.md')), 'react pack not installed from detection');
+    assert.ok(!fs.existsSync(path.join(dir, '.agents/stacks/pwa/STACK.md')), 'pwa pack installed without signals');
+  });
+
+  test('F14-3: init generates the Cursor and Claude adapters for the selected harnesses (AC #1, #3)', () => {
+    const pkg = JSON.stringify({ name: 'acme', dependencies: { react: '^18.2.0' } });
+    const { dir, status, output } = initSandbox({ 'package.json': pkg }, [
+      '--harness', 'cursor',
+      '--harness', 'claude',
+      '--name', 'Acme App',
+      '--lang', 'es',
+    ]);
+    assert.equal(status, 0, output);
+
+    const framework = fs.readFileSync(path.join(dir, '.cursor/rules/gripm-framework.mdc'), 'utf8');
+    assert.match(framework, /^alwaysApply: true$/m);
+    assert.match(framework, /AGENTS\.md/, 'the adapter must point at the canonical file, not duplicate it');
+
+    const gitRule = fs.readFileSync(path.join(dir, '.cursor/rules/git-workflow.mdc'), 'utf8');
+    assert.match(gitRule, /\.agents\/rules\/git-workflow\.md/);
+
+    const claude = fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8');
+    assert.match(claude, /AGENTS\.md/);
+    assert.match(claude, /gate-qa/, 'adapters must use the installed CLI, not a consumer package.json script');
+
+    const agents = AGENTS_IN(dir);
+    assert.match(agents, /^# Global Agent Instructions - Acme App$/m);
+    assert.match(agents, /\*\*Spanish\*\*/, '--lang es was not applied');
+  });
+
+  test('F14-4: a hand-written AGENTS.md is never touched by the wizard', () => {
+    const custom = '# My own rules\n\nDo not overwrite me.\n';
+    const { dir, status, output } = initSandbox({ 'AGENTS.md': custom });
+    assert.equal(status, 0, output);
+
+    assert.equal(AGENTS_IN(dir), custom, 'the wizard overwrote a human-owned AGENTS.md');
+    assert.match(output, /preserved/);
+  });
+
+  test('F14-5: --yes writes a .gripm/config.json the Board can read, --no-board skips it (AC #1)', () => {
+    const pkg = JSON.stringify({ name: 'acme-app' });
+
+    const withBoard = initSandbox({ 'package.json': pkg });
+    assert.equal(withBoard.status, 0, withBoard.output);
+
+    const config = JSON.parse(fs.readFileSync(path.join(withBoard.dir, '.gripm/config.json'), 'utf8'));
+    assert.equal(config.projectName, 'acme-app');
+    assert.equal(config.projectId, 'acme-app');
+    assert.equal(config.codePrefix, 'ACME');
+    assert.equal(config.language, 'en');
+    assert.equal(config.mode, 'single');
+    assert.equal(config.methodology, 'kanban');
+    assert.equal(config.version, '1.0.0');
+    assert.ok(fs.existsSync(path.join(withBoard.dir, 'backlog', 'tasks')), 'item pool not created');
+
+    const withoutBoard = initSandbox({ 'package.json': pkg }, ['--no-board']);
+    assert.equal(withoutBoard.status, 0, withoutBoard.output);
+    assert.ok(
+      !fs.existsSync(path.join(withoutBoard.dir, '.gripm', 'config.json')),
+      '--no-board still wrote the board config',
+    );
+  });
+
+  test('F14-6: the default harness is antigravity - no adapter of another harness is created', () => {
+    const { dir, status, output } = initSandbox({});
+    assert.equal(status, 0, output);
+
+    assert.ok(fs.existsSync(path.join(dir, 'AGENTS.md')));
+    assert.ok(fs.existsSync(path.join(dir, '.agents/skills/pm-orchestrator/SKILL.md')));
+    assert.ok(!fs.existsSync(path.join(dir, '.cursor')), 'a cursor adapter appeared without selecting cursor');
+    assert.ok(!fs.existsSync(path.join(dir, 'CLAUDE.md')), 'a claude adapter appeared without selecting claude');
+  });
+
+  test('F14-7: an existing CLAUDE.md is protected unless --force is passed', () => {
+    const mine = '# My own Claude notes\n';
+
+    const first = initSandbox({ 'CLAUDE.md': mine }, ['--harness', 'claude']);
+    assert.equal(first.status, 0, first.output);
+    assert.equal(fs.readFileSync(path.join(first.dir, 'CLAUDE.md'), 'utf8'), mine);
+    assert.match(first.output, /protected/);
+
+    const second = initSandbox({ 'CLAUDE.md': mine }, ['--harness', 'claude', '--force']);
+    assert.equal(second.status, 0, second.output);
+    assert.notEqual(fs.readFileSync(path.join(second.dir, 'CLAUDE.md'), 'utf8'), mine);
+    assert.match(second.output, /created/);
+  });
+
+  test('F14-8: an unknown harness fails loudly and writes nothing', () => {
+    const { dir, status, output } = initSandbox({}, ['--harness', 'copilot']);
+    assert.equal(status, 2, output);
+    assert.match(output, /Unknown harness/);
+    assert.ok(!fs.existsSync(path.join(dir, 'AGENTS.md')), 'files were written despite an invalid answer');
+  });
+
+  test('F14-9: --help, --list-harnesses and the non-TTY prompt fallbacks behave', async () => {
+    const help = runCmd(INIT_BIN, ['--help']);
+    assert.equal(help.status, 0, help.output);
+    assert.match(help.output, /--harness/);
+
+    const list = runCmd(INIT_BIN, ['--list-harnesses']);
+    assert.equal(list.status, 0, list.output);
+    assert.match(list.output, /antigravity/);
+    assert.match(list.output, /cursor/);
+    assert.match(list.output, /claude/);
+
+    const terminal = await import('../scripts/lib/terminal.mjs');
+    assert.equal(typeof terminal.promptText, 'function');
+    assert.equal(typeof terminal.promptConfirm, 'function');
+    assert.equal(typeof terminal.promptSelect, 'function');
+    assert.equal(typeof terminal.promptMultiSelect, 'function');
+
+    // Guarded: reading a prompt would block the whole suite if stdin were a TTY.
+    if (!process.stdin.isTTY) {
+      assert.equal(await terminal.promptConfirm('q', true), true);
+      assert.equal(await terminal.promptText('q', 'fallback'), 'fallback');
+      assert.equal(
+        await terminal.promptSelect('q', [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], 'b'),
+        'b',
+      );
+      assert.deepEqual(await terminal.promptMultiSelect('q', [{ value: 'a', label: 'A' }], ['a']), ['a']);
+    }
+  });
+
+  test('F14-10: every relative import of a core script is itself installed (import closure)', () => {
+    const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+    const core = new Set(manifest.core);
+
+    const posix = (p) => p.split(path.sep).join('/');
+    const resolveRelative = (fromFile, spec) =>
+      path.posix.normalize(path.posix.join(path.posix.dirname(posix(fromFile)), spec));
+
+    const orphans = [];
+    for (const file of manifest.core) {
+      if (!/\.(mjs|cjs|js)$/.test(file)) continue;
+
+      // Whole-content scan on purpose: a multi-line import puts the specifier on a
+      // line that does not start with "import", which a line-based scan misses.
+      const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
+      for (const match of source.matchAll(/['"](\.{1,2}\/[^'"]+)['"]/g)) {
+        const resolved = resolveRelative(file, match[1]);
+        // Only repo modules count; string literals that merely look like paths are ignored.
+        if (!fs.existsSync(path.join(ROOT, resolved))) continue;
+        if (!core.has(resolved)) orphans.push(`${file} imports ${resolved}`);
+      }
+    }
+
+    assert.deepEqual(
+      orphans,
+      [],
+      `the sync would install scripts whose dependencies it does not install:\n  ${orphans.join('\n  ')}`,
+    );
+  });
+
+  test('F14-11: the installed entry points actually run inside the consumer repo', () => {
+    const dir = createSandbox('e2e-installed-');
+    createFile(dir, 'package.json', JSON.stringify({ name: 'installed-app' }));
+
+    const install = runCmd(INIT_BIN, ['--repo', dir, '--source', ROOT, '--yes', '--harness', 'cursor', '--harness', 'claude']);
+    assert.equal(install.status, 0, install.output);
+
+    const installed = (script, args) => runCmd(path.join(dir, 'scripts', script), args, { cwd: ROOT });
+
+    // The wizard's closing message tells the user to re-run it: it must not crash.
+    const init = installed('init.mjs', ['--help']);
+    assert.equal(init.status, 0, `installed init.mjs does not run:\n${init.output}`);
+    assert.ok(!init.output.includes('ERR_MODULE_NOT_FOUND'), init.output);
+
+    // The installed STACK.md documents this exact command for the consumer.
+    const listStacks = installed('sync-playbook.mjs', ['--list-stacks', '--source', ROOT]);
+    assert.equal(listStacks.status, 0, `installed sync-playbook.mjs does not run:\n${listStacks.output}`);
+    assert.ok(!listStacks.output.includes('ERR_MODULE_NOT_FOUND'), listStacks.output);
+
+    const addStack = installed('sync-playbook.mjs', ['--stack', 'react', '--repo', dir, '--source', ROOT, '--yes']);
+    assert.equal(addStack.status, 0, `installed sync-playbook.mjs cannot install a stack pack:\n${addStack.output}`);
+    assert.ok(fs.existsSync(path.join(dir, '.agents/stacks/react/STACK.md')));
+
+    // The generated adapters point at this gate: it must be present and loadable.
+    const gate = installed('gate-qa.mjs', ['--no-run']);
+    assert.ok(!gate.output.includes('ERR_MODULE_NOT_FOUND'), `installed gate-qa.mjs does not run:\n${gate.output}`);
   });
 });

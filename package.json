@@ -13,11 +13,13 @@
     "./audit": "./scripts/audit-ux-code.cjs",
     "./gate": "./scripts/gate-qa.mjs",
     "./check-loc": "./scripts/check-loc.mjs",
+    "./init": "./scripts/init.mjs",
     "./package.json": "./package.json",
     "./scripts/*": "./scripts/*"
   },
   "scripts": {
     "sync": "node scripts/sync-playbook.mjs",
+    "init": "node scripts/init.mjs",
     "playbook:sync": "node scripts/sync-playbook.mjs",
     "stacks": "node scripts/sync-playbook.mjs --list-stacks",
     "audit:ux": "node scripts/audit-ux-code.cjs",

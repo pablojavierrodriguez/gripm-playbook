@@ -35,7 +35,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { c } from './lib/terminal.mjs';
+import { c, promptConfirm } from './lib/terminal.mjs';
 import {
   HISTORY_BUDGET,
   makeBudget,
@@ -69,18 +69,23 @@ export const FALLBACK_CORE_FILES = [
   '.agents/rules/git-workflow.md',
   '.agents/skills/pm-orchestrator/SKILL.md',
   '.agents/skills/market-researcher/SKILL.md',
-  '.agents/skills/worldclass-product-designer/SKILL.md',
+  '.agents/skills/product-designer/SKILL.md',
   '.agents/skills/principal-engineer/SKILL.md',
-  '.agents/skills/rigorous-qa-auditor/SKILL.md',
+  '.agents/skills/qa-auditor/SKILL.md',
   '.agents/skills/code-level-ux-auditor/SKILL.md',
   'scripts/audit-ux-code.cjs',
   'scripts/gate-qa.mjs',
   'scripts/check-loc.mjs',
   'scripts/ux-rules.json',
+  'scripts/sync-playbook.mjs',
+  'scripts/init.mjs',
   'scripts/lib/frontmatter.mjs',
   'scripts/lib/terminal.mjs',
+  'scripts/lib/adapters.mjs',
   'scripts/lib/pyramid.mjs',
   'scripts/lib/task-inspection.mjs',
+  'scripts/lib/provenance.mjs',
+  'scripts/lib/sync-classifier.mjs',
   'docs/sprints/SPRINT_SPEC_TEMPLATE.md',
   'docs/DOMAIN_TEMPLATE.md',
 ];
@@ -125,19 +130,6 @@ function printBanner(targetRepo, remote, ref, pinned, stacks) {
   ${c.dim('➜')}  ${c.dim('Upstream:')}     ${c.cyan(upstreamDisplay)}
   ${c.dim('➜')}  ${c.dim('Stack packs:')}  ${stackDisplay}
 `);
-}
-
-function prompt(question) {
-  return new Promise((resolve) => {
-    if (!process.stdin.isTTY) {
-      resolve(false);
-      return;
-    }
-    process.stdout.write(`${question} [y/N] `);
-    process.stdin.once('data', (data) => {
-      resolve(/^y(es)?$/i.test(data.toString().trim()));
-    });
-  });
 }
 
 export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) {
@@ -285,7 +277,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
     }
 
     if (!assumeYes && !isDryRun && !force) {
-      const ok = await prompt(`  Overwrite locally modified ${relativePath}?`);
+      const ok = await promptConfirm(`Overwrite locally modified ${relativePath}?`);
       if (!ok) {
         protectedFiles.push(relativePath);
         nextCustomizations.add(relativePath);
@@ -475,19 +467,30 @@ function printUsage() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
-  const opts = parseArgs(process.argv.slice(2));
+  const [subcommand, ...rest] = process.argv.slice(2);
 
-  if (opts.help) {
-    printUsage();
-  } else if (opts.listStacks) {
-    listStacks(opts.remote, opts.source).catch((err) => {
-      console.error('Fatal:', err.message);
-      process.exit(2);
-    });
+  if (subcommand === 'init') {
+    import('./init.mjs')
+      .then((module) => module.runInit(rest))
+      .catch((err) => {
+        console.error('Fatal:', err.message);
+        process.exit(2);
+      });
   } else {
-    runPlaybookSync(opts.repo, opts).catch((err) => {
-      console.error('Fatal:', err.message);
-      process.exit(2);
-    });
+    const opts = parseArgs(process.argv.slice(2));
+
+    if (opts.help) {
+      printUsage();
+    } else if (opts.listStacks) {
+      listStacks(opts.remote, opts.source).catch((err) => {
+        console.error('Fatal:', err.message);
+        process.exit(2);
+      });
+    } else {
+      runPlaybookSync(opts.repo, opts).catch((err) => {
+        console.error('Fatal:', err.message);
+        process.exit(2);
+      });
+    }
   }
 }

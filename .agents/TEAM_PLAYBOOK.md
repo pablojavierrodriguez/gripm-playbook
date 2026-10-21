@@ -14,9 +14,9 @@ The user never has to manually specify when to trigger a sprint or which sub-age
 
 | Operating Track | Typical Triggers | Execution & Sub-Agent Topology | Overhead / Documentation |
 | :--- | :--- | :--- | :--- |
-| **Mode 1: Surgical Focus** *(Fast-Track)* | Targeted bugfixes, calculations/invariants, copy/typo tweaks, linter fixes, failing unit tests. | **Host Orchestrator** applies [`principal-engineer`](skills/principal-engineer/SKILL.md) rules directly (or via 1 focused sub-agent). If certifying a backlog item (`review` ➔ `ready`), spawns a clean-context [`rigorous-qa-auditor`](skills/rigorous-qa-auditor/SKILL.md) sub-agent. | **Zero bureaucracy.** No sprint doc. Atomic modification + verification (`typecheck` + tests). |
-| **Mode 2: Tactical Duo** *(UX + Engineering)* | Component redesign, new modals/sheets, ergonomics & touch targets, visual charts. | **Host (`pm-orchestrator`)** dispatches clean-context sub-agents: **[`worldclass-product-designer`](skills/worldclass-product-designer/SKILL.md)** ➔ **[`principal-engineer`](skills/principal-engineer/SKILL.md)** ➔ **[`rigorous-qa-auditor`](skills/rigorous-qa-auditor/SKILL.md)**. | **Lightweight.** Plan outlined directly in chat. No sprint doc unless touching database schema. |
-| **Mode 3: Full Sprint & Backlog Flow** | Major backlog feature, database schema migrations, complex business workflows. | **Host (`pm-orchestrator`)** orchestrates isolated sub-agents: **[`market-researcher`](skills/market-researcher/SKILL.md)** ➔ **[`worldclass-product-designer`](skills/worldclass-product-designer/SKILL.md)** ➔ **[`principal-engineer`](skills/principal-engineer/SKILL.md)** (SDD) ➔ **[`rigorous-qa-auditor`](skills/rigorous-qa-auditor/SKILL.md)** ➔ **Release Management**. | **Formal.** Tracked via backlog task or sprint spec, verified through the Verification Pyramid and packaged by value. |
+| **Mode 1: Surgical Focus** *(Fast-Track)* | Targeted bugfixes, calculations/invariants, copy/typo tweaks, linter fixes, failing unit tests. | **Host Orchestrator** applies [`principal-engineer`](skills/principal-engineer/SKILL.md) rules directly (or via 1 focused sub-agent). If certifying a backlog item (`review` ➔ `ready`), spawns a clean-context [`qa-auditor`](skills/qa-auditor/SKILL.md) sub-agent. | **Zero bureaucracy.** No sprint doc. Atomic modification + verification (`typecheck` + tests). |
+| **Mode 2: Tactical Duo** *(UX + Engineering)* | Component redesign, new modals/sheets, ergonomics & touch targets, visual charts. | **Host (`pm-orchestrator`)** dispatches clean-context sub-agents: **[`product-designer`](skills/product-designer/SKILL.md)** ➔ **[`principal-engineer`](skills/principal-engineer/SKILL.md)** ➔ **[`qa-auditor`](skills/qa-auditor/SKILL.md)**. | **Lightweight.** Plan outlined directly in chat. No sprint doc unless touching database schema. |
+| **Mode 3: Full Sprint & Backlog Flow** | Major backlog feature, database schema migrations, complex business workflows. | **Host (`pm-orchestrator`)** orchestrates isolated sub-agents: **[`market-researcher`](skills/market-researcher/SKILL.md)** ➔ **[`product-designer`](skills/product-designer/SKILL.md)** ➔ **[`principal-engineer`](skills/principal-engineer/SKILL.md)** (SDD) ➔ **[`qa-auditor`](skills/qa-auditor/SKILL.md)** ➔ **Release Management**. | **Formal.** Tracked via backlog task or sprint spec, verified through the Verification Pyramid and packaged by value. |
 
 ---
 
@@ -33,12 +33,12 @@ When the host `pm-orchestrator` delegates to a specialist via `invoke_subagent`,
 | Sub-Agent Role | Harness Invocation (`invoke_subagent`) | Skill Required to Read First | Clean Input Provided by Orchestrator | Mandatory Output Returned |
 | :--- | :--- | :--- | :--- | :--- |
 | **Market Researcher** | `TypeName: "research"`<br>`Workspace: "inherit"`<br>*(Read-only + Web search)* | [`.agents/skills/market-researcher/SKILL.md`](skills/market-researcher/SKILL.md) | Problem statement + domain + specific UX/API questions. | `[RESEARCH]` brief: >= 3 product benchmarks, filtered domain edge-case table, and concrete recommendations. |
-| **Product Designer** | `TypeName: "research"` *(o `"self"` si genera assets)*<br>`Workspace: "inherit"`<br>*(Read-first design specification)* | [`.agents/skills/worldclass-product-designer/SKILL.md`](skills/worldclass-product-designer/SKILL.md) | Problem statement + ACs + Research brief + project design tokens. | `[DESIGN SPEC]`: semantic tokens, >= 44×44px touch targets, all 7 interactive states, Purpose Test verdicts, and copy veracity check. |
-| **Principal Engineer** | `TypeName: "self"`<br>`Workspace: "inherit"` *(o `"share"` en SDD paralelo)*<br>*(Full write + Terminal tools)* | [`.agents/skills/principal-engineer/SKILL.md`](skills/principal-engineer/SKILL.md) | Refined task (`doing`) + ACs + Design Spec + Architecture boundaries + files in scope + `.agents/rules/`. | Implemented modular code (< 1000 LOC per file, layers decoupled), checked ACs (`- [x]`), green local typecheck/tests, Ponytail honest close (what was not tested + residual risk), task in `review`. |
-| **Rigorous QA Auditor** *(NEVER in the coder's thread)* | `TypeName: "self"`<br>`Workspace: "inherit"`<br>*(Contract-bounded: NO source code edits, terminal execution only)* | [`.agents/skills/rigorous-qa-auditor/SKILL.md`](skills/rigorous-qa-auditor/SKILL.md) & [`.agents/skills/code-level-ux-auditor/SKILL.md`](skills/code-level-ux-auditor/SKILL.md) | **Blind audit payload only:** Task file path (ACs) + `git diff` (or commit range) + command to run `npm run gate:qa <ID>`. Zero developer rationalization history. | `[QA MATRIX]`: mechanical `gate:qa` exit code + blind semantic audit of `git diff` vs. ACs + verdict (`APPROVED -> ready` or `REJECTED -> doing` with file:line findings). |
+| **Product Designer** | `TypeName: "research"` *(or `"self"` if generating visual assets)*<br>`Workspace: "inherit"`<br>*(Read-first design specification)* | [`.agents/skills/product-designer/SKILL.md`](skills/product-designer/SKILL.md) | Problem statement + ACs + Research brief + project design tokens. | `[DESIGN SPEC]`: semantic tokens, >= 44×44px touch targets, all 7 interactive states, Purpose Test verdicts, and copy veracity check. |
+| **Principal Engineer** | `TypeName: "self"`<br>`Workspace: "inherit"` *(or `"share"` in parallel SDD)*<br>*(Full write + Terminal tools)* | [`.agents/skills/principal-engineer/SKILL.md`](skills/principal-engineer/SKILL.md) | Refined task (`doing`) + ACs + Design Spec + Architecture boundaries + files in scope + `.agents/rules/`. | Implemented modular code (< 1000 LOC per file, layers decoupled), checked ACs (`- [x]`), green local typecheck/tests, Honest Scope & Residual Risk Declaration (what was not tested + residual risk), task in `review`. |
+| **QA Auditor** *(NEVER in the coder's thread)* | `TypeName: "self"`<br>`Workspace: "inherit"`<br>*(Contract-bounded: NO source code edits, terminal execution only)* | [`.agents/skills/qa-auditor/SKILL.md`](skills/qa-auditor/SKILL.md) & [`.agents/skills/code-level-ux-auditor/SKILL.md`](skills/code-level-ux-auditor/SKILL.md) | **Blind audit payload only:** Task file path (ACs) + `git diff` (or commit range) + command to run `npm run gate:qa <ID>`. Zero developer rationalization history. | `[QA MATRIX]`: mechanical `gate:qa` exit code + blind semantic audit of `git diff` vs. ACs + verdict (`APPROVED -> ready` or `REJECTED -> doing` with file:line findings). |
 
 ### 🟢 When to Parallelize (Sub-Agents / Background Tasks):
-1. **Blind QA Certification (`rigorous-qa-auditor`):**
+1. **Blind QA Certification (`qa-auditor`):**
    - **Always isolated** in a fresh sub-agent context so verification is unbiased by the implementation conversation.
 2. **Exploratory Research & Benchmarking (`market-researcher`):**
    - Investigate industry references (Linear, Stripe, Notion, Obsidian) or analyze external API documentation without polluting the core technical context.
@@ -57,48 +57,48 @@ When the host `pm-orchestrator` delegates to a specialist via `invoke_subagent`,
 
 ### 🔁 Subagent-Driven Development (SDD)
 
-Un único hilo ejecutando un plan extenso sufre **fatiga de contexto**: olvida instrucciones tempranas, mezcla estados, reintroduce regresiones en tests que pasaban y empieza a parchear improvisando. SDD es el antídoto para tareas de alta complejidad.
+A single thread executing an extensive implementation plan suffers from **context degradation**: it forgets early instructions, conflates states, reintroduces regressions in previously passing tests, and resorts to improvised patching. SDD is the architectural antidote for high-complexity tasks.
 
-**1. Planes a prueba de contexto.** El `pm-orchestrator` desglosa el trabajo en pasos **hiper-atómicos e independientes**. Cada paso se redacta bajo Red-Green TDD con instrucciones explícitas y autocontenidas: un subagente `principal-engineer` sin historial debe poder ejecutarlo sin desviarse. El paso declara qué archivos toca, qué se espera que haga, y cómo se verifica.
+**1. Context-Resilient Execution Plans.** The `pm-orchestrator` decomposes work into **hyper-atomic, independent steps**. Each step is specified under Red-Green TDD with explicit, self-contained instructions: a `principal-engineer` sub-agent with a fresh context must be able to execute it without divergence. The step explicitly declares targeted files, expected behavior, and verification criteria.
 
-**2. Un subagente fresco por paso.** El orquestador **no** pica todo el código en el hilo principal. Despacha un subagente nuevo para el paso N (`TypeName: "self"`), operando sobre el árbol (`Workspace: "inherit"`) o en aislamiento (`Workspace: "share"` / worktree aislado, ver § Workspace Isolation).
+**2. Fresh Sub-Agent Per Step.** The orchestrator does **not** code the entire feature in the host thread. It dispatches a fresh sub-agent for step N (`TypeName: "self"`), operating on the working tree (`Workspace: "inherit"`) or in isolation (`Workspace: "share"` / isolated worktree, see § Workspace Isolation).
 
-**3. Supervisión y consolidación secuencial.** El orquestador revisa el diff producido, corre la verificación headless, y **solo cuando pasa en verde** consolida y dispara el paso N+1. Un subagente constructor no se lanza en paralelo con el siguiente sobre los mismos archivos. Al completar todos los pasos y pasar a `review`, el orquestador despacha al subagente `rigorous-qa-auditor` en contexto limpio para certificar.
+**3. Sequential Supervision & Consolidation.** The orchestrator reviews the resulting diff, executes headless verification, and **only when green** consolidates changes and triggers step N+1. A builder sub-agent is never spawned in parallel with another mutating the same files. Upon completing all steps and transitioning to `review`, the orchestrator dispatches the `qa-auditor` sub-agent in a clean context to certify.
 
 > [!CAUTION]
-> SDD multi-paso es para **tareas de alta complejidad**. Para un bugfix puntual (Modo 1) es sobre-ingeniería: aplica el criterio Ponytail - la estructura existe para cuando el problema la amerita, no por defecto.
+> Multi-step SDD is intended for **high-complexity tasks**. For a targeted bugfix (Mode 1), it is over-engineering: apply the Honest Scope principle - organizational structure exists when the problem warrants it, not by default.
 
 ### 🔒 Workspace Isolation & Autonomous Inter-Agent Coordination (IACP)
 
 When two or more agents or sub-agents work on the same repository at the same time, **each one operates in its own git worktree on its own branch**, and nobody runs `git checkout` in the main working tree. `.git/HEAD` and the working tree are shared filesystem state: a cross-checkout silently switches the other agent's branch *while it is writing*, and its next commit lands on the wrong branch.
 
 > [!TIP]
-> En entornos con soporte nativo de subagentes (como Antigravity), el aislamiento de árbol puede activarse declarando `Workspace: "share"` en `invoke_subagent` (crea un espacio de trabajo compartiendo el repositorio subyacente similar a un git worktree sin duplicar almacenamiento). Para procesos manuales o agentes externos, usar la receta canónica de `git worktree add`.
+> In environments with native sub-agent support (such as Antigravity), workspace isolation can be enabled by setting `Workspace: "share"` in `invoke_subagent` (creating a workspace sharing the underlying repository similar to a Git worktree without duplicating storage). For manual workflows or external agents, use the canonical `git worktree add` recipe.
 
 #### 🤝 Dynamic Peer Discovery & Handshake Protocol
 
-Para evitar que los agentes colisionen a ciegas o requieran que el usuario actúe como intermediario de información:
+To prevent agents from colliding blindly or requiring human intervention as an information relay:
 
-1. **Pre-Flight Concurrency Probe (Sincrónico y Obligatorio):**  
-   Antes de editar código o alterar ramas, todo agente recién invocado consulta el backlog buscando ítems en `status: doing` y corre `git status --porcelain`.  
-   - Si detecta un ítem en `doing` con un `claimed_by` distinto de su propia identidad, **descubre dinámicamente la presencia de su par**.
-   - **Salvaguarda de Árbol Compartido:** Queda terminantemente prohibido ejecutar `git checkout .`, `git restore .` o `git clean` sobre un working tree con cambios en vuelo de otro agente.
+1. **Pre-Flight Concurrency Probe (Synchronous & Mandatory):**  
+   Before editing code or altering branches, every newly invoked agent inspects the backlog for items with `status: doing` and runs `git status --porcelain`.  
+   - If it detects an item in `doing` with a `claimed_by` different from its own identity, it **dynamically discovers its active peer**.
+   - **Shared Tree Safeguard:** Prohibited to execute `git checkout .`, `git restore .`, or `git clean` on a working tree with in-flight changes from another agent.
 2. **Dynamic Task Claiming Namespaced (`claimed_by`):**  
-   Al mover un ítem a `status: doing`, el agente estampa atómicamente su identidad completa en el frontmatter YAML bajo el formato canónico `<provider_o_harness>:<session_or_agent_id>`:
+   When moving an item to `status: doing`, the agent atomically stamps its complete identity in the YAML frontmatter under the canonical format `<provider_or_harness>:<session_or_agent_id>`:
    - `antigravity:7e5f1a7d-1f19-46fd-bb33-baa4c0394372`
    - `cursor:composer-b82f1...`
    - `claude-code:session_01...`
    - `copilot:run-4819...`
    - `human:pablo`  
-   El ítem en `doing` es la única fuente de verdad (Single Source of Truth) del lease activo.
+   The item in `doing` serves as the Single Source of Truth for the active lease.
 3. **Autonomous Peer Handshake & Cross-Harness Protocol:**  
-   - **Intra-Harness (mismo proveedor, ej: `antigravity:` a `antigravity:`):** Emite un mensaje directo (`send_message` a `Recipient: claimed_by`) informando su presencia y alcance para coordinar o secuencializar autónomamente sin intermediación humana.
-   - **Cross-Harness (proveedores heterogéneos, ej: Antigravity detecta `cursor:...` o `human:...`):** El agente reconoce la frontera de mensajería, omite llamadas RPC inviables, respeta el lease en curso, se auto-aísla inmediatamente en su propio `git worktree` y notifica al usuario en su canal de chat.
-4. **Auto-Bifurcación en Worktree:**  
-   Si las tareas tocan áreas disjuntas, el segundo agente **no toca el working tree principal**: crea automáticamente su worktree aislado (`git worktree add -b <branch> ../<repo>-<task>`) y consolida al finalizar.
+   - **Intra-Harness (same runtime, e.g., `antigravity:` to `antigravity:`):** Issues a direct message (`send_message` with `Recipient: claimed_by`) announcing its presence and scope to coordinate or sequence work autonomously without human intermediation.
+   - **Cross-Harness (heterogeneous providers, e.g., Antigravity detecting `cursor:...` or `human:...`):** The agent recognizes the messaging boundary, avoids failing RPC calls, respects the active lease, immediately self-isolates in its own `git worktree`, and notifies the user in chat.
+4. **Auto-Branching in Worktree:**  
+   If tasks touch disjoint areas, the second agent **never touches the main working tree**: it automatically creates an isolated worktree (`git worktree add -b <branch> ../<repo>-<task>`) and consolidates upon completion.
 
 > [!CAUTION]
-> **A worktree isolates the working tree, not the content.** Two agents editing the same file still collide at merge time. Filesystem isolation is not an integration strategy: when several items touch the same documents (`AGENTS.md`, `TEAM_PLAYBOOK.md`, `STATE_MACHINE.md`, one shared `SKILL.md`, CI/CD pipelines o releases), sequence them or split the scope per file *before* parallelizing. Operational recipe and coexistence rules in [`.agents/rules/git-workflow.md`](rules/git-workflow.md) § Multi-Agent Parallelism.
+> **A worktree isolates the working tree, not the content.** Two agents editing the same file still collide at merge time. Filesystem isolation is not an integration strategy: when several items touch the same documents (`AGENTS.md`, `TEAM_PLAYBOOK.md`, `STATE_MACHINE.md`, a shared `SKILL.md`, CI/CD pipelines, or releases), sequence them or split the scope per file *before* parallelizing. Operational recipe and coexistence rules in [`.agents/rules/git-workflow.md`](rules/git-workflow.md) § Multi-Agent Parallelism.
 
 ---
 
@@ -114,13 +114,13 @@ Para evitar que los agentes colisionen a ciegas o requieran que el usuario actú
 [ 3. Dev Execution ] (Principal Engineer) ─────────► status: (pool) ➔ doing ➔ review
           │
           ▼
-[ 4. QA Gate & Certification ] (Rigorous QA Auditor) ──► status: review ➔ ready (Formal Handover)
+[ 4. QA Gate & Certification ] (QA Auditor) ──► status: review ➔ ready (Formal Handover)
           │
           ▼
 [ 5. Release Management & Prod ] (PO + Delivery Lead) ──► status: ready ➔ done (Deployed)
 ```
 
-Transitions, actors and guards are specified in [STATE_MACHINE.md](STATE_MACHINE.md).
+Transitions, actors, and guards are specified in [STATE_MACHINE.md](STATE_MACHINE.md).
 
 ### Phase 1: Briefing & Alignment (PM Orchestrator / PO)
 - **Input:** Backlog item or user requirement.
@@ -137,7 +137,7 @@ Transitions, actors and guards are specified in [STATE_MACHINE.md](STATE_MACHINE
 - **Output:** Passes the item to `status: review` upon completing implementation and local testing. **Cannot self-certify:** moving to `ready` is exclusive to the QA Auditor.
 
 ### Phase 4: QA Gate (`review` ➔ `ready`) - Formal Handover in a Clean-Context Sub-Agent (QA Auditor)
-- **Mandatory Clean-Context Sub-Agent:** The thread that implemented the code **never** executes Phase 4. The `pm-orchestrator` spawns an isolated [`rigorous-qa-auditor`](skills/rigorous-qa-auditor/SKILL.md) sub-agent (`invoke_subagent`) with a clean context window, passing only the task path (ACs) and the `git diff`.
+- **Mandatory Clean-Context Sub-Agent:** The thread that implemented the code **never** executes Phase 4. The `pm-orchestrator` spawns an isolated [`qa-auditor`](skills/qa-auditor/SKILL.md) sub-agent (`invoke_subagent`) with a clean context window, passing only the task path (ACs) and the `git diff`.
 - **Action:** The QA sub-agent audits the item using the **Verification Pyramid (Zero-Waste Testing)** in strict sequence:
   1. ✅ `tsc --noEmit` / `npm run validate` (strict typing & repo consistency, 0 errors)
   2. ✅ Unit & integration tests (`npm test`, headless code 0)

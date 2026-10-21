@@ -49,11 +49,17 @@ const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
 
 /** Maps the human labels used in the skill table to the ids used by the gate. */
 const PYRAMID_ALIASES = {
+  // English labels (current canonical wording of the QA skill).
+  'strict typecheck': 'validate',
   typecheck: 'validate',
-  'typecheck estricto': 'validate',
-  'tests headless': 'test',
-  'tests unitarios y de integración': 'test',
   'headless tests': 'test',
+  'tests headless': 'test',
+  'spec - backlog consistency': 'spec',
+  'static ux audit': 'audit:ux',
+  'production build': 'build',
+  // Spanish labels (legacy wording, kept so older snapshots still validate).
+  'typecheck estricto': 'validate',
+  'tests unitarios y de integración': 'test',
   'consistencia spec ↔ backlog': 'spec',
   'auditoría estática de ux': 'audit:ux',
   'build de producción': 'build',
@@ -95,7 +101,7 @@ function checkManifest() {
 }
 
 function checkPyramidParity() {
-  const skillPath = '.agents/skills/rigorous-qa-auditor/SKILL.md';
+  const skillPath = '.agents/skills/qa-auditor/SKILL.md';
   const gatePath = 'scripts/gate-qa.mjs';
   if (!exists(skillPath) || !exists(gatePath)) return;
 
@@ -107,7 +113,7 @@ function checkPyramidParity() {
   }
 
   const gateSteps = [...table[1].matchAll(/id:\s*'([^']+)'/g)].map((m) => m[1]);
-  const documented = [...read(skillPath).matchAll(/^\|\s*\d+\s*\|\s*([^|]+?)\s*\|[^|]*\|\s*(Sí|No)/gm)];
+  const documented = [...read(skillPath).matchAll(/^\|\s*\d+\s*\|\s*([^|]+?)\s*\|[^|]*\|\s*(Sí|Yes)/gm)];
 
   if (!documented.length) {
     fail('pyramid', `${skillPath} no longer has a parseable pyramid table`);
@@ -115,7 +121,7 @@ function checkPyramidParity() {
   }
 
   for (const [, label, blocks] of documented) {
-    if (blocks !== 'Sí') continue;
+    if (blocks !== 'Sí' && blocks !== 'Yes') continue;
     const id = PYRAMID_ALIASES[label.trim().toLowerCase()] ?? label.trim().toLowerCase();
     if (!gateSteps.includes(id)) {
       fail(

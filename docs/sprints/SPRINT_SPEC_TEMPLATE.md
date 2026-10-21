@@ -7,10 +7,10 @@
 -->
 
 - **Status:** `[ ideas | draft | blocked | doing | review | ready | done | dismissed ]`
-- **Blocked Reason:** `[ obligatorio y no vacío si status: blocked; omitir en otros estados ]`
-- **Dismissed Reason:** `[ obligatorio y no vacío si status: dismissed; omitir en otros estados ]`
+- **Blocked Reason:** `[ required and non-empty when status: blocked; omit in other states ]`
+- **Dismissed Reason:** `[ required and non-empty when status: dismissed; omit in other states ]`
 - **Last transition:** `[ from → to ]` by `[ actor ]` - `[ YYYY-MM-DD ]`
-- **Refined:** `[ yes (YYYY-MM-DD) | no - falta: <qué> ]`
+- **Refined:** `[ yes (YYYY-MM-DD) | no - missing: <what> ]`
 - **Sprint:** `[ SPRINT-XXX ]`
 - **Backlog Item:** `[ ID ]`
 - **Date:** YYYY-MM-DD
@@ -18,26 +18,26 @@
 
 **Acceptance Criteria**
 
-| # | Criterio | Verification method | Estado |
+| # | Criterion | Verification method | Status |
 | :--- | :--- | :--- | :--- |
 | AC-1 | [measurable criterion] | [test / manual check] | `- [ ]` |
 | AC-2 | [measurable criterion] | [test / manual check] | `- [ ]` |
 
-> Ningún ítem pasa a `review` con ACs sin marcar. La certificación de QA (`review` → `ready`) exige la tabla completa en verde.
+> No item moves to `review` with unchecked ACs. QA certification (`review` → `ready`) requires the full table in green.
 
-**Refinement gate (R1)** - un ítem solo entra a `doing` con refinamiento aprobado:
+**Refinement Gate (R1)** - an item only enters `doing` with an approved refinement:
 
-- [ ] Statement de problema desde la perspectiva del usuario
-- [ ] Alcance acotado **y** out-of-scope explícito
-- [ ] ACs medibles
-- [ ] Prioridad asignada por el PO
-- [ ] Ambigüedades resueltas y registradas (Grilling Session completada)
-- [ ] Arquitectura y límites modulares validados (< 1000 LOC por archivo)
+- [ ] Problem statement from the user's perspective
+- [ ] Bounded scope **and** explicit out-of-scope
+- [ ] Measurable ACs
+- [ ] Priority assigned by the PO
+- [ ] Ambiguities resolved and recorded (Structured Refinement Gate completed)
+- [ ] Architecture and module boundaries validated (< 1000 LOC per file)
 
 ---
 
 ## 1. 🔍 [RESEARCH] Benchmarks & Edge Cases - Market Researcher
-> Análisis de referentes y patrones de interacción probados.
+> Analysis of reference products and proven interaction patterns.
 
 - **References Analyzed:**
 - **Prominent Interaction Patterns:**
@@ -47,7 +47,7 @@
 ---
 
 ## 2. 🎨 [DESIGN SPEC] Experience & Micro-Interactions - Product Designer
-> Anatomía visual, estados, movimiento y ergonomía táctil.
+> Visual anatomy, states, motion, and touch ergonomics.
 
 - **Tokens & Visual Hierarchy:**
 - **Touch Targets (≥ 44px) & Mobile Ergonomics:**
@@ -64,7 +64,7 @@
 ---
 
 ## 3. ⚙️ [TECH ARCHITECTURE] Implementation & Robustness - Principal Engineer
-> Modularidad, hooks, tipado estricto e integridad de esquema.
+> Modularity, hooks, strict typing, and schema integrity.
 
 - **Architecture & Boundaries (Architecture-First, < 1000 LOC):**
 - **Files Created / Modified:**
@@ -74,46 +74,46 @@
   - [ ] `typecheck` - 0 errors
   - [ ] tests - 0 failures
 
-> Al completar esta sección el ítem pasa a `status: doing` → `review` (T1).
+> When this section is complete the item moves to `status: doing` → `review` (T1).
 
 ---
 
-## 4. 🛡️ [QA MATRIX] Certification - Rigorous QA Auditor
-> Auditoría del ítem antes de certificarlo.
+## 4. 🛡️ [QA MATRIX] Certification - QA Auditor
+> Audit of the item before certifying it.
 
-**Verification Pyramid - orden estricto. Ningún paso se saltea.**
+**Verification Pyramid - strict order. No step is skipped.**
 
-1. [ ] **Typecheck estricto** - 0 errores
-2. [ ] **Tests headless** - 0 fallos
-3. [ ] **Consistencia spec ↔ backlog** - ACs, alcance y estado de commit coherentes
-4. [ ] **Build de producción** - limpio
+1. [ ] **Strict typecheck** - 0 errors
+2. [ ] **Headless tests** - 0 failures
+3. [ ] **Spec ↔ backlog consistency** - ACs, scope, and commit state are coherent
+4. [ ] **Production build** - clean
 
-**Auditoría estática de UX (headless, sin browser):**
+**Static UX audit (headless, no browser):**
 
-- [ ] `node scripts/audit-ux-code.cjs --strict` en verde
+- [ ] `node scripts/audit-ux-code.cjs --strict` exits green
 
-**Auditoría visual en navegador - solo para lo no deducible estáticamente:**
+**In-browser visual audit - only for what is not statically deducible:**
 
-- [ ] Layout / CSS responsive no deducible por análisis estático (viewport objetivo)
-- [ ] Consola del navegador sin errores
+- [ ] Responsive layout / CSS not deducible by static analysis (target viewport)
+- [ ] Browser console free of errors
 
 > [!IMPORTANT]
-> `browser_subagent` y DevTools están **prohibidos** para lógica, estado, contratos de API o persistencia: eso se resuelve headless en los pasos 1 - 4. Solo se abren para issues de CSS/layout no deducibles estáticamente o por pedido explícito del usuario.
+> `browser_subagent` and DevTools are **prohibited** for logic, state, API contracts, or persistence: that is resolved headlessly in steps 1 - 4. Open them only for CSS/layout issues that static analysis cannot deduce, or on an explicit user request.
 
-**Compuerta ejecutable - gate runner:**
+**Executable gate - gate runner:**
 
-- [ ] `node scripts/gate-qa.mjs <ID>` en verde (exit code 0 requerido para certificar)
+- [ ] `node scripts/gate-qa.mjs <ID>` exits green (exit code 0 required to certify)
 
 **Findings & Resolved Friction:**
 
 - **Verdict:** `[ APPROVED → ready | REJECTED → doing ]`
 
-> **T2 (`review` → `ready`) es exclusiva del QA Auditor.** El developer no auto-certifica. La certificación requiere exit code 0 del runner. Al rechazar, registrar los findings accionables y mover el ítem a `doing` (T3).
+> **T2 (`review` → `ready`) belongs exclusively to the QA Auditor.** The developer does not self-certify. Certification requires exit code 0 from the runner. On rejection, record the actionable findings and move the item to `doing` (T3).
 
 ---
 
 ## 5. 🚀 [RELEASE] Packaging & Deployment - Release Management
-> Llenar en el momento del release, no durante el sprint.
+> Fill in at release time, not during the sprint.
 
 - **Release Version:** `[ vX.Y.Z ]`
 - **Items included (`ready` only):** `[ BACKLOG-ID, ... ]`
@@ -121,19 +121,19 @@
 - **Deploy Target:**
 - **Changelog Entry:**
 
-> Los releases se arman **por valor entregado** agrupando ítems en `ready`, con o sin sprint activo, históricos o del sprint en curso. Sprints y releases no tienen acoplamiento 1:1.
+> Releases are assembled **by delivered value**, grouping `ready` items, with or without an active sprint, historical or from the current one. Sprints and releases have no 1:1 coupling.
 
-- [ ] Paquete desplegado en producción
-- [ ] Items transicionados `ready` → `done` (T4)
+- [ ] Package deployed to production
+- [ ] Items transitioned `ready` → `done` (T4)
 
-> **Invariante fundamental:** ningún ítem puede estar en producción sin estar en `done`.
+> **Fundamental invariant:** no item can be in production without being in `done`.
 
 ---
 
 ## 6. 🧠 [KNOWLEDGE FEED] System Memory
-> Llenar al cerrar el sprint o el release. Requiere comando explícito del PO.
+> Fill in when the sprint or the release closes. Requires an explicit PO command.
 
-- **Rule Added / Updated:** `[ AGENTS.md o .agents/rules/* ]`
+- **Rule Added / Updated:** `[ AGENTS.md or .agents/rules/* ]`
 - **Skill Updated:** `[ .agents/skills/* ]`
 - **ADR Recorded:** `[ path ]`
 - **Backlog Items Created from Tech Debt:**

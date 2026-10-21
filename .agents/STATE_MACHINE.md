@@ -1,125 +1,125 @@
-# State Machine del Delivery Flow
+# Delivery Flow State Machine
 
-> **Fuente de verdad única del delivery status.** `AGENTS.md`, `TEAM_PLAYBOOK.md`, el README y las sprint specs referencian este archivo. Ningún otro documento redefine la tabla: si cambiás una regla, cambiás acá.
+> **Single source of truth for delivery status.** `AGENTS.md`, `TEAM_PLAYBOOK.md`, `README.md`, and sprint specifications reference this file. No other document redefines the state table: if you change a rule, you change it here.
 
 ---
 
-## 1. Status y Taxonomía del Flujo
+## 1. Statuses and Flow Taxonomy
 
-El ciclo de vida del trabajo consta de estados claramente tipados y sin ambigüedades:
+The work lifecycle consists of clearly typed, unambiguous statuses:
 
-| Fase | Status | Significado | Dónde reside | Quién lo asigna |
+| Phase | Status | Meaning | Where it Lives | Assigned By |
 | :--- | :--- | :--- | :--- | :--- |
-| **Discovery** | `ideas` | Idea, hipótesis o investigación preliminar. | Pool / Discovery | PO / Diseñador |
-| **Backlog** | `draft` | **Tarea formal especificada y con ACs.** Lista para entrar a desarrollo. | Backlog (disco) | PO / Dev al crear la tarea |
-| **Delivery** | `blocked` | **Detenido por un impedimento externo declarado.** Requiere `blocked_reason`. | Backlog (disco) | PO / Dev |
-| **Delivery** | `doing` | En desarrollo activo. Único status con código escribiéndose. | Rama de trabajo | Principal Engineer / Agente |
-| **Delivery** | `review` | Implementación completa y tests locales en verde. Esperando certificación. | Rama de trabajo | Principal Engineer / Agente |
-| **Delivery** | `ready` | **Entrega formal del desarrollo (Línea de llegada del Dev/Agente).** Certificado bajo Pirámide. | Rama / Staging | **QA Auditor / Test Suite** |
-| **Producción** | `done` | **Desplegado en producción.** Empaquetado y publicado en release. | Producción / Tag | **Release Management / Deploy** |
-| **Fuera del flujo** | `dismissed` | **Descartado.** El ítem no va a existir: la premisa era falsa, el alcance quedó absorbed, o el PO decidió que no vale. No es un bloqueo ni un abandono. | Backlog (disco) | **PO / Release Management** |
+| **Discovery** | `ideas` | Idea, hypothesis, or preliminary investigation. | Pool / Discovery | PO / Designer |
+| **Backlog** | `draft` | **Formally specified task with ACs.** Ready for development. | Backlog (disk) | PO / Engineer upon task creation |
+| **Delivery** | `blocked` | **Halted due to a declared external impediment.** Requires `blocked_reason`. | Backlog (disk) | PO / Engineer |
+| **Delivery** | `doing` | In active development. The only status with code actively being written. | Working branch | Principal Engineer / Agent |
+| **Delivery** | `review` | Implementation complete and local tests green. Awaiting certification. | Working branch | Principal Engineer / Agent |
+| **Delivery** | `ready` | **Formal development delivery (developer/agent finish line).** Certified under Pyramid. | Branch / Staging | **QA Auditor / Test Suite** |
+| **Production** | `done` | **Deployed to production.** Packaged and published in a release. | Production / Tag | **Release Management / Deploy** |
+| **Out of Flow** | `dismissed` | **Dismissed.** The item will not exist: premise was false, scope was absorbed, or the PO decided it is no longer valuable. Not blocked or abandoned. | Backlog (disk) | **PO / Release Management** |
 
-### Reglas Fundamentales de Estado:
+### Fundamental State Rules:
 
-1. **El Backlog no es un valor de estado:** Es la **dimensión de planificación y el contenedor** de trabajo no iniciado. Toda tarea en el Backlog tiene asignado legítimamente el estado canónico `draft` (o `ideas` si es exploratoria).
-2. **Cero ítems sin estado:** Toda tarea que se crea en disco nace con `status: draft`. Dejar tareas sin estado o con status vacío colisiona con el tipado estricto (`ItemStatus`) y corrompe los filtros.
-3. **`ready` es la meta del desarrollador:** El trabajo de desarrollo y del agente concluye formalmente al certificar en `ready`. Un desarrollador o agente **NUNCA** mueve una tarea a `done` durante el desarrollo.
-4. **`done` exige deploy real:** El estado `done` se asigna exclusivamente cuando el Release Manager o el pipeline empaqueta la versión y la despliega a producción (el Release Assembler promueve automáticamente de `ready` a `done`). Marcar `done` sin deploy real es una mentira de estado.
-5. **`blocked` exige `blocked_reason`:** Toda tarea en `blocked` **debe** declarar en su frontmatter el campo `blocked_reason: "<motivo>"`. Sin motivo no es un bloqueo, es una tarea abandonada en `doing` que distorsiona el WIP real. El campo es obligatorio y no vacío.
-6. **`dismissed` requiere `dismissed_reason`:** Igual que `blocked`, un descarte sin motivo escrito es indistinguible de un ítem olvidado. El campo es obligatorio. Distinguir los dos importa: `blocked` es un impedimento con salida prevista; `dismissed` es una decisión de que el ítem no existe. Un ítem descartado **no** aparece en ningún release y **no** se cuenta como capacidad entregada.
+1. **The Backlog is not a status value:** It is the **planning dimension and container** for unstarted work. Every task in the Backlog holds the legitimate canonical status `draft` (or `ideas` if exploratory).
+2. **Zero items without a status:** Every task created on disk is born with `status: draft`. Leaving tasks without a status or with an empty status breaks strict typing (`ItemStatus`) and corrupts view filters.
+3. **`ready` is the developer finish line:** Development work for both human engineers and AI agents concludes formally upon certification into `ready`. An engineer or agent **NEVER** moves a task to `done` during development.
+4. **`done` requires an actual deployment:** The `done` status is assigned exclusively when Release Management or the release pipeline packages the release and deploys it to production (the Release Assembler automatically promotes `ready` ➔ `done`). Marking `done` without an actual deploy is a state lie.
+5. **`blocked` requires `blocked_reason`:** Every task moved to `blocked` **must** declare a non-empty `blocked_reason: "<reason>"` field in its YAML frontmatter. Without a reason, it is not a blockage; it is an abandoned task in `doing` distorting active WIP.
+6. **`dismissed` requires `dismissed_reason`:** Identical to `blocked`, a dismissal without an explicit written reason is indistinguishable from an abandoned item. The field is mandatory. Distinguishing the two is vital: `blocked` is a temporary impediment with an expected resolution; `dismissed` is a deliberate decision that the item will not exist. A dismissed item **never** appears in release notes and **never** counts toward delivered capacity.
 
 ---
 
-## 2. Refinement: un gate, no un estado
+## 2. Refinement: A Gate, Not a Status
 
-El refinamiento es una **condición de entrada**, no una etapa del flujo. Se modela como un flag en el ítem, no como un status.
+Refinement is an **entry condition**, not a workflow stage. It is modeled as a flag on the backlog item, not as a status token.
 
-**Gate R1 - un ítem solo puede entrar a `doing` si:**
-1. Tiene statement de problema (perspectiva del usuario, no del código).
-2. Tiene alcance acotado **y** out-of-scope explícito.
-3. Tiene ACs medibles. "Que quede lindo" no es un AC.
-4. Tiene Prioridad asignada por el PO.
-5. **Sus ambigüedades están resueltas y registradas.** Un ítem refinado por asunción del agente no pasó R1: la desalineación inicial no se detecta en QA, porque el QA valida contra ACs que nacieron de la premisa equivocada. El refinamiento exige una ronda de preguntas explícitas sobre casos borde, fallbacks, estados vacíos y tradeoffs, con las respuestas grabadas en el ítem. Detalle en la skill `pm-orchestrator` § Grilling Session.
+**Gate R1 - an item may enter `doing` only if:**
+1. It has a clear **problem statement** (from the user perspective, not code internals).
+2. It has a bounded scope **and** explicit out-of-scope boundaries.
+3. It has measurable acceptance criteria (ACs). "Make it look nice" is not an acceptance criterion.
+4. It has an assigned priority set by the Product Owner.
+5. **Its ambiguities are explicitly resolved and recorded.** An item refined by agent assumption fails Gate R1: initial misalignment cannot be caught by QA, because QA validates against acceptance criteria born from the wrong premise. Refinement demands an explicit inquiry round covering edge cases, fallbacks, empty states, and trade-offs, with answers recorded on the item. Detailed in skill [`pm-orchestrator`](skills/pm-orchestrator/SKILL.md) § Structured Refinement Interview.
 
-El flag se registra en el backlog del proyecto:
+The flag is recorded in the project backlog:
 
 ```markdown
-### [BACKLOG-001] Título en imperativo
-- **Refined:** yes (2026-10-04)   # o: no - falta: <qué>
+### [BACKLOG-001] Imperative task title
+- **Refined:** yes (2026-10-04)   # or: no - missing: <details>
 ```
 
-Un ítem no refinado permanece en `draft` (o `ideas` si es discovery) en el backlog. No puede entrar a `doing` hasta que se apruebe el Gate R1.
+An unrefined item remains in `draft` (or `ideas` if discovery) in the backlog. It cannot transition to `doing` until Gate R1 passes.
 
 ---
 
-## 3. Transiciones
+## 3. Transitions
 
-| # | De → A | Actor | Guard |
+| # | From → To | Actor | Guard |
 | :--- | :--- | :--- | :--- |
-| T0 | `draft` → `doing` | Principal Engineer | **Gate R1 aprobado** + priorizado por el PO + **todas las `dependencies:` en `done`** + registro atómico de `claimed_by: "<provider>:<session_or_agent_id>"` (ej: `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) en frontmatter + rama/worktree listos. |
-| T1 | `doing` → `review` | Principal Engineer | Código implementado, ACs marcadas `- [x]`, y pasos 1 - 2 de la Pirámide en verde local (`typecheck` + tests). |
-| T2 | `review` → `ready` | **QA Auditor (Subagente Aislado)** | Pirámide de Verificación completa en verde, **`npm run gate:qa` con exit code 0**, y **auditoría ciega del `git diff` ejecutada en un subagente con ventana de contexto limpia (`invoke_subagent`)**. Ni la prosa ni el mismo hilo que escribió el código pueden certificar. |
-| T3 | `review` → `doing` | QA Auditor (Subagente Aislado) | Rechazado, con findings accionables (`archivo:línea`) registrados en la QA Matrix. |
-| T4 | `ready` → `done` | Release Management | Paquete desplegado en producción. |
-| T5 | `doing` → `draft` | PO | Timebox del sprint expirado, o depriorizado explícitamente. |
-| T_block | `draft` → `blocked` | PO / Dev | Impedimento externo identificado. `blocked_reason` obligatorio. |
-| T_block | `doing` → `blocked` | PO / Dev | Impedimento externo identificado. `blocked_reason` obligatorio. |
-| T_unblock | `blocked` → `doing` / `draft` | PO / Dev | El impedimento fue resuelto **o** sus `dependencies:` quedaron en `done` o fueron **desvinculadas del array**. Una dependencia que no existe en disco no está desvinculada: sigue declarada. Verificable con `node scripts/gate-qa.mjs unblock <id>`. |
-| T_dismiss | `ideas` / `draft` / `doing` → `dismissed` | PO / Release Management | `dismissed_reason` obligatorio. Solo desde `ideas`, `draft` o `doing`: **nunca desde `ready`**, porque un ítem certificado no se descarta, se entrega o se revierte a `doing`. |
-| T_revive | `dismissed` → `draft` | PO | El descarte fue un error, o cambió la premisa. Vuelve al pool **conservando su refinamiento**, igual que todo retorno al pool. |
+| T0 | `draft` → `doing` | Principal Engineer | **Gate R1 approved** + prioritized by PO + **all `dependencies:` in `done`** + atomic registration of `claimed_by: "<provider>:<session_or_agent_id>"` (e.g., `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) in frontmatter + branch/worktree ready. |
+| T1 | `doing` → `review` | Principal Engineer | Code implemented, ACs checked (`- [x]`), and Pyramid steps 1 - 2 green locally (`typecheck` + tests). |
+| T2 | `review` → `ready` | **QA Auditor (Isolated Sub-Agent)** | Complete Verification Pyramid green, **`npm run gate:qa` exit code 0**, and **blind diff audit executed in an isolated clean-context sub-agent (`invoke_subagent`)**. Neither prose nor the coding thread may self-certify. |
+| T3 | `review` → `doing` | QA Auditor (Isolated Sub-Agent) | Rejected, with actionable findings (`file:line`) recorded in the QA Matrix. |
+| T4 | `ready` → `done` | Release Management | Package deployed to production. |
+| T5 | `doing` → `draft` | PO | Sprint timebox expired, or explicitly deprioritized. |
+| T_block | `draft` → `blocked` | PO / Dev | External impediment identified. Mandatory `blocked_reason`. |
+| T_block | `doing` → `blocked` | PO / Dev | External impediment identified. Mandatory `blocked_reason`. |
+| T_unblock | `blocked` → `doing` / `draft` | PO / Dev | Impediment resolved **or** all `dependencies:` reached `done` or were **explicitly unlinked from the array**. A dependency missing on disk is not unlinked: it remains declared. Verified with `node scripts/gate-qa.mjs unblock <id>`. |
+| T_dismiss | `ideas` / `draft` / `doing` → `dismissed` | PO / Release Management | Mandatory `dismissed_reason`. Allowed only from `ideas`, `draft`, or `doing`: **never from `ready`**, because a certified item is delivered or reverted to `doing`, never dismissed. |
+| T_revive | `dismissed` → `draft` | PO | Dismissal was made in error, or premise evolved. Returns to the pool **retaining its prior refinement**, consistent with any return to the pool. |
 
 ---
 
-## 4. Invariantes
+## 4. Invariants
 
-1. **Producción ⊆ `done`.** Ningún ítem puede estar en producción sin estar en `done`. Violarlo es un incidente de proceso, no un detalle de bookkeeping.
-2. **El developer no auto-certifica (Aislamiento de Contexto Obligatorio).** T2 (`review` → `ready`) es exclusiva del QA Auditor corriendo en un **subagente con ventana de contexto limpia (`invoke_subagent`)**. El hilo o subagente que implementó el código jamás mueve su propio ítem a `ready`.
-3. **`ready` es inmutable.** Una vez certificado, el código no se modifica sin volver a `doing`. Un fix post-QA **invalida la certificación**: el ítem vuelve a `doing` y reingresa por T1/T2 completas.
-4. **T4 exige deploy real.** Marcar `done` sin desplegar es una mentira de estado.
-5. **Ni sprint ni retrospectiva se cierran por deducción.** Requieren comando textual explícito del PO.
-6. **El refinamiento nunca se pierde.** Un ítem que vuelve al pool conserva su registro de refinamiento; no se re-refina desde cero.
-7. **`ready` se gana con doble compuerta (Mecánica + Subagente Ciego).** La transición T2 requiere exit code 0 de `npm run gate:qa` **más** la revisión del `git diff` contra las ACs en un subagente QA sin el historial de desarrollo. Un agente que simule el rol de QA en el mismo hilo en que escribió el código está violando este invariante, por bienintencionado que sea.
-8. **Ninguna dependencia se cumple por intuición.** Un ítem no entra a `doing` ni se certifica en `ready` mientras alguna tarea de su `dependencies:` no esté en `done`. La desvinculación de una dependencia es un acto explícito y queda registrada, no una omisión silenciosa.
-9. **Pre-Flight Concurrency Probe & Dynamic Claiming:** Ningún agente inicia modificaciones de código ni altera ramas sin ejecutar previamente el probe de concurrencia sincrónico (`status: doing` en backlog y `git status`). Al tomar una tarea, estampa atómicamente en el frontmatter `claimed_by: "<provider>:<session_or_agent_id>"` (ej: `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`). Si existe una tarea en `doing` con `claimed_by` ajeno, **queda terminantemente prohibido ejecutar `git restore .`, `git checkout .` o `git clean` sobre el árbol de trabajo compartido**. La coordinación entre agentes pares se canaliza autónomamente: si comparten harness (ej: `antigravity:` a `antigravity:`), se comunican vía `send_message`; si pertenecen a proveedores heterogéneos (`cursor:`, `claude-code:`, `human:`), el agente detecta la barrera de mensajería, respeta el lease sin emitir RPC fallido y se auto-aísla mecánicamente mediante `git worktree`.
-
----
-
-## 5. Release management desacoplado
-
-- Sprints y releases **no** tienen acoplamiento 1:1.
-- Un release se arma agrupando ítems en `ready`, estén o no en el sprint activo, y sean históricos o del sprint en curso.
-- El criterio de agrupación es **valor entregado**, no fecha.
-- El `CHANGELOG` del release lista los ítems por su ID de backlog.
+1. **Production ⊆ `done`.** No item can exist in production without being in `done`. Violating this is a process incident, not a bookkeeping detail.
+2. **Developers Never Self-Certify (Mandatory Context Isolation).** Transition T2 (`review` → `ready`) is exclusive to the QA Auditor running in an **isolated clean-context sub-agent (`invoke_subagent`)**. The thread or sub-agent that implemented the code never promotes its own item to `ready`.
+3. **`ready` is immutable.** Once certified, code is not modified without returning to `doing`. A post-QA fix **invalidates certification**: the item returns to `doing` and must traverse full T1/T2 cycles again.
+4. **T4 requires an actual deployment.** Marking `done` without deploying is a state lie.
+5. **Sprints and retrospectives never close by deduction.** Both require explicit, textual commands from the Product Owner.
+6. **Refinement is never lost.** An item returning to the backlog pool retains its refinement record; it is not re-refined from scratch.
+7. **`ready` is earned via Double Gate (Mechanical Runner + Blind Sub-Agent).** Transition T2 requires exit code 0 from `npm run gate:qa` **plus** an independent review of the `git diff` against acceptance criteria in a clean QA sub-agent without developer bias. An agent simulating QA in the coding thread violates this invariant, regardless of intent.
+8. **Dependencies are never assumed.** An item cannot enter `doing` or certify into `ready` while any task in its `dependencies:` array is not in `done`. Unlinking a dependency requires an explicit modification of the array, never a silent omission.
+9. **Pre-Flight Concurrency Probe & Dynamic Claiming:** No agent starts code changes or creates branches without first running the synchronous concurrency probe (`status: doing` in backlog and `git status`). Upon claiming a task, it atomically stamps `claimed_by: "<provider>:<session_or_agent_id>"` (e.g., `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) in the frontmatter. If an item in `doing` is claimed by another actor, **it is strictly prohibited to execute `git restore .`, `git checkout .`, or `git clean` on the shared working tree**. Coordination across peer agents proceeds autonomously: if sharing a harness (e.g., `antigravity:` to `antigravity:`), communicate via `send_message`; if across heterogeneous providers (`cursor:`, `claude-code:`, `human:`), recognize the messaging boundary, respect the active lease without attempting failing RPC calls, and self-isolate mechanically via `git worktree`.
 
 ---
 
-## 6. Cómo se refleja en una sprint spec
+## 5. Decoupled Release Management
 
-El campo `Status:` de `docs/sprints/SPRINT-XXX.md` o del frontmatter de tareas usa **exactamente** uno de estos valores canónicos en minúsculas:
+- Sprints and releases have **no 1:1 coupling**.
+- A release is assembled by grouping items in `ready`, whether from the active sprint or historical backlog.
+- Grouping criteria is **delivered value**, not arbitrary calendar dates.
+- The release `CHANGELOG` lists all included items by their canonical backlog ID.
+
+---
+
+## 6. Sprint Specification Representation
+
+The `Status:` field in `docs/sprints/SPRINT-XXX.md` or task frontmatter uses **exactly** one of these lowercase canonical values:
 
 ```
 ideas | draft | blocked | doing | review | ready | done | dismissed
 ```
 
-Una tarea en `blocked` o en `dismissed` declara además su motivo en el frontmatter:
+Tasks in `blocked` or `dismissed` declare their reason in the YAML frontmatter:
 
 ```markdown
 ---
 id: TASK-ID
 status: blocked
-blocked_reason: "Bloqueada: el servicio upstream / API externa no define el contrato de idempotencia"
+blocked_reason: "Blocked: upstream service does not yet expose an idempotent retry contract"
 ---
 
 ---
 id: TASK-ID
 status: dismissed
-dismissed_reason: "Descartado: la premisa era falsa, el módulo ya no existe en el producto"
+dismissed_reason: "Dismissed: premise was invalid; module is deprecated in architecture"
 ---
 ```
 
-Y registra la transición operada cuando aplique:
+And record the transition in task notes when applicable:
 
 ```markdown
 - **Status:** `review`
-- **Last transition:** `review` → `ready` por QA Auditor (2026-10-04)
+- **Last transition:** `review` → `ready` by QA Auditor (2026-10-04)
 ```

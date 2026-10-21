@@ -1,90 +1,90 @@
-# DOMAIN.md - Glosario Ubicuo de Dominio
+# DOMAIN.md - Ubiquitous Domain Glossary
 
-> Plantilla **opt-in** para proyectos que adoptan el playbook. No es obligatoria: un proyecto sin glosario sigue siendo válido. Se recomienda cuando dos o más agentes trabajen sobre el mismo dominio.
+> **Opt-in** template for projects that adopt the playbook. It is not mandatory: a project without a glossary is still valid. It is recommended when two or more agents work on the same domain.
 
-Copiar como `DOMAIN.md` en la raíz del proyecto y completar.
-
----
-
-## Por qué existe
-
-Un glosario de dominio no es documentación. Es una **palanca de concisión y precisión**:
-
-1. **Concisión.** El término canónico reemplaza el párrafo. "Una reserva se cancela" dice más que tres líneas explicando el flujo de cancelación.
-2. **Precisión.** Evita alucinaciones conceptuales: el agente no inventa un concepto que el proyecto ya nombró de otra manera.
-
-Cuando existe, los agentes lo consultan **antes de usar un término**, y usan el vocabulario canónico en código, mensajes de commit, ACs y conversaciones.
+Copy as `DOMAIN.md` in the project root and fill it in.
 
 ---
 
-## Cómo escribir una entrada
+## Why it exists
 
-Cada concepto sigue la misma plantilla. La disciplina es lo que lo hace útil: sin la regla del nombre, el glosario degenera en un documento más.
+A domain glossary is not documentation. It is a **lever for concision and precision**:
+
+1. **Concision.** The canonical term replaces the paragraph. "A reservation cancels" says more than three lines explaining the cancellation flow.
+2. **Precision.** It prevents conceptual hallucinations: the agent does not invent a concept the project has already named differently.
+
+When it exists, agents consult it **before using a term**, and use the canonical vocabulary in code, commit messages, ACs, and conversations.
+
+---
+
+## How to write an entry
+
+Every concept follows the same template. The discipline is what makes it useful: without the name rule, the glossary degenerates into one more document.
 
 ```markdown
-### <Término canónico en PascalCase o snake_case>
+### <Canonical term in PascalCase or snake_case>
 
-**Qué es:** Una frase. El significado operativo, no la definición de diccionario.
+**What it is:** One sentence. The operational meaning, not the dictionary definition.
 
-**Por qué existe:** El problema del usuario que existe. Si no hay problema, no hay término.
+**Why it exists:** The user problem that exists. If there is no problem, there is no term.
 
-**No es:** El concepto parece gemelo y no lo es. Esta línea es la que más valor entrega:
-previene la confusión con el término vecino.
+**It is not:** The concept that looks like a twin and is not. This line delivers the most value:
+it prevents confusion with the neighbouring term.
 
-**Ejemplo:** Un caso concreto y real del dominio.
+**Example:** One concrete, real case from the domain.
 ```
 
-### Reglas
+### Rules
 
-| Regla | Por qué |
+| Rule | Why |
 | :--- | :--- |
-| **El nombre es el identificador del código.** El término canónico se usa literal en variables, tipos y funciones. Si el nombre del glosario y el del código difieren, uno de los dos está mal. |
-| **"No es" es obligatorio.** El error más caro en un dominio es la confusión entre dos conceptos vecinos. |
-| **Un término, un significado.** Si necesita dos significados, son dos términos. |
-| **Sin sinónimos.** Si dos palabras significan lo mismo, queda una. |
-| **Ejemplos reales, no inventados.** Un ejemplo fabricado es peor que ningún ejemplo. |
-| **Fecha de revisión.** Los glosarios envejecen mal. Un término sin verificar en seis meses es una fuente de alucinación. |
+| **The name is the code identifier.** The canonical term is used literally in variables, types, and functions. If the glossary name and the code name differ, one of the two is wrong. |
+| **"It is not" is mandatory.** The most expensive mistake in a domain is confusing two neighbouring concepts. |
+| **One term, one meaning.** If it needs two meanings, they are two terms. |
+| **No synonyms.** If two words mean the same thing, one of them goes. |
+| **Real examples, not invented ones.** A fabricated example is worse than no example. |
+| **Revision date.** Glossaries age badly. A term not verified in six months is a hallucination source. |
 
 > [!CAUTION]
-> **Un glosario desactualizado es peor que no tener glosario.** Un término que ya no se usa induces al agente a usar código muerto. Cuando un término deja de ser parte del dominio, se **borra**; no se marca como obsoleto.
+> **A stale glossary is worse than no glossary.** A term that is no longer used induces the agent to write dead code. When a term stops being part of the domain, it is **deleted**; it is not marked as obsolete.
 
 ---
 
-## Estructura del archivo
+## File structure
 
 ```markdown
-# Domain - <Nombre del Producto>
+# Domain - <Product Name>
 
-<!-- Actualizado por última vez: YYYY-MM-DD por <rol> -->
+<!-- Last updated: YYYY-MM-DD by <role> -->
 
-## Glosario
+## Glossary
 
 ### Booking
 ### Guest
 ### Reservation
 ### Cancellation
 
-## Invariantes del dominio
+## Domain Invariants
 
-<!-- Reglas que no se negocian. Cross-reference a las de .agents/rules/ si ya existen. -->
+<!-- Non-negotiable rules. Cross-reference .agents/rules/ if they already exist. -->
 
-- Una reserva no puede solaparse con otra para la misma habitación.
-- Cancelar una reserva libera el inventario de forma atómica.
+- A reservation cannot overlap another reservation for the same room.
+- Cancelling a reservation releases the inventory atomically.
 
-## Lenguaje prohibido
+## Banned Language
 
-<!-- Palabras que el proyecto NO usa, para evitar que el agente las reintroduzca. -->
+<!-- Words the project does NOT use, so the agent does not reintroduce them. -->
 
-| No usar | Usar en su lugar | Por qué |
+| Do not use | Use instead | Why |
 | :--- | :--- | :--- |
-| "usuario" | "guest" | Un usuario puede ser staff; un guest no. |
-| "pedido" | "order" | Terminología del dominio, no de la plataforma. |
+| "user" | "guest" | A user may be staff; a guest never is. |
+| "purchase" | "order" | Domain terminology, not platform terminology. |
 ```
 
 ---
 
-## Mantenimiento
+## Maintenance
 
-- **Lo escribe el PO**, no el agente. El agente puede proponer entradas, pero el vocabulario del negocio es una decisión de producto.
-- **Se actualiza con el dominio, no con el sprint.** Si el glosario cambia cada sprint, no era un glosario: era un changelog.
-- **El agente señala las brechas.** Si encontrás un concepto del proyecto que no está en el glosario y lo usás dos o más veces, es una entrada faltante: proponela.
+- **The PO writes it**, not the agent. The agent may propose entries, but business vocabulary is a product decision.
+- **It is updated with the domain, not with the sprint.** If the glossary changes every sprint, it was not a glossary: it was a changelog.
+- **The agent flags the gaps.** If you find a project concept that is not in the glossary and you use it two or more times, it is a missing entry: propose it.

@@ -1,6 +1,6 @@
 # ⚡ Gripm Playbook
 
-> **Autonomous multi-agent agile framework for modern software development: dynamic modes, decoupled releases, and a single-threaded execution model.**
+> **A delivery pipeline your AI agents cannot argue with: one command installs it, a mechanical gate certifies every item, and the agent that wrote the code never certifies itself.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/pablojavierrodriguez/gripm-playbook/pulls)
@@ -41,16 +41,16 @@ Both extremes fail in real software engineering:
                                              │
              ┌───────────────────────────────┼───────────────────────────────┐
              ▼                               ▼                               ▼
-  [ principal-engineer ]          [ rigorous-qa-auditor ]     [ worldclass-product-designer ]
+  [ principal-engineer ]          [ qa-auditor ]     [ product-designer ]
   • Strict typing                 • Verification Pyramid      • Touch ergonomics ≥44px
   • Domain invariants             • tsc + headless tests      • Semantic token system
   • Sequential Git mutations      • Zero unrequested commits  • Micro-interactions
 ```
 
-- **Default entry point (`pm-orchestrator`).** Unless you explicitly invoke another role directly, every conversation starts with the Orchestrator leading the Grilling Session and selecting the operating mode.
+- **Default entry point (`pm-orchestrator`).** Unless you explicitly invoke another role directly, every conversation starts with the Orchestrator leading the Structured Refinement Gate and selecting the operating mode.
 - **Skills are isolated operational contracts.** Each skill in `.agents/skills/` is loaded into a fresh sub-agent context when dispatched via `invoke_subagent`, keeping the main thread clean.
 - **Sequential writer discipline.** Domain logic, schemas and Git mutations run sequentially (one active writer per scope, or isolated via `git worktree`) to prevent races.
-- **Blind QA certification in a virgin context.** Transition T2 (`review` → `ready`) **never** runs in the coder's thread: a clean-context `rigorous-qa-auditor` sub-agent receives only the task ACs and the `git diff`, runs `npm run gate:qa <ID>` (`exit 0`), and audits the diff without confirmation bias.
+- **Blind QA certification in a virgin context.** Transition T2 (`review` → `ready`) **never** runs in the coder's thread: a clean-context `qa-auditor` sub-agent receives only the task ACs and the `git diff`, runs `npm run gate:qa <ID>` (`exit 0`), and audits the diff without confirmation bias.
 
 ### ⚖️ Swarms vs. Same-Thread Roleplay vs. This Playbook
 
@@ -97,14 +97,14 @@ Full specification, with actors and guards: **[`.agents/STATE_MACHINE.md`](.agen
 [ 1. Discovery & PM ] (pm-orchestrator)            refinement gate (R1)
               │
               ▼
-[ 2. Research & Design ] (market-researcher + worldclass-product-designer)
+[ 2. Research & Design ] (market-researcher + product-designer)
               │
               ▼
 [ 3. Dev Execution ] (principal-engineer) ────────► status: draft → doing → review
               │                                                ▲         │
               │                                                └─blocked─┘
               ▼
-[ 4. QA Certification ] (rigorous-qa-auditor) ────► status: review → ready   ← formal handover (npm run gate:qa)
+[ 4. QA Certification ] (qa-auditor) ────► status: review → ready   ← formal handover (npm run gate:qa)
               │
               ▼
 [ 5. Release & Prod ] (PO + Delivery Lead) ───────► status: ready → done     ← after a real deploy
@@ -113,7 +113,7 @@ Full specification, with actors and guards: **[`.agents/STATE_MACHINE.md`](.agen
 **The canonical status vocabulary lives in [`.agents/STATE_MACHINE.md`](.agents/STATE_MACHINE.md): `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`.**
 
 - **The backlog is a planning container, not a status.** Every item on disk starts in `draft` (or `ideas` for unrefined discovery); zero items exist without a status.
-- **Refinement is an interactive gate (R1), not a state.** Requires a Grilling Session to resolve edge cases, fallbacks, empty states and tradeoffs before entering `doing` (`node scripts/gate-qa.mjs start <ID>`).
+- **Refinement is an interactive gate (R1), not a state.** Requires a Structured Refinement Gate to resolve edge cases, fallbacks, empty states and tradeoffs before entering `doing` (`node scripts/gate-qa.mjs start <ID>`).
 - **`blocked` requires `blocked_reason`.** Halts WIP inflation; unblocking (`T_unblock`) requires resolving the impediment or dependencies and is executed mechanically via `node scripts/gate-qa.mjs unblock <ID>`.
 - **`dismissed` requires `dismissed_reason`.** Formal decision that an item will not exist; items in `ready` are never dismissed.
 - **`ready` is the formal delivery of development.** Only the clean-context QA Auditor sub-agent can certify `review → ready`, where `npm run gate:qa <ID>` (exit code 0) mutates `status: ready` on disk; a developer never self-certifies.
@@ -135,9 +135,9 @@ The framework is deliberately split so that installing it does not impose a stac
 | :--- | :--- |
 | `pm-orchestrator` | Sprint leadership, refinement gate, PO sovereignty |
 | `market-researcher` | Benchmarks and domain edge cases |
-| `worldclass-product-designer` | Visual hierarchy, tokens, touch ergonomics, states |
+| `product-designer` | Visual hierarchy, tokens, touch ergonomics, states |
 | `principal-engineer` | Architecture, invariants, strict typing, performance |
-| `rigorous-qa-auditor` | Verification Pyramid, a11y, certification authority |
+| `qa-auditor` | Verification Pyramid, a11y, certification authority |
 | `code-level-ux-auditor` | 13 static UX signatures + the `audit-ux` CLI |
 
 ### Stack packs - installed on demand
@@ -163,9 +163,9 @@ The core layer is validated to contain **zero** references to any specific produ
 │   ├── skills/                    # CORE - stack agnostic, always installed
 │   │   ├── pm-orchestrator/SKILL.md
 │   │   ├── market-researcher/SKILL.md
-│   │   ├── worldclass-product-designer/SKILL.md
+│   │   ├── product-designer/SKILL.md
 │   │   ├── principal-engineer/SKILL.md
-│   │   ├── rigorous-qa-auditor/SKILL.md
+│   │   ├── qa-auditor/SKILL.md
 │   │   └── code-level-ux-auditor/SKILL.md
 │   └── stacks/                    # OPTIONAL - installed with --stack <name>
 │       ├── react/{STACK.md, skills/…}
@@ -177,8 +177,9 @@ The core layer is validated to contain **zero** references to any specific produ
 │   ├── gate-review-items.mjs      # CI entry point: gates all items in review
 │   ├── ux-rules.json              # Rule catalog - single source of truth
 │   ├── sync-playbook.mjs          # Installer / updater (with parity check)
+│   ├── init.mjs                   # Onboarding wizard + harness adapters
 │   └── validate-repo.mjs          # Self-consistency guardian
-├── tests/                         # Test suite (node:test, 128 tests across 30 suites)
+├── tests/                         # Test suite (node:test, 332 tests across 72 suites)
 ├── backlog/tasks/                 # Item pool, Backlog.md format (PLAY- prefix)
 ├── docs/
 │   ├── BACKLOG.md                 # Backlog convention → items live in backlog/tasks/
@@ -195,22 +196,32 @@ The core layer is validated to contain **zero** references to any specific produ
 
 ## 🚀 Quickstart
 
+### ⚡ 30 seconds
+
+```bash
+npx @gripm/playbook init
+```
+
+The wizard detects your stack from `package.json`, installs the framework, and gives your agent its native instructions: `AGENTS.md` for Antigravity, `.cursor/rules/*.mdc` for Cursor, `CLAUDE.md` for Claude Code. It also parametrizes `AGENTS.md` with your project name, stack and language, so no placeholder is left for you to fill in by hand.
+
+Useful flags: `--yes` (accept every default, no prompts), `--stack <name>`, `--harness <name>`, `--name <name>`, `--lang en|es`, `--no-board`, `--force`, `--help`.
+
+> [!IMPORTANT]
+> The wizard never overwrites what a human wrote. A hand-edited `AGENTS.md` is always kept, even with `--force`. Generated artifacts that already exist (`CLAUDE.md`, `.cursor/rules/*.mdc`, `.gripm/config.json`) are reported as protected and kept, and `--force` is what allows the wizard to regenerate them.
+
 ### Option A - Project-level install (recommended)
 
 ```bash
 git clone https://github.com/pablojavierrodriguez/gripm-playbook.git temp-playbook
-cp -r temp-playbook/.agents temp-playbook/docs temp-playbook/AGENTS.md ./
-cp temp-playbook/scripts/sync-playbook.mjs temp-playbook/scripts/audit-ux-code.cjs \
-   temp-playbook/scripts/ux-rules.json temp-playbook/scripts/validate-repo.mjs scripts/ 2>/dev/null
+cp -r temp-playbook/.agents temp-playbook/docs temp-playbook/scripts temp-playbook/AGENTS.md ./
 rm -rf temp-playbook
 ```
 
-Then open `AGENTS.md` and fill in the **Tech Stack** and **Language** placeholders.
-
-Add stack packs only if you need them:
+Then run the wizard once: it installs the stack packs and parametrizes `AGENTS.md` for your project.
 
 ```bash
-node scripts/sync-playbook.mjs --stack react --stack mobile
+node scripts/init.mjs                       # interactive
+node scripts/init.mjs --stack react --yes   # non-interactive
 node scripts/sync-playbook.mjs --list-stacks
 ```
 
@@ -355,7 +366,7 @@ Adding a signature means editing `scripts/ux-rules.json` **and** documenting it 
 | Role | Recommended MCP | Unlocks |
 | :--- | :--- | :--- |
 | **PM Orchestrator & Principal Engineer** | GitHub MCP | Read backlog issues, inspect PR diffs, draft releases from the repo |
-| **Rigorous QA Auditor** | Chrome DevTools / Puppeteer MCP | Viewport resizing (375px), a11y auditing, console error detection |
+| **QA Auditor** | Chrome DevTools / Puppeteer MCP | Viewport resizing (375px), a11y auditing, console error detection |
 | **Principal Engineer** | Postgres / Database MCP | Live schema inspection, migration verification, query tuning |
 | **All roles** | Filesystem MCP | Fast traversal of large monorepos |
 
@@ -370,9 +381,9 @@ The framework holds itself to its own standard:
 
 ```bash
 npm run validate     # manifest ⇄ disk, fallback parity, rule catalog ⇄ skill docs, core purity, links, status vocabulary
-npm test             # 128 tests over rule engine, sync layer, gate runner and repo validator
+npm test             # 332 tests over rule engine, sync layer, gate runner, repo validator and onboarding CLI
 npm run gate:review  # verifies every item in review satisfies the executable gate
-npm run check:all    # validate + test
+npm run check:all    # validate + check:loc + test
 ```
 
 ---
@@ -391,22 +402,22 @@ npm run check:all    # validate + test
 
 ---
 
-## 🇪🇸 Resumen en Español
+## 🌐 Framework Summary
 
-**Agentic Team Playbook** es un framework de gobernanza y delivery ágil para assistants de IA:
+**Gripm Playbook** is an agile governance and delivery framework for AI coding assistants:
 
-- **Autonomía sin burocracia:** clasificación dinámica entre *Foco Quirúrgico* (fixes directos), *Dúo Táctico* (UX + código) y *Sprint & Backlog Flow* (loop formal).
-- **Orquestador por defecto + Subagentes de Contexto Limpio:** cada conversación inicia por defecto con el `pm-orchestrator` (salvo invocación directa de otro rol), quien conduce la Grilling Session y despacha subagentes aislados (`invoke_subagent`) con contratos explícitos para Research, Diseño, Ingeniería (SDD) y QA. Aislamiento multi-agente mediante `git worktree` y protocolo sincrónico de Peer Discovery (`claimed_by`).
-- **Vocabulario canónico de estados:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`. **El backlog es el pool de planificación, no un status**, y el **refinamiento es un gate interactivo (R1)** (Grilling Session para despejar ambigüedades, apoyado en el glosario de dominio `DOMAIN.md`).
-- **Estados `blocked` y `dismissed`:** motivos obligatorios y no vacíos (`blocked_reason` / `dismissed_reason`). Resolución estricta de dependencias comprobable mecánicamente con `gate-qa.mjs unblock <ID>`.
-- **`ready` es la entrega formal con Doble Compuerta:** solo un subagente `rigorous-qa-auditor` en **ventana de contexto limpia** mueve `review → ready`, respaldado por exit code 0 de `npm run gate:qa` y una auditoría ciega del `git diff` contra las ACs. El hilo que escribió el código jamás se auto-certifica.
-- **Disciplina senior (Ponytail):** diff mínimo viable, reutilización previa obligatoria, mapeo de blast radius y cierre honesto.
-- **Filtro Anti-Slop:** higiene de comentarios, prohibición de evasión de tipos (`as unknown as`), receta Oxlint y Purpose Test en diseño y copy.
-- **Invariante fundamental:** ningún ítem puede estar en producción sin estar en `done`, y marcar `done` sin deploy real es una mentira de estado.
-- **Desacople Sprint ↔ Release:** los releases se arman por valor entregado con ítems en `ready`, con o sin sprint activo.
-- **Pirámide de Verificación:** typecheck → tests headless → consistencia de spec/backlog → build → auditoría UX estática (con soporte de i18n y baselines portables POSIX). Browser subagents prohibidos para lógica, estado, API o persistencia.
-- **Dos capas:** *core* agnóstico de stack (siempre instalado) + *stack packs* opcionales (`react`, `mobile`, `pwa`). El core se valida como libre de referencias a producto o backend.
-- **Sync no destructivo:** `AGENTS.md` nunca se sobrescribe; las customizaciones locales se detectan por hash, se reportan como `[Protected]` y exigen `--force`; todo overwrite queda respaldado.
+- **Autonomy without bureaucracy:** dynamic classification between *Surgical Focus* (direct fixes), *Tactical Duo* (UX + code), and *Full Sprint Flow* (formal agile loop).
+- **Hub Orchestrator + Clean-Context Sub-Agents:** every conversation starts with `pm-orchestrator` by default (unless another role is explicitly invoked), who conducts the Structured Refinement Gate and dispatches isolated sub-agents (`invoke_subagent`) with explicit contracts for Research, Design, Engineering (SDD) and QA. Multi-agent isolation via `git worktree` and synchronous Peer Discovery protocol (`claimed_by`).
+- **Canonical status vocabulary:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`. **The backlog is the planning pool, not a status**, and **refinement is an interactive gate (R1)** that clears edge cases, fallbacks, and tradeoffs before entering `doing`.
+- **`blocked` and `dismissed` require mandatory, non-empty reasons** (`blocked_reason` / `dismissed_reason`). Strict dependency resolution enforced mechanically via `gate-qa.mjs unblock <ID>`.
+- **`ready` is the formal developer delivery gate:** only a `qa-auditor` sub-agent running in a **clean context window** moves `review → ready`, backed by exit code 0 from `npm run gate:qa` and a blind audit of the `git diff` against the ACs. The thread that wrote the code never self-certifies.
+- **Senior engineering discipline:** minimum viable diff, mandatory reuse of existing utilities, blast radius mapping before every edit, and Honest Scope & Residual Risk Declaration at the close of every intervention.
+- **Anti-Slop filter:** comment hygiene, prohibition of type escape patterns (`as unknown as`), Oxlint recipe, and Purpose Test on design and copy.
+- **Fundamental invariant:** no item can exist in production without being in `done`, and marking `done` without an actual deploy is a state lie.
+- **Decoupled Sprint - Release:** releases are assembled by delivered value from `ready` items, with or without an active sprint.
+- **Verification Pyramid:** typecheck → headless tests → spec/backlog consistency → build → static UX audit (with i18n support and portable POSIX baselines). Browser sub-agents prohibited for logic, state, API or persistence verification.
+- **Two layers:** *core* stack-agnostic layer (always installed) + optional *stack packs* (`react`, `mobile`, `pwa`). The core is validated to contain zero product or backend references.
+- **Non-destructive sync:** `AGENTS.md` is never overwritten; local customizations are detected by hash, reported as `[Protected]`, and protected on every subsequent run until `--force`; every overwrite is backed up.
 
 ---
 
