@@ -89,7 +89,7 @@ To prevent agents from colliding blindly or requiring human intervention as an i
    - `cursor:composer-b82f1...`
    - `claude-code:session_01...`
    - `copilot:run-4819...`
-   - `human:pablo`  
+   - `human:<username>`  
    The item in `doing` serves as the Single Source of Truth for the active lease.
 3. **Autonomous Peer Handshake & Cross-Harness Protocol:**  
    - **Intra-Harness (same runtime, e.g., `antigravity:` to `antigravity:`):** Issues a direct message (`send_message` with `Recipient: claimed_by`) announcing its presence and scope to coordinate or sequence work autonomously without human intermediation.

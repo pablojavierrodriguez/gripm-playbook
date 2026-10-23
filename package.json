@@ -6,7 +6,10 @@
   "main": "./scripts/sync-playbook.mjs",
   "bin": {
     "playbook": "scripts/sync-playbook.mjs",
-    "gripm-playbook": "scripts/sync-playbook.mjs"
+    "gripm-playbook": "scripts/sync-playbook.mjs",
+    "gate-qa": "scripts/gate-qa.mjs",
+    "audit-ux": "scripts/audit-ux-code.cjs",
+    "check-loc": "scripts/check-loc.mjs"
   },
   "exports": {
     ".": "./scripts/sync-playbook.mjs",

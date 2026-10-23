@@ -278,6 +278,37 @@ function writeItemPool(repo) {
   }
 }
 
+function addPlaybookScripts(repo) {
+  const pkgFile = path.join(repo, 'package.json');
+  if (!fs.existsSync(pkgFile)) return;
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+    pkg.scripts = pkg.scripts || {};
+    let added = 0;
+    const scriptsToAdd = {
+      'gate:qa': 'playbook gate',
+      'gate:review': 'playbook review',
+      'audit:ux': 'playbook audit',
+      'audit:ux:strict': 'playbook audit --strict',
+      'check:loc': 'playbook check-loc',
+    };
+    for (const [key, cmd] of Object.entries(scriptsToAdd)) {
+      if (!pkg.scripts[key]) {
+        pkg.scripts[key] = cmd;
+        added += 1;
+      }
+    }
+    if (added > 0) {
+      fs.writeFileSync(pkgFile, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+      console.log(`  ${c.green('✔')} ${c.green('updated'.padEnd(10))} package.json ${c.dim(`(${added} playbook script${added > 1 ? 's' : ''} added)`)}`);
+    } else {
+      console.log(`  ${c.dim('•')} ${c.dim('preserved'.padEnd(10))} package.json ${c.dim('(scripts already present)')}`);
+    }
+  } catch {
+    // Non-fatal if package.json cannot be parsed or modified
+  }
+}
+
 function printHarnesses() {
   console.log(`\n  ${c.bold('gripm')} ${c.dim('· Playbook Harnesses')}\n`);
   for (const harness of HARNESS_CHOICES) {
@@ -344,6 +375,7 @@ export async function runInit(argv = []) {
 
   writeAdapters(repo, answers, opts);
   writeItemPool(repo);
+  addPlaybookScripts(repo);
   if (answers.board) writeBoardConfig(repo, answers, opts);
 
   console.log(`

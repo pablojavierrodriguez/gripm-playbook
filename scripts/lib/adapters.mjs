@@ -28,7 +28,7 @@ export const HARNESS_CHOICES = [
 
 const NON_NEGOTIABLES = [
   '**No commit and no push without explicit verbal authorization.** "Looks good", "ok" and "proceed" mean implement code only.',
-  '**Every change maps to a task in `backlog/tasks/`.** Dev moves `draft` to `doing` to `review`; only a clean-context QA sub-agent moves `review` to `ready` via `node scripts/gate-qa.mjs <ID>` (exit code 0).',
+  '**Every change maps to a task in `backlog/tasks/`.** Dev moves `draft` to `doing` to `review`; only a clean-context QA sub-agent moves `review` to `ready` via `gate-qa <ID>` or `playbook gate <ID>` (or `node scripts/gate-qa.mjs <ID>`, exit code 0).',
   '**Never mark `done` during development.** `done` is reserved for a real release deploy.',
   '**Run the Verification Pyramid before any promotion:** repo consistency, headless tests, spec and backlog consistency, static UX audit, build.',
   '**No browser sub-agent for logic, state, API or persistence.** Those are audited headlessly in milliseconds.',

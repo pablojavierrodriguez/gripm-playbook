@@ -49,12 +49,27 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// ROOT is the project being audited. When the script is synced into a target
-// repo it lands in <target>/scripts/, so __dirname/.. is already correct.
-// AUDIT_UX_ROOT allows pointing the auditor at another project explicitly.
-const ROOT = process.env.AUDIT_UX_ROOT
-  ? path.resolve(process.env.AUDIT_UX_ROOT)
-  : path.resolve(__dirname, '..');
+// ROOT is the project being audited. AUDIT_UX_ROOT or --root/--cwd points explicitly.
+// Defaults to process.cwd() for consumer portability.
+function resolveAuditRoot() {
+  if (process.env.AUDIT_UX_ROOT) return path.resolve(process.env.AUDIT_UX_ROOT);
+  for (let i = 2; i < process.argv.length; i++) {
+    if ((process.argv[i] === '--root' || process.argv[i] === '--cwd') && process.argv[i + 1]) {
+      return path.resolve(process.argv[i + 1]);
+    }
+    if (process.argv[i].startsWith('--root=')) return path.resolve(process.argv[i].split('=')[1]);
+    if (process.argv[i].startsWith('--cwd=')) return path.resolve(process.argv[i].split('=')[1]);
+  }
+  const isInNodeModules = __dirname.split(path.sep).includes('node_modules');
+  const scriptParent = path.resolve(__dirname, '..');
+  const cwd = process.cwd();
+  if (isInNodeModules) return cwd;
+  if (cwd !== scriptParent && (fs.existsSync(path.join(cwd, 'package.json')) || fs.existsSync(path.join(cwd, 'src')))) {
+    return cwd;
+  }
+  return scriptParent;
+}
+const ROOT = resolveAuditRoot();
 const RULES_PATH = path.join(__dirname, 'ux-rules.json');
 const CONFIG_NAME = '.uxaudit.json';
 const BASELINE_NAME = 'audit-ux-baseline.json';

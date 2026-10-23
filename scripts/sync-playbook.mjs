@@ -35,6 +35,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { routeCli } from './lib/cli-router.mjs';
 import { c, promptConfirm } from './lib/terminal.mjs';
 import {
   HISTORY_BUDGET,
@@ -75,6 +76,7 @@ export const FALLBACK_CORE_FILES = [
   '.agents/skills/code-level-ux-auditor/SKILL.md',
   'scripts/audit-ux-code.cjs',
   'scripts/gate-qa.mjs',
+  'scripts/gate-review-items.mjs',
   'scripts/check-loc.mjs',
   'scripts/ux-rules.json',
   'scripts/sync-playbook.mjs',
@@ -86,6 +88,7 @@ export const FALLBACK_CORE_FILES = [
   'scripts/lib/task-inspection.mjs',
   'scripts/lib/provenance.mjs',
   'scripts/lib/sync-classifier.mjs',
+  'scripts/lib/cli-router.mjs',
   'docs/sprints/SPRINT_SPEC_TEMPLATE.md',
   'docs/DOMAIN_TEMPLATE.md',
 ];
@@ -133,14 +136,26 @@ function printBanner(targetRepo, remote, ref, pinned, stacks) {
 }
 
 export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) {
+  const packageBundleRoot = path.resolve(path.dirname(__filename), '..');
+  const targetDir = path.resolve(targetRepo);
+  const hasLocalPackageBundle = fs.existsSync(path.join(packageBundleRoot, MANIFEST_PATH));
+  const shouldDefaultToLocalBundle =
+    !options.source &&
+    !options.remote &&
+    hasLocalPackageBundle &&
+    targetDir !== packageBundleRoot;
+
   const isLocalSource =
     !!options.source ||
+    shouldDefaultToLocalBundle ||
     (options.remote && fs.existsSync(options.remote) && fs.statSync(options.remote).isDirectory());
   const localSourceDir = options.source
     ? path.resolve(options.source)
-    : isLocalSource
-      ? path.resolve(options.remote)
-      : null;
+    : shouldDefaultToLocalBundle
+      ? packageBundleRoot
+      : isLocalSource
+        ? path.resolve(options.remote)
+        : null;
   const remote = localSourceDir || options.remote || DEFAULT_REMOTE;
   const requestedRef = options.tag || options.branch;
   const stacks = options.stacks || [];
@@ -457,28 +472,13 @@ function parseArgs(argv) {
 }
 
 function printUsage() {
-  console.log(
-    fs
-      .readFileSync(__filename, 'utf8')
-      .split('*/')[0]
-      .replace(/^\/\*\*?/, '')
-      .replace(/^ \* ?/gm, ''),
-  );
+  console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0].replace(/^\/\*\*?/, '').replace(/^ \* ?/gm, ''));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
   const [subcommand, ...rest] = process.argv.slice(2);
-
-  if (subcommand === 'init') {
-    import('./init.mjs')
-      .then((module) => module.runInit(rest))
-      .catch((err) => {
-        console.error('Fatal:', err.message);
-        process.exit(2);
-      });
-  } else {
-    const opts = parseArgs(process.argv.slice(2));
-
+  routeCli(subcommand, rest, (args) => {
+    const opts = parseArgs(args);
     if (opts.help) {
       printUsage();
     } else if (opts.listStacks) {
@@ -492,5 +492,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
         process.exit(2);
       });
     }
-  }
+  });
 }

@@ -27,9 +27,30 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readFrontmatter } from './gate-qa.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+function resolveRoot() {
+  if (process.env.GRIPM_ROOT) return path.resolve(process.env.GRIPM_ROOT);
+  for (let i = 2; i < process.argv.length; i++) {
+    if ((process.argv[i] === '--root' || process.argv[i] === '--cwd') && process.argv[i + 1]) {
+      return path.resolve(process.argv[i + 1]);
+    }
+    if (process.argv[i].startsWith('--root=')) return path.resolve(process.argv[i].split('=')[1]);
+    if (process.argv[i].startsWith('--cwd=')) return path.resolve(process.argv[i].split('=')[1]);
+  }
+  const isInNodeModules = SCRIPT_DIR.split(path.sep).includes('node_modules');
+  const scriptParent = path.resolve(SCRIPT_DIR, '..');
+  if (isInNodeModules) return process.cwd();
+  if (fs.existsSync(path.join(scriptParent, 'backlog', 'tasks'))) {
+    return scriptParent;
+  }
+  return process.cwd();
+}
+
+const ROOT = resolveRoot();
 const TASKS_DIR = path.join(ROOT, 'backlog', 'tasks');
-const GATE = path.join(ROOT, 'scripts', 'gate-qa.mjs');
+const LOCAL_GATE = path.join(ROOT, 'scripts', 'gate-qa.mjs');
+const GATE = fs.existsSync(LOCAL_GATE) ? LOCAL_GATE : path.join(SCRIPT_DIR, 'gate-qa.mjs');
 
 const statusOf = (content) => readFrontmatter(content)?.status;
 
@@ -54,9 +75,10 @@ function main() {
 
   let failed = 0;
   for (const { name, file } of reviewItems) {
-    const result = spawnSync(process.execPath, [GATE, file, '--no-run'], {
+    const result = spawnSync(process.execPath, [GATE, file, '--no-run', '--root', ROOT], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, GRIPM_ROOT: ROOT },
     });
     const code = result.status;
 

@@ -12,6 +12,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readFrontmatter, readACs, mutateTaskFrontmatter } from './lib/frontmatter.mjs';
 import { c, printHeader } from './lib/terminal.mjs';
@@ -24,17 +25,99 @@ import {
   isSameActor,
 } from './lib/task-inspection.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+export function resolveProjectRoot(explicitRoot = null, targetPath = null) {
+  if (explicitRoot) return path.resolve(explicitRoot);
+  if (process.env.GRIPM_ROOT) return path.resolve(process.env.GRIPM_ROOT);
+
+  if (targetPath) {
+    const absTarget = path.resolve(targetPath);
+    if (fs.existsSync(absTarget) || targetPath.includes('/') || targetPath.includes('\\')) {
+      let curr = fs.existsSync(absTarget) && fs.statSync(absTarget).isDirectory()
+        ? absTarget
+        : path.dirname(absTarget);
+      while (true) {
+        if (
+          fs.existsSync(path.join(curr, 'backlog', 'tasks')) ||
+          fs.existsSync(path.join(curr, '.agents')) ||
+          fs.existsSync(path.join(curr, 'package.json'))
+        ) {
+          return curr;
+        }
+        const parent = path.dirname(curr);
+        if (parent === curr) break;
+        curr = parent;
+      }
+    }
+  }
+
+  const scriptParent = path.resolve(SCRIPT_DIR, '..');
+  const isInNodeModules = SCRIPT_DIR.split(path.sep).includes('node_modules');
+  const cwd = process.cwd();
+
+  if (targetPath && !targetPath.includes('/') && !targetPath.includes('\\')) {
+    const cwdTasks = path.join(cwd, 'backlog', 'tasks');
+    if (fs.existsSync(cwdTasks) && resolveTaskPathFromDir(targetPath, cwdTasks)) {
+      return cwd;
+    }
+    const parentTasks = path.join(scriptParent, 'backlog', 'tasks');
+    if (fs.existsSync(parentTasks) && resolveTaskPathFromDir(targetPath, parentTasks)) {
+      return scriptParent;
+    }
+  }
+
+  if (isInNodeModules) {
+    return cwd;
+  }
+
+  let isPlaybookRepo = false;
+  try {
+    const pkgPath = path.join(scriptParent, 'package.json');
+    if (fs.existsSync(path.join(scriptParent, '.playbook-manifest.json')) && fs.existsSync(pkgPath)) {
+      isPlaybookRepo = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).name === '@gripm/playbook';
+    }
+  } catch {}
+
+  if (!isPlaybookRepo && (fs.existsSync(path.join(scriptParent, 'package.json')) || fs.existsSync(path.join(scriptParent, 'backlog', 'tasks')))) {
+    return scriptParent;
+  }
+
+  if (isPlaybookRepo && cwd !== scriptParent && (fs.existsSync(path.join(cwd, 'package.json')) || fs.existsSync(path.join(cwd, 'backlog', 'tasks')))) {
+    return cwd;
+  }
+
+  if (fs.existsSync(path.join(cwd, 'backlog', 'tasks')) || fs.existsSync(path.join(cwd, 'package.json'))) {
+    return cwd;
+  }
+
+  return scriptParent;
+}
+
+export function getExplicitRoot(argv = []) {
+  for (let i = 0; i < argv.length; i++) {
+    if ((argv[i] === '--root' || argv[i] === '--cwd') && argv[i + 1]) {
+      return argv[i + 1];
+    }
+    if (argv[i].startsWith('--root=')) return argv[i].split('=')[1];
+    if (argv[i].startsWith('--cwd=')) return argv[i].split('=')[1];
+  }
+  return null;
+}
+
+const ROOT = resolveProjectRoot();
 const TASKS_DIR = path.join(ROOT, 'backlog', 'tasks');
 
 export { readFrontmatter, readACs, mutateTaskFrontmatter, inspectTask, resolveActor, isSameActor };
 
-export function loadTasks(tasksDir = TASKS_DIR) {
-  return loadTasksFromDir(tasksDir);
+export function loadTasks(tasksDir) {
+  const dir = tasksDir || path.join(resolveProjectRoot(), 'backlog', 'tasks');
+  return loadTasksFromDir(dir);
 }
 
-export function resolveTaskPath(target, tasksDir = TASKS_DIR) {
-  return resolveTaskPathFromDir(target, tasksDir);
+export function resolveTaskPath(target, tasksDir) {
+  const dir = tasksDir || path.join(resolveProjectRoot(null, target), 'backlog', 'tasks');
+  return resolveTaskPathFromDir(target, dir);
 }
 
 /**
@@ -49,14 +132,56 @@ const PYRAMID_STEPS = [
   { id: 'build', label: 'Production build', script: 'build', blocking: false, optional: true },
 ];
 
-export function resolvePyramid(root = ROOT) {
-  return resolvePyramidSteps(root, PYRAMID_STEPS);
+export function resolvePyramid(root = resolveProjectRoot(), options = {}) {
+  const isAutonomous = options.autonomous || (process.argv && process.argv.includes('--autonomous'));
+  const steps = resolvePyramidSteps(root, PYRAMID_STEPS);
+  if (isAutonomous) {
+    for (const step of steps) {
+      if (!step.available && step.id === 'audit:ux') {
+        step.available = true;
+        step.runner = (r) => {
+          const auditScript = path.resolve(SCRIPT_DIR, 'audit-ux-code.cjs');
+          const res = spawnSync(process.execPath, [auditScript, '--strict', '--quiet'], {
+            cwd: r,
+            encoding: 'utf8',
+            env: { ...process.env, AUDIT_UX_ROOT: r },
+          });
+          if (res.status === 0) {
+            return { state: 'passed', detail: 'packaged audit-ux --strict passed' };
+          }
+          const tail = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-4).join('\n      ');
+          return { state: 'failed', detail: `audit-ux failed (exit code ${res.status})${tail ? `\n      ${tail}` : ''}` };
+        };
+      }
+      if (!step.available && step.id === 'spec') {
+        step.available = true;
+        step.runner = (r) => {
+          const tasksDir = path.join(r, 'backlog', 'tasks');
+          if (!fs.existsSync(tasksDir)) {
+            return { state: 'passed', detail: 'no backlog/tasks directory' };
+          }
+          const reviewScript = path.resolve(SCRIPT_DIR, 'gate-review-items.mjs');
+          const res = spawnSync(process.execPath, [reviewScript], {
+            cwd: r,
+            encoding: 'utf8',
+            env: { ...process.env, GRIPM_ROOT: r },
+          });
+          if (res.status === 0) {
+            return { state: 'passed', detail: 'packaged review check passed' };
+          }
+          const tail = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-4).join('\n      ');
+          return { state: 'failed', detail: `spec review check failed (exit code ${res.status})${tail ? `\n      ${tail}` : ''}` };
+        };
+      }
+    }
+  }
+  return steps;
 }
 
 function getPositionalTarget(argv) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--by' || arg === '--as' || arg === '--to') {
+    if (arg === '--by' || arg === '--as' || arg === '--to' || arg === '--root' || arg === '--cwd') {
       i += 1;
       continue;
     }
@@ -71,6 +196,8 @@ export function unblockMain(argv) {
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--to' && argv[i + 1]) {
       targetStatus = argv[++i];
+    } else if (argv[i] === '--root' || argv[i] === '--cwd') {
+      i += 1;
     } else if (!argv[i].startsWith('--') && !target) {
       target = argv[i];
     }
@@ -83,7 +210,10 @@ export function unblockMain(argv) {
 
   printHeader('QA Gate · unblock (T_unblock)');
 
-  const taskPath = resolveTaskPath(target);
+  const explicitRoot = getExplicitRoot(argv);
+  const projectRoot = resolveProjectRoot(explicitRoot, target);
+  const tasksDir = path.join(projectRoot, 'backlog', 'tasks');
+  const taskPath = resolveTaskPath(target, tasksDir);
   if (!taskPath) {
     console.log(`  ${c.red('✖')} no task found for "${target}" in backlog/tasks/\n`);
     process.exit(1);
@@ -91,7 +221,7 @@ export function unblockMain(argv) {
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  console.log(`  ${c.dim('➜')} Task:    ${path.relative(ROOT, taskPath)}`);
+  console.log(`  ${c.dim('➜')} Task:    ${path.relative(projectRoot, taskPath)}`);
   console.log(`    ID:      ${c.bold(frontmatter?.id ?? '(unreadable)')}`);
   console.log(`    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
 
@@ -100,7 +230,7 @@ export function unblockMain(argv) {
     process.exit(0);
   }
 
-  const { tasks, collisions } = loadTasks();
+  const { tasks, collisions } = loadTasks(tasksDir);
   const blockers = inspectTask({ content, frontmatter }, tasks).filter((f) => f.startsWith('unblock refused'));
 
   for (const collision of collisions) {
@@ -134,7 +264,10 @@ export function startMain(argv) {
   }
 
   printHeader('QA Gate · start (T0: draft → doing)');
-  const taskPath = resolveTaskPath(target);
+  const explicitRoot = getExplicitRoot(argv);
+  const projectRoot = resolveProjectRoot(explicitRoot, target);
+  const tasksDir = path.join(projectRoot, 'backlog', 'tasks');
+  const taskPath = resolveTaskPath(target, tasksDir);
   if (!taskPath) {
     console.log(`  ${c.red('✖')} no task found for "${target}" in backlog/tasks/\n`);
     process.exit(1);
@@ -142,7 +275,7 @@ export function startMain(argv) {
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  const { tasks, collisions } = loadTasks();
+  const { tasks, collisions } = loadTasks(tasksDir);
   const failures = [];
 
   if (!frontmatter || !frontmatter.id || !frontmatter.id.trim()) {
@@ -187,7 +320,10 @@ export function submitMain(argv) {
   }
 
   printHeader('QA Gate · submit (T1: doing → review)');
-  const taskPath = resolveTaskPath(target);
+  const explicitRoot = getExplicitRoot(argv);
+  const projectRoot = resolveProjectRoot(explicitRoot, target);
+  const tasksDir = path.join(projectRoot, 'backlog', 'tasks');
+  const taskPath = resolveTaskPath(target, tasksDir);
   if (!taskPath) {
     console.log(`  ${c.red('✖')} no task found for "${target}" in backlog/tasks/\n`);
     process.exit(1);
@@ -195,7 +331,7 @@ export function submitMain(argv) {
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  const { tasks, collisions } = loadTasks();
+  const { tasks, collisions } = loadTasks(tasksDir);
   const failures = inspectTask({ content, frontmatter: { ...frontmatter, status: 'review' } }, tasks);
   if (frontmatter?.status !== 'doing') {
     failures.unshift(`status is "${frontmatter?.status ?? '(missing)'}" but T1 only submits items in "doing"`);
@@ -231,7 +367,10 @@ export function main(argv) {
 
   printHeader('QA Gate');
 
-  const taskPath = resolveTaskPath(target);
+  const explicitRoot = getExplicitRoot(argv);
+  const projectRoot = resolveProjectRoot(explicitRoot, target);
+  const tasksDir = path.join(projectRoot, 'backlog', 'tasks');
+  const taskPath = resolveTaskPath(target, tasksDir);
   if (!taskPath) {
     console.log(`  ${c.red('✖')} no task found for "${target}" in backlog/tasks/\n`);
     process.exit(1);
@@ -239,11 +378,11 @@ export function main(argv) {
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  console.log(`  ${c.dim('➜')} Task:    ${path.relative(ROOT, taskPath)}`);
+  console.log(`  ${c.dim('➜')} Task:    ${path.relative(projectRoot, taskPath)}`);
   console.log(`    ID:      ${c.bold(frontmatter?.id ?? '(unreadable)')}`);
   console.log(`    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
 
-  const { tasks, collisions } = loadTasks();
+  const { tasks, collisions } = loadTasks(tasksDir);
   const failures = inspectTask({ content, frontmatter }, tasks, { certifier });
 
   for (const collision of collisions) {
@@ -262,11 +401,9 @@ export function main(argv) {
   let pyramidRan = 0;
 
   if (runPyramid) {
-    const taskDirRoot = path.dirname(taskPath);
-    const workRoot = fs.existsSync(path.join(taskDirRoot, 'package.json'))
-      ? taskDirRoot
-      : ROOT;
-    const steps = resolvePyramid(workRoot);
+    const isAutonomous = argv.includes('--autonomous');
+    const workRoot = projectRoot;
+    const steps = resolvePyramid(workRoot, { autonomous: isAutonomous });
     console.log(`  ${c.bold('Verification pyramid:')}`);
     const execResult = executePyramid(steps, workRoot);
     pyramidFailed = execResult.pyramidFailed;
