@@ -301,6 +301,65 @@ Prose assertions are not gates. Transition T2 (`review` → `ready`) is enforced
 
 ---
 
+## 🌐 Ecosystem Scope: Node/TypeScript Native & Polyglot Bridge
+
+Gripm Playbook operates on a core craftsmanship invariant: **perfect the framework in a primary ecosystem (Node.js & TypeScript) before expanding native distributions to others.**
+
+### Current Native Scope (Node.js & TypeScript)
+
+- **Distribution:** Distributed as an npm package ([`@gripm/playbook`](https://www.npmjs.com/package/@gripm/playbook)). Zero-install execution via `npx @gripm/playbook init` and `npx @gripm/playbook sync`.
+- **Mechanical Gates & Execution Engines:** All CLI tools (`gate-qa`, `sync-playbook`, `audit-ux`, `check-loc`) and consistency validators (`validate-repo.mjs`) are zero-dependency Node.js engines.
+- **Native Verification Pyramid:** Binds directly to standard npm scripts in `package.json` (`validate` or `typecheck`, `test`, `gate:review`, `build`).
+
+### Polyglot Projects Bridge (Python, Go, Rust, Makefiles, etc.)
+
+While dedicated packages for other package managers (e.g. PyPI, Cargo, Homebrew) are reserved for future roadmap milestones, Gripm Playbook can govern **any** software project today without compromise.
+
+Non-Node repositories integrate with Gripm Playbook by placing a minimal `package.json` with npm proxy scripts pointing to native language toolchains:
+
+```json
+// Example: Python project (pytest + flake8 / mypy)
+{
+  "name": "python-service",
+  "private": true,
+  "scripts": {
+    "validate": "flake8 && mypy .",
+    "test": "pytest",
+    "build": "make build"
+  }
+}
+```
+
+```json
+// Example: Rust project (cargo clippy + cargo test)
+{
+  "name": "rust-crate",
+  "private": true,
+  "scripts": {
+    "validate": "cargo clippy -- -D warnings",
+    "test": "cargo test",
+    "build": "cargo build --release"
+  }
+}
+```
+
+```json
+// Example: Go project (golangci-lint + go test)
+{
+  "name": "go-microservice",
+  "private": true,
+  "scripts": {
+    "validate": "golangci-lint run",
+    "test": "go test ./...",
+    "build": "go build -v ./..."
+  }
+}
+```
+
+This bridge allows any repository to leverage the full multi-agent delivery loop (dynamic operating modes, Subagent-Driven Development, worktree concurrency isolation, and blind clean-context QA certification) using its native compiler and test runner.
+
+---
+
 ## 🔍 The static UX auditor
 
 A generic engine plus a declarative rule catalog. No project names, no file names, no hardcoded paths.
@@ -436,6 +495,7 @@ npm run check:all    # validate + check:loc + test
 - **Decoupled Sprint - Release:** releases are assembled by delivered value from `ready` items, with or without an active sprint.
 - **Verification Pyramid:** typecheck → headless tests → spec/backlog consistency → build → static UX audit (with i18n support and portable POSIX baselines). Browser sub-agents prohibited for logic, state, API or persistence verification.
 - **Two layers:** *core* stack-agnostic layer (always installed) + optional *stack packs* (`react`, `mobile`, `pwa`). The core is validated to contain zero product or backend references.
+- **Ecosystem focus & polyglot bridge:** engineered and distributed natively for Node.js / TypeScript via npm; bridges to polyglot stacks (Python, Go, Rust, Make) via lightweight package.json proxy scripts.
 - **Non-destructive sync:** `AGENTS.md` is never overwritten; local customizations are detected by hash, reported as `[Protected]`, and protected on every subsequent run until `--force`; every overwrite is backed up.
 
 ---

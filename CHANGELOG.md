@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **100% stack and domain agnostic core** (`PLAY-021`). Eradicated financial and banking domain terminology (balances, liabilities, equity, payment APIs) from invariant definitions and contracts, replacing them with universal software engineering principles (capacity limits, rate limiting, unit normalization). Fixed task prefixes (`DEV-XXX`) replaced by canonical placeholders (`TASK-ID`).
-- **Standard hyphen rule (Anti-Em-Dash)** (`PLAY-022`). Replaced artificial AI em-dashes (`—`) and en-dashes (`–`) with standard hyphens (` - `) across all documentation, templates, and specifications.
+- **Standard hyphen rule (Anti-Em-Dash)** (`PLAY-022`). Replaced artificial AI em-dash and en-dash characters with standard hyphens (` - `) across all documentation, templates, and specifications.
 
 ---
 
@@ -183,8 +183,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Saneamiento P0 de skills de stacks**: Eliminadas todas las referencias residuales a componentes y entidades de prueba (`People.tsx`, `SettingsPage.tsx`, `MeetingDetailModal`, `PermissionGate`, `SPEC-070`, `vibrant-gradient-primary`, `font-mono-data`, `Check-in QR`, `OrgContext`) en los skills de `react` y `mobile`.
-- **Formato regional estándar**: Reemplazado el valor inválido `'regional-locale'` por formato regional BCP-47 (`es-ES`) en `recharts-reporting` y `forms-rhf-zod`.
+- **P0 stack skill sanitization**: Removed all residual references to test components and test fixtures (`People.tsx`, `SettingsPage.tsx`, `MeetingDetailModal`, `PermissionGate`, `SPEC-070`, `vibrant-gradient-primary`, `font-mono-data`, `Check-in QR`, `OrgContext`) from `react` and `mobile` stack skills.
+- **Standard regional formatting**: Replaced invalid placeholder `'regional-locale'` with standard BCP-47 format (`es-ES`) in `recharts-reporting` and `forms-rhf-zod`.
 - **A local customisation was protected exactly once.** The lockfile recorded the local hash of a protected file, so on the next run the file matched its own baseline and was overwritten without warning. Customizations are now recorded in a dedicated `customizations` list and stay protected until `--force`.
 
 ## [2.0.0] - 2026-10-04

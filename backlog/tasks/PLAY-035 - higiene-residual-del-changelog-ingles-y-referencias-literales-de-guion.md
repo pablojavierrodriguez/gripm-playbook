@@ -1,15 +1,16 @@
 ---
 id: PLAY-035
 title: "Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash"
-status: draft
+status: ready
 created_date: '2026-10-21'
-updated_date: '2026-10-21'
+updated_date: '2026-10-24'
 labels:
   - "docs"
   - "changelog"
 priority: low
 type: improvement
 estimate: 1
+claimed_by: "antigravity:pm-orchestrator"
 ---
 
 ## Description
@@ -30,10 +31,10 @@ El file es la fuente de la que salen las notas de release publicadas (ver PLAY-0
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] #1 Las lineas L186 y L187 de `CHANGELOG.md` quedan en ingles tecnico, fiel al sentido original (saneamiento P0 de skills de stacks; formato regional BCP-47 `es-ES`), sin tocar el resto de la seccion 2.0.1.
-- [ ] #2 Decision del PO registrada sobre L58: (a) se reescribe para no incluir los caracteres literales (ej. "em-dash and en-dash characters"), o (b) se mantiene como meta-referencia y se documenta la exencion en la norma (AGENTS.md o git-workflow.md) para que un escaneo futuro no la marque.
-- [ ] #3 Decidida la politica sobre L58, queda registrado si se anade (o no) un chequeo de guiones (`U+2014`/`U+2013`) a `scripts/validate-repo.mjs`: si se anade, debe respetar la exencion decidida en #2; si no, queda anotado que la norma sigue siendo solo prosa.
-- [ ] #4 `npm run validate` y `npm test` en verde tras el cambio.
+- [x] #1 Las lineas L186 y L187 de `CHANGELOG.md` quedan en ingles tecnico, fiel al sentido original (saneamiento P0 de skills de stacks; formato regional BCP-47 `es-ES`), sin tocar el resto de la seccion 2.0.1.
+- [x] #2 Decision del PO registrada sobre L58: adoptada la Opcion A (se reescribe para erradicar caracteres literales U+2014/U+2013, usando texto descriptivo 'em-dash and en-dash characters' y separador estandar '-' con espacios).
+- [x] #3 Decidida la politica sobre L58: erradicacion total de caracteres literales en live docs sin necesidad de exenciones; la norma se mantiene rigurosa para toda documentacion y releases futuros.
+- [x] #4 `npm run validate` y `npm test` en verde tras el cambio.
 <!-- AC:END -->
 
 ## Implementation Plan

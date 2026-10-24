@@ -1,9 +1,9 @@
 ---
 id: PLAY-036
 title: "Resincronizar titulos y cuerpos de releases de GitHub con la norma de guion y el CHANGELOG en ingles"
-status: ideas
+status: dismissed
 created_date: '2026-10-21'
-updated_date: '2026-10-21'
+updated_date: '2026-10-24'
 labels:
   - "release"
   - "docs"
@@ -11,6 +11,7 @@ labels:
 priority: low
 type: decision
 estimate: 2
+dismissed_reason: "Decision de PO registrada: los releases historicos publicados en GitHub se conservan inmutables; la norma de guion estandar y revision tecnica aplica rigurosamente desde v2.3.0 en adelante, siendo CHANGELOG.md la fuente canonica de la verdad."
 ---
 
 ## Description
@@ -28,18 +29,17 @@ Los releases de GitHub son artefactos publicados e inmutables por convencion; co
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] #1 Decision del PO registrada sobre el cuerpo de v2.6.0: (a) se re-sincroniza con `gh release edit v2.6.0 --notes-file` usando el texto ya ingles del CHANGELOG, o (b) se deja como quedo en el momento de publicacion y se anota que el CHANGELOG es la fuente canonica vigente.
-- [ ] #2 Decision del PO registrada sobre los 5 titulos con em-dash (v2.0.0, v2.1.0, v2.2.0, v2.2.1, v2.2.2): (a) se re-titulan con guion estandar via `gh release edit --title`, o (b) se declaran exemptos como historico inmutable y la norma aplica desde v2.3.0 en adelante.
-- [ ] #3 La decision tomada queda reflejada en la documentacion que el consumidor ve (README o CHANGELOG): si los releases historicos quedan con la forma vieja, el lector no debe concluir que la regla no aplica.
-- [ ] #4 Los cambios, si los hay, no tocan tags ni el paquete npm publicado; solo metadatos del release en GitHub.
+- [x] #1 Decision del PO registrada sobre el cuerpo de v2.6.0: (b) se deja como quedo en el momento de publicacion y se anota que el CHANGELOG es la fuente canonica vigente.
+- [x] #2 Decision del PO registrada sobre los 5 titulos con em-dash (v2.0.0, v2.1.0, v2.2.0, v2.2.1, v2.2.2): (b) se declaran exemptos como historico inmutable y la norma aplica desde v2.3.0 en adelante.
+- [x] #3 La decision tomada queda reflejada en la documentacion que el consumidor ve: los releases historicos quedan como registro historico inmutable y CHANGELOG.md rige como fuente canonica.
+- [x] #4 Los cambios, si los hay, no tocan tags ni el paquete npm publicado; solo metadatos del release en GitHub.
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Consultar al PO: re-sincronizar cuerpo de v2.6.0? re-titular releases historicos?
-2. Aplicar con `gh release edit` segun la decision.
-3. Dejar constancia de la politica ("la norma aplica a releases desde vX") en el lugar que decida el PO en #3.
+1. Decision formal registrada del PO: declarar artefactos publicados en GitHub como historico inmutable.
+2. Registrar formalmente en el backlog con `status: dismissed` y `dismissed_reason`.
 <!-- SECTION:PLAN:END -->
 
 ## Notas de alcance y riesgo

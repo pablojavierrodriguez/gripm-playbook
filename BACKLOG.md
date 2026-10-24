@@ -3,7 +3,7 @@
 
 ## Resumen de Estados
 
-### 💡 Ideas / Discovery (3)
+### 💡 Ideas / Discovery (2)
 
 #### [PLAY-007] onlyFile debería enganchar el componente renderizado y no el nombre del archivo
 - **Prioridad**: `p2` | **Tipo**: `improvement`
@@ -42,26 +42,29 @@ Contexto que la vuelve real: el backlog de este repo y `docs/BACKLOG.md` se escr
 
 ---
 
-#### [PLAY-036] Resincronizar titulos y cuerpos de releases de GitHub con la norma de guion y el CHANGELOG en ingles
-- **Prioridad**: `p3` | **Tipo**: `decision`
+### 🚀 Ready for Deploy (4)
 
-La revision de `dev` tras la v2.6.0 verifico que lo publicado en GitHub diverge del CHANGELOG ya corregido:
+#### [PLAY-035] Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash
+- **Prioridad**: `p3` | **Tipo**: `improvement`
 
-1. **El cuerpo del release v2.6.0** todavia contiene las entradas originales en espanol de PLAY-031 ("ASCII diagrama estatico en el primer fold...") y PLAY-034 ("QA Ciega y Anti-Self-Certification..."), mientras que `CHANGELOG.md` ya las tiene en ingles tras `2b56029`. Verificado con `gh release view v2.6.0 --json body`.
+La revision de `dev` tras el commit `2b56029` ("eradicate em-dash from live files, english 2.6.0 entries") dejo dos residuos verificables en `CHANGELOG.md`, ambos fuera del alcance de ese commit pero inconsistentes con el estandar que el propio repo declara:
 
-2. **Cinco titulos de release usan em-dash como separador**, lo que la Standard Hyphen Rule de AGENTS.md cubre explicitamente ("release titles"): `v2.2.2 — Zero-network sync...`, `v2.2.1 — UX-010...`, `v2.2.0 — Punto de extension...`, `v2.1.0 — Anatomia de unidad...`, `v2.0.0 — Agentic Team Playbook`. Los releases desde v2.3.0 usan solo el numero, sin separador.
+1. **Dos entradas en espanol sin traducir** en la seccion `2.0.1`:
+   - L186: "- **Saneamiento P0 de skills de stacks**: Eliminadas todas las referencias residuales..."
+   - L187: "- **Formato regional estandar**: Reemplazado el valor invalido `'regional-locale'`..."
+   El commit tradujo las entradas espanolas de `2.6.0` pero no hizo un barrido completo del archivo.
 
-Los releases de GitHub son artefactos publicados e inmutables por convencion; corregirlos es decision del PO, no una consecuencia mecanica de arreglar el CHANGELOG local. Este item existe para que la decision quede registrada y no se pierda.
+2. **Una referencia literal a em-dash/en-dash** en L58 (entrada `PLAY-022`): "`Replaced artificial AI em-dashes (—) and en-dashes (–) with standard hyphens`". Es una meta-referencia entre backticks a los caracteres que la regla combate, no prosa con guion prohibido. Es defendible, pero cualquier escaneo automatico futuro la cazaria.
+
+El file es la fuente de la que salen las notas de release publicadas (ver PLAY-036), asi que lo que quede aqui termina en GitHub/npm.
 
 **Criterios de Aceptación:**
-- [ ] #1 Decision del PO registrada sobre el cuerpo de v2.6.0: (a) se re-sincroniza con `gh release edit v2.6.0 --notes-file` usando el texto ya ingles del CHANGELOG, o (b) se deja como quedo en el momento de publicacion y se anota que el CHANGELOG es la fuente canonica vigente.
-- [ ] #2 Decision del PO registrada sobre los 5 titulos con em-dash (v2.0.0, v2.1.0, v2.2.0, v2.2.1, v2.2.2): (a) se re-titulan con guion estandar via `gh release edit --title`, o (b) se declaran exemptos como historico inmutable y la norma aplica desde v2.3.0 en adelante.
-- [ ] #3 La decision tomada queda reflejada en la documentacion que el consumidor ve (README o CHANGELOG): si los releases historicos quedan con la forma vieja, el lector no debe concluir que la regla no aplica.
-- [ ] #4 Los cambios, si los hay, no tocan tags ni el paquete npm publicado; solo metadatos del release en GitHub.
+- [x] #1 Las lineas L186 y L187 de `CHANGELOG.md` quedan en ingles tecnico, fiel al sentido original (saneamiento P0 de skills de stacks; formato regional BCP-47 `es-ES`), sin tocar el resto de la seccion 2.0.1.
+- [x] #2 Decision del PO registrada sobre L58: adoptada la Opcion A (se reescribe para erradicar caracteres literales U+2014/U+2013, usando texto descriptivo 'em-dash and en-dash characters' y separador estandar '-' con espacios).
+- [x] #3 Decidida la politica sobre L58: erradicacion total de caracteres literales en live docs sin necesidad de exenciones; la norma se mantiene rigurosa para toda documentacion y releases futuros.
+- [x] #4 `npm run validate` y `npm test` en verde tras el cambio.
 
 ---
-
-### 🚀 Ready for Deploy (3)
 
 #### [PLAY-037] Portabilidad de paquete: CLI unificado, resolucion dinamica de raiz y desacople de piramide para proyectos consumidores
 - **Prioridad**: `p1` | **Tipo**: `improvement`
@@ -91,9 +94,20 @@ Este item implementa el Modelo Hibrido: el consumidor puede optar por usar `@gri
 #### [PLAY-038] El trigger de aislamiento es demasiado estrecho: GIT_RULES no cubre un arbol sucio sin lease
 - **Prioridad**: `p1` | **Tipo**: `bug`
 
-`scripts/lib/adapters.mjs:39-47` define `GIT_RULES`, el set de cinco reglas de git que el init inyecta en todo consumidor. Dos de ellas formaban un par incompleto: regla 4 (prohibición de revertir) y regla 5 (mecanismo de worktree), sin disparador observable para un árbol con cambios ajenos sin lease.
+`scripts/lib/adapters.mjs:39-47` define `GIT_RULES`, el set de cinco reglas de git que el init inyecta en todo consumidor. Dos de ellas forman un par incompleto:
 
-Incidente medido (2026-10-22, repo gripm): otro agente dejó seis archivos stageados (`A `) en `backlog/tasks/` con `status: ideas` y sin `claimed_by`. Ninguna condición disparaba, forzando al agente a luchar contra el índice.
+- Regla 4: *"A `doing` item carrying a foreign `claimed_by` owns the tree: never revert or clean it."* Es **prohibicion negativa**: no hagas nada destructivo.
+- Regla 5: *"Parallel work runs in isolated worktrees: `git worktree add -b <branch> ../<repo>-<task>`."* Es **mecanismo**: aislate y trabaja igual.
+
+Ninguna de las dos dice **cuando se pasa de modo normal a modo aislado**. El unico disparador explicito es la regla 4, y su condicion es estrecha: un item en `doing` con `claimed_by` ajeno.
+
+Incidente medido (2026-10-22, repo gripm): otro agente dejo **seis** archivos stageados (`A `) en `backlog/tasks/` con `status: ideas` y **sin `claimed_by`**. Ninguna condicion existente disparo, asi que el agente en curso se quedo en el arbol principal y lucho contra el indice compartido durante toda la certificacion de DEV-326.
+
+El costo no fue cosmético. `BACKLOG.md` es un agregado que referencia **todas** las tareas del arbol, y el Backlog Guard exige que no referencie tareas fantasma. Con seis tareas ajenas sin commitear, **todo** commit que incluyera el consolidado quedaba bloqueado. El agente tuvo que decidir entre incluir trabajo ajeno en su commit o romper la coherencia del consolidado, y pregunto al PO porque no habia regla que lo resolviera.
+
+Un worktree lo habria resuelto limpiamente: la rama sale de HEAD, no ve las tareas sin trackear del otro agente, y su `BACKLOG.md` no las referencia. **La cura ya esta escrita en la regla 5; lo que falta es el disparador que active la regla 5.**
+
+La condicion actual tampoco detecta la situacion real de colision. `claimed_by` es un lease declarado; los archivos stageados en el indice de git son **estado observable**. El segundo es una evidencia mas fuerte que el primero: no requiere que el otro agente haya sido disciplinoso, solo que exista.
 
 **Criterios de Aceptación:**
 - [x] #1 `GIT_RULES` declara un disparador adicional: archivos `A ` o `M ` en `git status --porcelain` que el agente en curso no creo.
@@ -107,9 +121,25 @@ Incidente medido (2026-10-22, repo gripm): otro agente dejó seis archivos stage
 #### [PLAY-040] El gate escribe la transicion de estado sin regenerar el consolidado y el commit siguiente se rechaza
 - **Prioridad**: `p1` | **Tipo**: `bug`
 
-`scripts/gate-qa.mjs` escribe `status` en disco en dos transiciones: T1 (`submit`, doing a review) y T2 (review a ready), ambas via `mutateTaskFrontmatter`. Sin la regeneracion automatica, `BACKLOG.md` quedaba desfasado y el hook de commit rechazaba el cambio.
+`scripts/gate-qa.mjs` escribe `status` en disco en dos transiciones: T1 (`submit`, doing a review) y T2 (review a ready), ambas via `mutateTaskFrontmatter`. **Ninguna de las dos regenera `BACKLOG.md`.**
 
-El gate ahora regenera el consolidado invocando `syncConsolidatedBacklog` en el proyecto consumidor tras cada mutacion de estado valida si `BACKLOG.md` existe, ejecutando el script `backlog:sync` o fallbacks correspondientes y omitiendo en silencio si no existe.
+El Backlog Guard del consumidor (`verify-backlog-sync.js`, hook `--hook`) rechaza cualquier commit cuyo `BACKLOG.md` este desfasado respecto a las tareas. Asi que el flujo mecanico completo queda roto en un punto que nadie documenta:
+
+```
+node scripts/gate-qa.mjs submit DEV-326    -> escribe doing a review. EXIT 0.
+npm run backlog:check                      -> EXIT 1: BACKLOG.md desactualizado.
+npm run backlog:sync                        -> EXIT 0.
+node scripts/gate-qa.mjs DEV-326           -> GATE PASSED, escribe ready. EXIT 0.
+npm run backlog:check                       -> EXIT 1: BACKLOG.md desactualizado otra vez.
+npm run backlog:sync                        -> EXIT 0.
+git commit                                  -> recien aqui pasa el guard.
+```
+
+Medido en gripm el 2026-10-22 durante la certificacion de DEV-326: **dos** syncs de mas, ambos provocados por el propio gate. El gate es la herramienta que certifica que el repo esta listo para commitear, y cada corrida lo deja en un estado que el hook de pre-commit rechaza.
+
+El punto ciego es estructural. El gate escribe un archivo y no conoce el consolidado que lo refleja. No es un bug de implementacion puntual: es que la transicion y el consolidado estan en capas que no se hablan.
+
+**Nota de alcance:** `scripts/gate-qa.mjs` tiene 147 lineas de diff sin commitear en este repo por PLAY-037 (portabilidad de rutas para consumidores). Ese trabajo es ortogonal a este hallazgo, pero comparte archivo: verificar el estado antes de tocar, y re-sincronizar el alcance si PLAY-037 lo reubica.
 
 **Criterios de Aceptación:**
 - [x] #1 Despues de que el gate escribe una transicion (`submit` o T2), `npm run backlog:check` sale con codigo 0 sin que el usuario corra `backlog:sync` a mano.
@@ -117,55 +147,6 @@ El gate ahora regenera el consolidado invocando `syncConsolidatedBacklog` en el 
 - [x] #3 El gate no stagea nada. La regla "un hook verifica, no muta" aplica tambien a la CLI: regenerar el consolidado no equivale a `git add BACKLOG.md`.
 - [x] #4 Un consumidor sin `BACKLOG.md` en disco (proyecto que aun no lo genero) no recibe error: la regeneracion se omite en silencio.
 - [x] #5 `npm run check:all` sale con 0 tras el cambio.
-
----
-
-### 📋 Backlog / Draft (1)
-
-#### [PLAY-035] Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash
-- **Prioridad**: `p3` | **Tipo**: `improvement`
-
-La revision de `dev` tras el commit `2b56029` ("eradicate em-dash from live files, english 2.6.0 entries") dejo dos residuos verificables en `CHANGELOG.md`, ambos fuera del alcance de ese commit pero inconsistentes con el estandar que el propio repo declara:
-
-1. **Dos entradas en espanol sin traducir** en la seccion `2.0.1`:
-   - L186: "- **Saneamiento P0 de skills de stacks**: Eliminadas todas las referencias residuales..."
-   - L187: "- **Formato regional estandar**: Reemplazado el valor invalido `'regional-locale'`..."
-   El commit tradujo las entradas espanolas de `2.6.0` pero no hizo un barrido completo del archivo.
-
-2. **Una referencia literal a em-dash/en-dash** en L58 (entrada `PLAY-022`): "`Replaced artificial AI em-dashes (—) and en-dashes (–) with standard hyphens`". Es una meta-referencia entre backticks a los caracteres que la regla combate, no prosa con guion prohibido. Es defendible, pero cualquier escaneo automatico futuro la cazaria.
-
-El file es la fuente de la que salen las notas de release publicadas (ver PLAY-036), asi que lo que quede aqui termina en GitHub/npm.
-
-**Criterios de Aceptación:**
-- [ ] #1 Las lineas L186 y L187 de `CHANGELOG.md` quedan en ingles tecnico, fiel al sentido original (saneamiento P0 de skills de stacks; formato regional BCP-47 `es-ES`), sin tocar el resto de la seccion 2.0.1.
-- [ ] #2 Decision del PO registrada sobre L58: (a) se reescribe para no incluir los caracteres literales (ej. "em-dash and en-dash characters"), o (b) se mantiene como meta-referencia y se documenta la exencion en la norma (AGENTS.md o git-workflow.md) para que un escaneo futuro no la marque.
-- [ ] #3 Decidida la politica sobre L58, queda registrado si se anade (o no) un chequeo de guiones (`U+2014`/`U+2013`) a `scripts/validate-repo.mjs`: si se anade, debe respetar la exencion decidida en #2; si no, queda anotado que la norma sigue siendo solo prosa.
-- [ ] #4 `npm run validate` y `npm test` en verde tras el cambio.
-
----
-
-### 🚫 Dismissed (1)
-
-#### [PLAY-039] El adaptador de Cursor declara como canonico un archivo que no existe: .agents/rules/git-workflow.md
-- **Prioridad**: `p2` | **Tipo**: `bug` | **Estado**: `dismissed` (2026-10-24)
-
-**`dismissed_reason`:** premisa falsa. El archivo `.agents/rules/git-workflow.md` existe en el arbol (5651 bytes). El reporte se apoyo en un glob POSIX que omite directorios ocultos, asi que infra-reporto. Sin defecto.
-
-`scripts/lib/adapters.mjs:118-130` define `renderCursorGitRule()`, que genera para el consumidor un archivo de reglas de Cursor cuya primera linea apunta a `.agents/rules/git-workflow.md` como "canonical source". El reporte original afirmo que ese archivo no existia, verificado con un glob `**/git-workflow.md` que dio cero resultados.
-
-**Verificacion posterior (2026-10-24) desmintio la premisa.** El archivo esta en `.agents/rules/` con contenido real (`# Git Workflow & Commit Governance`). El glob `**/` no desciende a `.agents/` por ser un directorio oculto: el fallo fue del tooling, no del artefacto. Cruces que lo confirman:
-
-- `sync-playbook.mjs:70` lo declara en `FALLBACK_CORE_FILES`; un sync en dry-run a un repo temporal sale 0 sin avisos "not found".
-- `.playbook-manifest.json:7` lo declara; `validate-repo.mjs` lo valida en verde.
-- `validate-repo.mjs:146,238` lo referencian; ambos loops saltarian si faltara, pero al existir si corren contra el.
-
-**Por que se descarto en vez de "arreglarse":** los AC pedian eliminar la linea o dejar `grep -r "git-workflow.md"` vacio en `scripts/` y templates. Eso degradaria una puntera valida hacia un archivo que el init si instala, y ademas romperia la paridad del manifiesto. El T_dismiss desde `draft` exige `dismissed_reason`, aqui registrado.
-
-**Criterios de Aceptación** (anulados por la premisa falsa):
-- [ ] #1 La linea "Canonical source" se elimina de `renderCursorGitRule()`, o se sustituye por una ruta que exista y que el init realmente instale.
-- [ ] #2 No queda ninguna referencia a `.agents/rules/git-workflow.md` en el repo: `grep -r "git-workflow.md"` devuelve vacio en `scripts/` y en los templates.
-- [ ] #3 Si la decision es eliminar la linea, se documenta en las notas por que las reglas inline son la fuente unica y no un archivo aparte.
-- [ ] #4 `npm run check:all` sale con 0 tras el cambio.
 
 ---
 
@@ -872,5 +853,55 @@ Este defecto quedo fuera de PLAY-029 (alcance editorial) y de PLAY-030 (alcance 
 - [x] #8 `npm run check:all` pasa con 0 errores tras el cambio (332/332 tests, 72 suites).
 - [x] #9 **Fix post-QA (invariante T_ready-immutability).** La QA ciego (subagente limpio) hallo que el barrido inicial subescalo el alcance: el inventario solo cubrio los 5 archivos donde aparecia `npm run gate:qa`, no **todos** los archivos core. Se reabrio el item a `doing` (STATE_MACHINE L77: un fix post-QA invalida la certificacion y debe recorrer T1/T2 de nuevo) y se sustituyeron las 4 lineas restantes de **mismo defecto** en archivos que el consumidor **si** recibe y cuyo binario **si** esta en core: `.agents/skills/code-level-ux-auditor/SKILL.md` L26 (forma `node scripts/audit-ux-code.cjs --update-baseline`, ya usada en L21-25) y L32 (prosa), mas `scripts/audit-ux-code.cjs` L1009 y L1204 (la **propia salida del binario** instruia `npm run audit:ux` al consumidor).
 - [x] #10 **Hallazgos reportados, deliberadamente fuera de este fix** (mismo origen: `package.json` no viaja al consumidor, pero no admiten sustitucion porque su binario no esta en core o es ambiguo): (a) `npm run validate` en `TEAM_PLAYBOOK.md` L142; (b) `npm run lint:anti-slop` en `principal-engineer/SKILL.md` L215, que ademas no existe ni en este `package.json` (lectura ambigua: recomendacion de CI propia del consumidor vs script ausente); (c) en `README.md` (landing page, no instalado) `validate`, `gate:review` y `check:all`. Todos requieren decision propia del PO, no se resuelven por sustitucion.
+
+---
+
+### 📦 Archivadas / Descartadas (2)
+
+#### [PLAY-036] Resincronizar titulos y cuerpos de releases de GitHub con la norma de guion y el CHANGELOG en ingles
+- **Prioridad**: `p3` | **Tipo**: `decision`
+
+La revision de `dev` tras la v2.6.0 verifico que lo publicado en GitHub diverge del CHANGELOG ya corregido:
+
+1. **El cuerpo del release v2.6.0** todavia contiene las entradas originales en espanol de PLAY-031 ("ASCII diagrama estatico en el primer fold...") y PLAY-034 ("QA Ciega y Anti-Self-Certification..."), mientras que `CHANGELOG.md` ya las tiene en ingles tras `2b56029`. Verificado con `gh release view v2.6.0 --json body`.
+
+2. **Cinco titulos de release usan em-dash como separador**, lo que la Standard Hyphen Rule de AGENTS.md cubre explicitamente ("release titles"): `v2.2.2 — Zero-network sync...`, `v2.2.1 — UX-010...`, `v2.2.0 — Punto de extension...`, `v2.1.0 — Anatomia de unidad...`, `v2.0.0 — Agentic Team Playbook`. Los releases desde v2.3.0 usan solo el numero, sin separador.
+
+Los releases de GitHub son artefactos publicados e inmutables por convencion; corregirlos es decision del PO, no una consecuencia mecanica de arreglar el CHANGELOG local. Este item existe para que la decision quede registrada y no se pierda.
+
+**Criterios de Aceptación:**
+- [x] #1 Decision del PO registrada sobre el cuerpo de v2.6.0: (b) se deja como quedo en el momento de publicacion y se anota que el CHANGELOG es la fuente canonica vigente.
+- [x] #2 Decision del PO registrada sobre los 5 titulos con em-dash (v2.0.0, v2.1.0, v2.2.0, v2.2.1, v2.2.2): (b) se declaran exemptos como historico inmutable y la norma aplica desde v2.3.0 en adelante.
+- [x] #3 La decision tomada queda reflejada en la documentacion que el consumidor ve: los releases historicos quedan como registro historico inmutable y CHANGELOG.md rige como fuente canonica.
+- [x] #4 Los cambios, si los hay, no tocan tags ni el paquete npm publicado; solo metadatos del release en GitHub.
+
+---
+
+#### [PLAY-039] El adaptador de Cursor declara como canonico un archivo que no existe: .agents/rules/git-workflow.md
+- **Prioridad**: `p2` | **Tipo**: `bug`
+
+`scripts/lib/adapters.mjs:118-130` define `renderCursorGitRule()`, que genera para el consumidor un archivo de reglas de Cursor con este cuerpo:
+
+```
+# Git workflow
+
+Canonical source: `.agents/rules/git-workflow.md` - read it before any `git commit` or `git push`.
+
+<las cinco GIT_RULES, inline>
+```
+
+La linea "Canonical source" apunta a `.agents/rules/git-workflow.md`. **Ese archivo no existe.** Verificado con un glob sobre `**/git-workflow.md` en el repo de gripm: cero resultados.
+
+El efecto es que todo agente de Cursor recibe una orden explicita de leer un archivo ausente antes de cualquier `git commit` o `git push`. Las reglas si estan presentes, inline debajo de la referencia; pero la instruccion manda a buscarlas a otro lado.
+
+Es doblemente ironico porque el contenido es correcto: el archivo inventado se llamaria "canonical source" del mismo texto que ya esta embebido. La referencia no aporta nada aunque existiera, salvo un segundo lugar donde mantenerlo.
+
+Este defecto se detecto de forma indirecta: al releer `GIT_RULES` para investigar un problema de colision multi-agente (PLAY-038), la referencia canonica aparecio como primera linea de la regla generada, y su objetivo no estaba en el arbol.
+
+**Criterios de Aceptación:**
+- [ ] #1 La linea "Canonical source" se elimina de `renderCursorGitRule()`, o se sustituye por una ruta que exista y que el init realmente instale.
+- [ ] #2 No queda ninguna referencia a `.agents/rules/git-workflow.md` en el repo: `grep -r "git-workflow.md"` devuelve vacio en `scripts/` y en los templates.
+- [ ] #3 Si la decision es eliminar la linea, se documenta en las notas por que las reglas inline son la fuente unica y no un archivo aparte.
+- [ ] #4 `npm run check:all` sale con 0 tras el cambio.
 
 ---
