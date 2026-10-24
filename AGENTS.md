@@ -90,7 +90,7 @@ Headline rule, for immediate effect:
 > [!CAUTION]
 > **Prohibited to run `git checkout` or `git restore` in the primary working tree while another agent is working in the same repository.** The working tree and `.git/HEAD` represent shared filesystem state: checking out a branch silently switches the other agent's branch while it is writing, landing its subsequent commit on the wrong branch.
 
-- **Pre-Flight Concurrency Probe:** Before modifying files or running Git commands, check the backlog (`status: doing`) and `git status --porcelain`. If an item is in `doing` with a foreign `claimed_by` (format `<provider>:<id>`, e.g., `antigravity:<id>`, `cursor:<id>`, `human:<id>`), **never revert or clean the shared working tree**.
+- **Pre-Flight Concurrency Probe:** Before modifying files or running Git commands, check the backlog (`status: doing`) and `git status --porcelain`. If an item is in `doing` with a foreign `claimed_by` (format `<provider>:<id>`, e.g., `antigravity:<id>`, `cursor:<id>`, `human:<id>`) or `git status --porcelain` reveals uncommitted changes (`A `, `M `) not created by the active session, **never revert or clean the shared working tree**, and immediately self-isolate in a worktree.
 - **Autonomous Handshake & Cross-Harness Protocol:** If agents share a runtime (e.g., `antigravity:`), contact the peer directly via `send_message(Recipient: claimed_by)`. If from heterogeneous providers, respect the lease, avoid failing RPC calls, and immediately self-isolate in a worktree, notifying the user in chat.
 - **Auto-Worktree:** Each agent or parallel task operates in its own isolated worktree on its own branch. Recipe and coexistence rules in [`.agents/rules/git-workflow.md`](.agents/rules/git-workflow.md) § Multi-Agent Parallelism.
 

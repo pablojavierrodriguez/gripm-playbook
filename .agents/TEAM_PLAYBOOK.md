@@ -81,8 +81,8 @@ To prevent agents from colliding blindly or requiring human intervention as an i
 
 1. **Pre-Flight Concurrency Probe (Synchronous & Mandatory):**  
    Before editing code or altering branches, every newly invoked agent inspects the backlog for items with `status: doing` and runs `git status --porcelain`.  
-   - If it detects an item in `doing` with a `claimed_by` different from its own identity, it **dynamically discovers its active peer**.
-   - **Shared Tree Safeguard:** Prohibited to execute `git checkout .`, `git restore .`, or `git clean` on a working tree with in-flight changes from another agent.
+   - If it detects an item in `doing` with a `claimed_by` different from its own identity, or uncommitted changes (`A `, `M `) in `git status --porcelain` not authored by the current session, it **dynamically discovers an active peer or foreign in-flight changes**.
+   - **Shared Tree Safeguard & Mandatory Isolation:** Prohibited to execute `git checkout .`, `git restore .`, or `git clean` on a working tree with in-flight changes from another agent. The detecting agent immediately self-isolates in a worktree.
 2. **Dynamic Task Claiming Namespaced (`claimed_by`):**  
    When moving an item to `status: doing`, the agent atomically stamps its complete identity in the YAML frontmatter under the canonical format `<provider_or_harness>:<session_or_agent_id>`:
    - `antigravity:7e5f1a7d-1f19-46fd-bb33-baa4c0394372`

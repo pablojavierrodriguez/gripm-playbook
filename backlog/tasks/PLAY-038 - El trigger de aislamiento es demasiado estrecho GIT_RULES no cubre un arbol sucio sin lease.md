@@ -1,9 +1,9 @@
 ---
 id: PLAY-038
 title: "El trigger de aislamiento es demasiado estrecho: GIT_RULES no cubre un arbol sucio sin lease"
-status: draft
+status: ready
 created_date: '2026-10-22'
-updated_date: '2026-10-22'
+updated_date: '2026-10-24'
 labels:
   - "git"
   - "multi-agent"
@@ -11,6 +11,7 @@ labels:
 priority: high
 type: bug
 estimate: 2
+claimed_by: "antigravity:2212e80c-aa8b-42e7-a29b-3a1b82c2d913"
 ---
 
 ## Description
@@ -35,11 +36,11 @@ La condicion actual tampoco detecta la situacion real de colision. `claimed_by` 
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] #1 `GIT_RULES` declara un disparador adicional: archivos `A ` o `M ` en `git status --porcelain` que el agente en curso no creo.
-- [ ] #2 Ese disparador **obliga al aislamiento en worktree** (regla 5), no solo a no revertir (regla 4). La prohibicion negativa no basta: deja al agente paralizado en el arbol principal, que es exactamente lo que ocurrio.
-- [ ] #3 La regla distingue explicitamente entre cambios propios del agente en curso y suciedad ajena. El disparador no puede exigir aislamiento ante los propios cambios.
-- [ ] #4 `AGENTS.md` y `.agents/TEAM_PLAYBOOK.md` reflejan el mismo disparador **solo si** reproducen esta seccion. Verificar antes de tocar: si la norma vive unicamente en `GIT_RULES`, no duplicarla.
-- [ ] #5 `npm run check:all` sale con 0 tras el cambio (validate + check:loc + test).
+- [x] #1 `GIT_RULES` declara un disparador adicional: archivos `A ` o `M ` en `git status --porcelain` que el agente en curso no creo.
+- [x] #2 Ese disparador **obliga al aislamiento en worktree** (regla 5), no solo a no revertir (regla 4). La prohibicion negativa no basta: deja al agente paralizado en el arbol principal, que es exactamente lo que ocurrio.
+- [x] #3 La regla distingue explicitamente entre cambios propios del agente en curso y suciedad ajena. El disparador no puede exigir aislamiento ante los propios cambios.
+- [x] #4 `AGENTS.md` y `.agents/TEAM_PLAYBOOK.md` reflejan el mismo disparador **solo si** reproducen esta seccion. Verificar antes de tocar: si la norma vive unicamente en `GIT_RULES`, no duplicarla.
+- [x] #5 `npm run check:all` sale con 0 tras el cambio (validate + check:loc + test).
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -56,4 +57,7 @@ La condicion actual tampoco detecta la situacion real de colision. `claimed_by` 
 **Por que no alcanza con reforzar la regla 4.** La regla 4 prohibe revertir. No dice que el agente deba dejar de trabajar en el arbol principal, y en el incidente el agente no reverteo nada: lucho con el indice. Ampliar la prohibicion no habria cambiado su conducta, porque el costo aparecia al commitear, no al editar.
 
 **Por que el lease no es suficiente como senal.** `claimed_by` exige que el otro agente lo declare. Los archivos stageados son observables sin su cooperation. Confiar solo en el lease asume disciplina en el emisor; confiar en el indice asume solo que git funciona.
+
+**Honest Scope & Residual Risk Declaration:**
+No tests were skipped. The rule in `scripts/lib/adapters.mjs` was expanded with rule 5 mandating immediate worktree isolation whenever uncommitted changes (`A `, `M `) not created by the active session are observed in `git status --porcelain`. Parity was maintained across `AGENTS.md`, `.agents/TEAM_PLAYBOOK.md`, and `.agents/rules/git-workflow.md`. Residual risk: multi-agent isolation relies on peer adherence to the prompt rules when external agents (Cursor, Claude Code, Copilot) operate outside mechanical harness hooks.
 <!-- SECTION:NOTES:END -->

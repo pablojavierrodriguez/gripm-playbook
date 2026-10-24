@@ -61,7 +61,7 @@ Los releases de GitHub son artefactos publicados e inmutables por convencion; co
 
 ---
 
-### 🚀 Ready for Deploy (1)
+### 🚀 Ready for Deploy (2)
 
 #### [PLAY-037] Portabilidad de paquete: CLI unificado, resolucion dinamica de raiz y desacople de piramide para proyectos consumidores
 - **Prioridad**: `p1` | **Tipo**: `improvement`
@@ -88,7 +88,23 @@ Este item implementa el Modelo Hibrido: el consumidor puede optar por usar `@gri
 
 ---
 
-### 📋 Backlog / Draft (3)
+#### [PLAY-038] El trigger de aislamiento es demasiado estrecho: GIT_RULES no cubre un arbol sucio sin lease
+- **Prioridad**: `p1` | **Tipo**: `bug`
+
+`scripts/lib/adapters.mjs:39-47` define `GIT_RULES`, el set de cinco reglas de git que el init inyecta en todo consumidor. Dos de ellas formaban un par incompleto: regla 4 (prohibición de revertir) y regla 5 (mecanismo de worktree), sin disparador observable para un árbol con cambios ajenos sin lease.
+
+Incidente medido (2026-10-22, repo gripm): otro agente dejó seis archivos stageados (`A `) en `backlog/tasks/` con `status: ideas` y sin `claimed_by`. Ninguna condición disparaba, forzando al agente a luchar contra el índice.
+
+**Criterios de Aceptación:**
+- [x] #1 `GIT_RULES` declara un disparador adicional: archivos `A ` o `M ` en `git status --porcelain` que el agente en curso no creo.
+- [x] #2 Ese disparador **obliga al aislamiento en worktree** (regla 5), no solo a no revertir (regla 4). La prohibicion negativa no basta: deja al agente paralizado en el arbol principal, que es exactamente lo que ocurrio.
+- [x] #3 La regla distingue explicitamente entre cambios propios del agente en curso y suciedad ajena. El disparador no puede exigir aislamiento ante los propios cambios.
+- [x] #4 `AGENTS.md` y `.agents/TEAM_PLAYBOOK.md` reflejan el mismo disparador **solo si** reproducen esta seccion. Verificar antes de tocar: si la norma vive unicamente en `GIT_RULES`, no duplicarla.
+- [x] #5 `npm run check:all` sale con 0 tras el cambio (validate + check:loc + test).
+
+---
+
+### 📋 Backlog / Draft (2)
 
 #### [PLAY-035] Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash
 - **Prioridad**: `p3` | **Tipo**: `improvement`
@@ -109,33 +125,6 @@ El file es la fuente de la que salen las notas de release publicadas (ver PLAY-0
 - [ ] #2 Decision del PO registrada sobre L58: (a) se reescribe para no incluir los caracteres literales (ej. "em-dash and en-dash characters"), o (b) se mantiene como meta-referencia y se documenta la exencion en la norma (AGENTS.md o git-workflow.md) para que un escaneo futuro no la marque.
 - [ ] #3 Decidida la politica sobre L58, queda registrado si se anade (o no) un chequeo de guiones (`U+2014`/`U+2013`) a `scripts/validate-repo.mjs`: si se anade, debe respetar la exencion decidida en #2; si no, queda anotado que la norma sigue siendo solo prosa.
 - [ ] #4 `npm run validate` y `npm test` en verde tras el cambio.
-
----
-
-#### [PLAY-038] El trigger de aislamiento es demasiado estrecho: GIT_RULES no cubre un arbol sucio sin lease
-- **Prioridad**: `p1` | **Tipo**: `bug`
-
-`scripts/lib/adapters.mjs:39-47` define `GIT_RULES`, el set de cinco reglas de git que el init inyecta en todo consumidor. Dos de ellas forman un par incompleto:
-
-- Regla 4: *"A `doing` item carrying a foreign `claimed_by` owns the tree: never revert or clean it."* Es **prohibicion negativa**: no hagas nada destructivo.
-- Regla 5: *"Parallel work runs in isolated worktrees: `git worktree add -b <branch> ../<repo>-<task>`."* Es **mecanismo**: aislate y trabaja igual.
-
-Ninguna de las dos dice **cuando se pasa de modo normal a modo aislado**. El unico disparador explicito es la regla 4, y su condicion es estrecha: un item en `doing` con `claimed_by` ajeno.
-
-Incidente medido (2026-10-22, repo gripm): otro agente dejo **seis** archivos stageados (`A `) en `backlog/tasks/` con `status: ideas` y **sin `claimed_by`**. Ninguna condicion existente disparo, asi que el agente en curso se quedo en el arbol principal y lucho contra el indice compartido durante toda la certificacion de DEV-326.
-
-El costo no fue cosmético. `BACKLOG.md` es un agregado que referencia **todas** las tareas del arbol, y el Backlog Guard exige que no referencie tareas fantasma. Con seis tareas ajenas sin commitear, **todo** commit que incluyera el consolidado quedaba bloqueado. El agente tuvo que decidir entre incluir trabajo ajeno en su commit o romper la coherencia del consolidado, y pregunto al PO porque no habia regla que lo resolviera.
-
-Un worktree lo habria resuelto limpiamente: la rama sale de HEAD, no ve las tareas sin trackear del otro agente, y su `BACKLOG.md` no las referencia. **La cura ya esta escrita en la regla 5; lo que falta es el disparador que active la regla 5.**
-
-La condicion actual tampoco detecta la situacion real de colision. `claimed_by` es un lease declarado; los archivos stageados en el indice de git son **estado observable**. El segundo es una evidencia mas fuerte que el primero: no requiere que el otro agente haya sido disciplinoso, solo que exista.
-
-**Criterios de Aceptación:**
-- [ ] #1 `GIT_RULES` declara un disparador adicional: archivos `A ` o `M ` en `git status --porcelain` que el agente en curso no creo.
-- [ ] #2 Ese disparador **obliga al aislamiento en worktree** (regla 5), no solo a no revertir (regla 4). La prohibicion negativa no basta: deja al agente paralizado en el arbol principal, que es exactamente lo que ocurrio.
-- [ ] #3 La regla distingue explicitamente entre cambios propios del agente en curso y suciedad ajena. El disparador no puede exigir aislamiento ante los propios cambios.
-- [ ] #4 `AGENTS.md` y `.agents/TEAM_PLAYBOOK.md` reflejan el mismo disparador **solo si** reproducen esta seccion. Verificar antes de tocar: si la norma vive unicamente en `GIT_RULES`, no duplicarla.
-- [ ] #5 `npm run check:all` sale con 0 tras el cambio (validate + check:loc + test).
 
 ---
 

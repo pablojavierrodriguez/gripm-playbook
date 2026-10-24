@@ -41,6 +41,7 @@ const GIT_RULES = [
   'One task, one consolidated commit: the code and the task file.',
   'Never run `git checkout` or `git restore` in the primary working tree while another agent works here.',
   'A `doing` item carrying a foreign `claimed_by` owns the tree: never revert or clean it.',
+  'Foreign uncommitted changes in `git status --porcelain` (files `A ` or `M ` not created by the active session) mandate immediate worktree isolation: do not struggle with the dirty index or revert foreign work, isolate via worktree instead.',
   'Parallel work runs in isolated worktrees: `git worktree add -b <branch> ../<repo>-<task>`.',
 ]
   .map((item) => `- ${item}`)

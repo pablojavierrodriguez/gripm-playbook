@@ -2112,6 +2112,8 @@ describe('Tier 5: Zero-Friction Onboarding Init (PLAY-030)', () => {
 
     const gitRule = fs.readFileSync(path.join(dir, '.cursor/rules/git-workflow.mdc'), 'utf8');
     assert.match(gitRule, /\.agents\/rules\/git-workflow\.md/);
+    assert.match(gitRule, /Foreign uncommitted changes in `git status --porcelain`/, 'GIT_RULES must include foreign dirty tree isolation trigger');
+    assert.match(gitRule, /isolate via worktree instead/, 'GIT_RULES must mandate worktree isolation');
 
     const claude = fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8');
     assert.match(claude, /AGENTS\.md/);

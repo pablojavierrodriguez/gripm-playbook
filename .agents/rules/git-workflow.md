@@ -37,12 +37,12 @@ The two failure modes this causes:
 ### Rule & Discovery Protocol (Pre-Flight Concurrency Probe)
 
 Before running any Git command or modifying files:
-1. **Synchronous Probe:** The agent inspects the backlog (`status: doing`) and runs `git status --porcelain`. If it detects an item in `doing` with a `claimed_by` different from its own namespaced identity (`<provider>:<id>`), it **dynamically discovers an active peer**.
+1. **Synchronous Probe:** The agent inspects the backlog (`status: doing`) and runs `git status --porcelain`. If it detects an item in `doing` with a `claimed_by` different from its own namespaced identity (`<provider>:<id>`), or uncommitted changes (`A `, `M `) in `git status --porcelain` not authored by the active session, it **dynamically discovers an active peer or foreign in-flight state**.
 2. **Shared Tree Safeguard:** Prohibited to run `git checkout .`, `git restore .`, or `git clean`. The agent assumes uncommitted changes belong to its peer.
 3. **Autonomous Handshake & Cross-Harness Protocol:**
    - **Intra-Harness (same runtime, e.g., `antigravity:`):** Issues a `send_message` to the `claimed_by` recipient of the active task to coordinate priorities.
    - **Cross-Harness (different provider, e.g., `cursor:`, `claude-code:`, `human:`):** Respects the lease without attempting unviable RPC calls, notifies the user in chat, and proceeds directly to worktree isolation.
-4. **Worktree Isolation:** When two or more agents operate simultaneously on the same repository, **each agent or parallel task operates in its own worktree**. No agent changes branches in the primary working tree.
+4. **Worktree Isolation:** When two or more agents operate simultaneously on the same repository, or foreign uncommitted changes are present in the working tree, **each agent or parallel task operates in its own worktree**. Never struggle with a dirty shared index: isolate via worktree. No agent changes branches in the primary working tree.
 
 ### Recipe
 
