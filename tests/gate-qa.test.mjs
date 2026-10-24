@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { inspectTask, loadTasks, mutateTaskFrontmatter, readFrontmatter, resolvePyramid } from '../scripts/gate-qa.mjs';
+import { inspectTask, loadTasks, mutateTaskFrontmatter, readFrontmatter, resolvePyramid, syncConsolidatedBacklog } from '../scripts/gate-qa.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GATE = path.join(ROOT, 'scripts', 'gate-qa.mjs');
@@ -836,5 +836,108 @@ describe('mechanical state transitions (T0, T1, T2, T_unblock)', () => {
     const { code, stdout } = runGate([file, '--no-run', '--by', 'antigravity:qa-auditor-clean']);
     assert.equal(code, 2, 'independent QA subagent passes task inspection');
     assert.match(stdout, /TASK INSPECTION PASSED/);
+  });
+
+  describe('consolidated backlog auto-regeneration on state transitions (PLAY-040)', () => {
+    test('syncConsolidatedBacklog triggers backlog:sync script when BACKLOG.md exists (AC #1)', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'backlog-sync-'));
+      const backlogFile = path.join(dir, 'BACKLOG.md');
+      fs.writeFileSync(backlogFile, 'OLD_BACKLOG', 'utf8');
+      fs.writeFileSync(
+        path.join(dir, 'package.json'),
+        JSON.stringify({
+          name: 'consumer',
+          scripts: {
+            'backlog:sync': 'node -e "require(\'fs\').writeFileSync(\'BACKLOG.md\', \'SYNCED_BACKLOG\')"',
+          },
+        }),
+      );
+
+      syncConsolidatedBacklog(dir);
+      assert.equal(fs.readFileSync(backlogFile, 'utf8'), 'SYNCED_BACKLOG');
+    });
+
+    test('syncConsolidatedBacklog silently skips when BACKLOG.md does not exist (AC #4)', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'no-backlog-'));
+      fs.writeFileSync(
+        path.join(dir, 'package.json'),
+        JSON.stringify({
+          name: 'consumer-without-backlog',
+          scripts: {
+            'backlog:sync': 'node -e "process.exit(1)"',
+          },
+        }),
+      );
+
+      assert.doesNotThrow(() => syncConsolidatedBacklog(dir));
+      assert.equal(fs.existsSync(path.join(dir, 'BACKLOG.md')), false);
+    });
+
+    test('gate transitions (submit T1 and gate:qa T2) regenerate BACKLOG.md on pass, never on fail (AC #1 & #2)', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-sync-e2e-'));
+      fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'backlog', 'tasks'), { recursive: true });
+      fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+      fs.cpSync(path.join(ROOT, 'scripts', 'lib'), path.join(dir, 'scripts', 'lib'), { recursive: true });
+
+      const backlogPath = path.join(dir, 'BACKLOG.md');
+      fs.writeFileSync(backlogPath, 'INITIAL_CONSOLIDATED', 'utf8');
+      fs.writeFileSync(
+        path.join(dir, 'package.json'),
+        JSON.stringify({
+          name: 'consumer-project',
+          scripts: {
+            validate: 'node -e "process.exit(0)"',
+            test: 'node -e "process.exit(0)"',
+            'gate:review': 'node -e "process.exit(0)"',
+            'audit:ux:strict': 'node -e "process.exit(0)"',
+            'backlog:sync': 'node -e "require(\'fs\').writeFileSync(\'BACKLOG.md\', \'UPDATED_BY_SYNC\')"',
+          },
+        }),
+      );
+
+      // 1. Submit T1: doing -> review
+      const taskFile = path.join(dir, 'backlog', 'tasks', 'DEV-100.md');
+      fs.writeFileSync(
+        taskFile,
+        '---\nid: DEV-100\nstatus: doing\ndependencies: []\npriority: high\n---\n<!-- AC:BEGIN -->\n- [x] #1 Done\n<!-- AC:END -->\n',
+      );
+
+      execFileSync(process.execPath, [path.join(dir, 'scripts', 'gate-qa.mjs'), 'submit', taskFile], {
+        cwd: dir,
+        encoding: 'utf8',
+      });
+      assert.equal(readFrontmatter(fs.readFileSync(taskFile, 'utf8')).status, 'review');
+      assert.equal(fs.readFileSync(backlogPath, 'utf8'), 'UPDATED_BY_SYNC');
+
+      // 2. Gate certification T2: review -> ready
+      fs.writeFileSync(backlogPath, 'STALE_AGAIN', 'utf8');
+      execFileSync(process.execPath, [path.join(dir, 'scripts', 'gate-qa.mjs'), taskFile, '--by', 'qa:peer'], {
+        cwd: dir,
+        encoding: 'utf8',
+      });
+      assert.equal(readFrontmatter(fs.readFileSync(taskFile, 'utf8')).status, 'ready');
+      assert.equal(fs.readFileSync(backlogPath, 'utf8'), 'UPDATED_BY_SYNC');
+
+      // 3. Rejected gate never mutates BACKLOG.md (AC #2)
+      fs.writeFileSync(backlogPath, 'UNTOUCHED', 'utf8');
+      const failTask = path.join(dir, 'backlog', 'tasks', 'DEV-101.md');
+      fs.writeFileSync(
+        failTask,
+        '---\nid: DEV-101\nstatus: review\ndependencies: []\npriority: high\n---\n<!-- AC:BEGIN -->\n- [ ] #1 Unchecked\n<!-- AC:END -->\n',
+      );
+
+      let failed = false;
+      try {
+        execFileSync(process.execPath, [path.join(dir, 'scripts', 'gate-qa.mjs'), failTask], {
+          cwd: dir,
+          encoding: 'utf8',
+        });
+      } catch {
+        failed = true;
+      }
+      assert.equal(failed, true, 'gate must fail on unchecked AC');
+      assert.equal(fs.readFileSync(backlogPath, 'utf8'), 'UNTOUCHED', 'failed gate must never touch BACKLOG.md');
+    });
   });
 });

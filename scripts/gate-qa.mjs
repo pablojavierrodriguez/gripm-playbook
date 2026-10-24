@@ -16,7 +16,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readFrontmatter, readACs, mutateTaskFrontmatter } from './lib/frontmatter.mjs';
 import { c, printHeader } from './lib/terminal.mjs';
-import { resolvePyramidSteps, executePyramid } from './lib/pyramid.mjs';
+import { resolvePyramidSteps, executePyramid, readScripts } from './lib/pyramid.mjs';
 import {
   loadTasks as loadTasksFromDir,
   resolveTaskPath as resolveTaskPathFromDir,
@@ -107,6 +107,46 @@ export function getExplicitRoot(argv = []) {
 
 const ROOT = resolveProjectRoot();
 const TASKS_DIR = path.join(ROOT, 'backlog', 'tasks');
+
+export function syncConsolidatedBacklog(projectRoot) {
+  const backlogPath = path.join(projectRoot, 'BACKLOG.md');
+  if (!fs.existsSync(backlogPath)) {
+    return;
+  }
+
+  const scripts = readScripts(projectRoot);
+  const candidates = ['backlog:sync', 'sync:backlog', 'backlog:export', 'export:backlog'];
+  const scriptName = candidates.find((name) => Boolean(scripts[name]));
+
+  if (scriptName) {
+    try {
+      spawnSync('npm', ['run', '--silent', scriptName], {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        shell: process.platform === 'win32',
+        stdio: 'ignore',
+      });
+    } catch {}
+  } else if (fs.existsSync(path.join(projectRoot, 'scripts', 'sync-backlog.js'))) {
+    try {
+      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'sync-backlog.js')], {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        shell: process.platform === 'win32',
+        stdio: 'ignore',
+      });
+    } catch {}
+  } else if (fs.existsSync(path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'))) {
+    try {
+      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'), '--export'], {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        shell: process.platform === 'win32',
+        stdio: 'ignore',
+      });
+    } catch {}
+  }
+}
 
 export { readFrontmatter, readACs, mutateTaskFrontmatter, inspectTask, resolveActor, isSameActor };
 
@@ -246,6 +286,7 @@ export function unblockMain(argv) {
 
   const updated = mutateTaskFrontmatter(content, { status: targetStatus, remove: ['blocked_reason'] });
   fs.writeFileSync(taskPath, updated, 'utf8');
+  syncConsolidatedBacklog(projectRoot);
 
   console.log(`  ${c.bold('T_unblock guard:')}`);
   console.log(`    ${c.green('✔')} every dependency is done or unlinked`);
@@ -307,6 +348,7 @@ export function startMain(argv) {
 
   const set = claimedBy ? { claimed_by: claimedBy } : {};
   fs.writeFileSync(taskPath, mutateTaskFrontmatter(content, { status: 'doing', set }), 'utf8');
+  syncConsolidatedBacklog(projectRoot);
   console.log(`  ${c.green('✔')} START ALLOWED - ${frontmatter.id} moved draft → doing.\n`);
   process.exit(0);
 }
@@ -347,6 +389,7 @@ export function submitMain(argv) {
   }
 
   fs.writeFileSync(taskPath, mutateTaskFrontmatter(content, { status: 'review' }), 'utf8');
+  syncConsolidatedBacklog(projectRoot);
   console.log(`  ${c.green('✔')} SUBMIT ALLOWED - ${frontmatter.id} moved doing → review.\n`);
   process.exit(0);
 }
@@ -432,6 +475,7 @@ export function main(argv) {
 
   if (ok) {
     fs.writeFileSync(taskPath, mutateTaskFrontmatter(content, { status: 'ready' }), 'utf8');
+    syncConsolidatedBacklog(projectRoot);
     console.log(`  ${c.green('✔')} GATE PASSED - ${frontmatter.id} promoted review → ready (may be promoted).\n`);
     process.exit(0);
   }

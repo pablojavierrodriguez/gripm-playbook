@@ -61,7 +61,7 @@ Los releases de GitHub son artefactos publicados e inmutables por convencion; co
 
 ---
 
-### 🚀 Ready for Deploy (2)
+### 🚀 Ready for Deploy (3)
 
 #### [PLAY-037] Portabilidad de paquete: CLI unificado, resolucion dinamica de raiz y desacople de piramide para proyectos consumidores
 - **Prioridad**: `p1` | **Tipo**: `improvement`
@@ -104,7 +104,23 @@ Incidente medido (2026-10-22, repo gripm): otro agente dejó seis archivos stage
 
 ---
 
-### 📋 Backlog / Draft (2)
+#### [PLAY-040] El gate escribe la transicion de estado sin regenerar el consolidado y el commit siguiente se rechaza
+- **Prioridad**: `p1` | **Tipo**: `bug`
+
+`scripts/gate-qa.mjs` escribe `status` en disco en dos transiciones: T1 (`submit`, doing a review) y T2 (review a ready), ambas via `mutateTaskFrontmatter`. Sin la regeneracion automatica, `BACKLOG.md` quedaba desfasado y el hook de commit rechazaba el cambio.
+
+El gate ahora regenera el consolidado invocando `syncConsolidatedBacklog` en el proyecto consumidor tras cada mutacion de estado valida si `BACKLOG.md` existe, ejecutando el script `backlog:sync` o fallbacks correspondientes y omitiendo en silencio si no existe.
+
+**Criterios de Aceptación:**
+- [x] #1 Despues de que el gate escribe una transicion (`submit` o T2), `npm run backlog:check` sale con codigo 0 sin que el usuario corra `backlog:sync` a mano.
+- [x] #2 La regeneracion del consolidado ocurre solo si la verificacion previa paso, respetando el contrato ya documentado en `verify-backlog-sync.js:363-365`: un commit rechazado nunca deja el consolidado reescrito como efecto secundario.
+- [x] #3 El gate no stagea nada. La regla "un hook verifica, no muta" aplica tambien a la CLI: regenerar el consolidado no equivale a `git add BACKLOG.md`.
+- [x] #4 Un consumidor sin `BACKLOG.md` en disco (proyecto que aun no lo genero) no recibe error: la regeneracion se omite en silencio.
+- [x] #5 `npm run check:all` sale con 0 tras el cambio.
+
+---
+
+### 📋 Backlog / Draft (1)
 
 #### [PLAY-035] Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash
 - **Prioridad**: `p3` | **Tipo**: `improvement`
@@ -125,38 +141,6 @@ El file es la fuente de la que salen las notas de release publicadas (ver PLAY-0
 - [ ] #2 Decision del PO registrada sobre L58: (a) se reescribe para no incluir los caracteres literales (ej. "em-dash and en-dash characters"), o (b) se mantiene como meta-referencia y se documenta la exencion en la norma (AGENTS.md o git-workflow.md) para que un escaneo futuro no la marque.
 - [ ] #3 Decidida la politica sobre L58, queda registrado si se anade (o no) un chequeo de guiones (`U+2014`/`U+2013`) a `scripts/validate-repo.mjs`: si se anade, debe respetar la exencion decidida en #2; si no, queda anotado que la norma sigue siendo solo prosa.
 - [ ] #4 `npm run validate` y `npm test` en verde tras el cambio.
-
----
-
-#### [PLAY-040] El gate escribe la transicion de estado sin regenerar el consolidado y el commit siguiente se rechaza
-- **Prioridad**: `p1` | **Tipo**: `bug`
-
-`scripts/gate-qa.mjs` escribe `status` en disco en dos transiciones: T1 (`submit`, doing a review) y T2 (review a ready), ambas via `mutateTaskFrontmatter`. **Ninguna de las dos regenera `BACKLOG.md`.**
-
-El Backlog Guard del consumidor (`verify-backlog-sync.js`, hook `--hook`) rechaza cualquier commit cuyo `BACKLOG.md` este desfasado respecto a las tareas. Asi que el flujo mecanico completo queda roto en un punto que nadie documenta:
-
-```
-node scripts/gate-qa.mjs submit DEV-326    -> escribe doing a review. EXIT 0.
-npm run backlog:check                      -> EXIT 1: BACKLOG.md desactualizado.
-npm run backlog:sync                        -> EXIT 0.
-node scripts/gate-qa.mjs DEV-326           -> GATE PASSED, escribe ready. EXIT 0.
-npm run backlog:check                       -> EXIT 1: BACKLOG.md desactualizado otra vez.
-npm run backlog:sync                        -> EXIT 0.
-git commit                                  -> recien aqui pasa el guard.
-```
-
-Medido en gripm el 2026-10-22 durante la certificacion de DEV-326: **dos** syncs de mas, ambos provocados por el propio gate. El gate es la herramienta que certifica que el repo esta listo para commitear, y cada corrida lo deja en un estado que el hook de pre-commit rechaza.
-
-El punto ciego es estructural. El gate escribe un archivo y no conoce el consolidado que lo refleja. No es un bug de implementacion puntual: es que la transicion y el consolidado estan en capas que no se hablan.
-
-**Nota de alcance:** `scripts/gate-qa.mjs` tiene 147 lineas de diff sin commitear en este repo por PLAY-037 (portabilidad de rutas para consumidores). Ese trabajo es ortogonal a este hallazgo, pero comparte archivo: verificar el estado antes de tocar, y re-sincronizar el alcance si PLAY-037 lo reubica.
-
-**Criterios de Aceptación:**
-- [ ] #1 Despues de que el gate escribe una transicion (`submit` o T2), `npm run backlog:check` sale con codigo 0 sin que el usuario corra `backlog:sync` a mano.
-- [ ] #2 La regeneracion del consolidado ocurre solo si la verificacion previa paso, respetando el contrato ya documentado en `verify-backlog-sync.js:363-365`: un commit rechazado nunca deja el consolidado reescrito como efecto secundario.
-- [ ] #3 El gate no stagea nada. La regla "un hook verifica, no muta" aplica tambien a la CLI: regenerar el consolidado no equivale a `git add BACKLOG.md`.
-- [ ] #4 Un consumidor sin `BACKLOG.md` en disco (proyecto que aun no lo genero) no recibe error: la regeneracion se omite en silencio.
-- [ ] #5 `npm run check:all` sale con 0 tras el cambio.
 
 ---
 

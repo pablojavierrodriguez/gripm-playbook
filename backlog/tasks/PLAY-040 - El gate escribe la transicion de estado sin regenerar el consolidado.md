@@ -1,9 +1,9 @@
 ---
 id: PLAY-040
 title: "El gate escribe la transicion de estado sin regenerar el consolidado y el commit siguiente se rechaza"
-status: draft
+status: ready
 created_date: '2026-10-22'
-updated_date: '2026-10-22'
+updated_date: '2026-10-24'
 labels:
   - "gate"
   - "backlog"
@@ -11,6 +11,7 @@ labels:
 priority: high
 type: bug
 estimate: 2
+claimed_by: "antigravity:2212e80c-aa8b-42e7-a29b-3a1b82c2d913"
 ---
 
 ## Description
@@ -40,11 +41,11 @@ El punto ciego es estructural. El gate escribe un archivo y no conoce el consoli
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] #1 Despues de que el gate escribe una transicion (`submit` o T2), `npm run backlog:check` sale con codigo 0 sin que el usuario corra `backlog:sync` a mano.
-- [ ] #2 La regeneracion del consolidado ocurre solo si la verificacion previa paso, respetando el contrato ya documentado en `verify-backlog-sync.js:363-365`: un commit rechazado nunca deja el consolidado reescrito como efecto secundario.
-- [ ] #3 El gate no stagea nada. La regla "un hook verifica, no muta" aplica tambien a la CLI: regenerar el consolidado no equivale a `git add BACKLOG.md`.
-- [ ] #4 Un consumidor sin `BACKLOG.md` en disco (proyecto que aun no lo genero) no recibe error: la regeneracion se omite en silencio.
-- [ ] #5 `npm run check:all` sale con 0 tras el cambio.
+- [x] #1 Despues de que el gate escribe una transicion (`submit` o T2), `npm run backlog:check` sale con codigo 0 sin que el usuario corra `backlog:sync` a mano.
+- [x] #2 La regeneracion del consolidado ocurre solo si la verificacion previa paso, respetando el contrato ya documentado en `verify-backlog-sync.js:363-365`: un commit rechazado nunca deja el consolidado reescrito como efecto secundario.
+- [x] #3 El gate no stagea nada. La regla "un hook verifica, no muta" aplica tambien a la CLI: regenerar el consolidado no equivale a `git add BACKLOG.md`.
+- [x] #4 Un consumidor sin `BACKLOG.md` en disco (proyecto que aun no lo genero) no recibe error: la regeneracion se omite en silencio.
+- [x] #5 `npm run check:all` sale con 0 tras el cambio.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -61,4 +62,7 @@ El punto ciego es estructural. El gate escribe un archivo y no conoce el consoli
 **Por que es alta prioridad y no un detalle de DX.** El gate existe para eliminar la certificacion manual. Hoy elimina la parte de "verificar" y devuelve la parte de "escribir" al usuario, que tiene que recordar dos comandos intercalados. Es la misma promesa rota en el mismo lugar donde DEV-326 la arreglaba: el fork del gate en gripm tampoco escribia, y el canon si pero a medias.
 
 **Relacion con PLAY-034.** Esa tarea mostro que el consumidor no recibe `package.json` y por eso no tiene los alias npm. Si la solucion aqui termina siendo invocar un script npm desde el gate, conviene usar la forma `node` directa, que PLAY-034 ya establecio como norma para todo lo que viaja al consumidor.
+
+**Honest Scope & Residual Risk Declaration:**
+No tests were skipped. The implementation in `scripts/gate-qa.mjs` triggers `syncConsolidatedBacklog` after successful status mutations across transitions (T0, T1, T2, T_unblock). It checks for candidate scripts (`backlog:sync`, `sync:backlog`, `backlog:export`) in `package.json` or fallback script files, with silent no-op when `BACKLOG.md` is absent. Residual risk: in consumer projects where `backlog:sync` fails due to external syntax errors or missing environment variables, the gate catches and ignores the error so the primary QA workflow is not aborted.
 <!-- SECTION:NOTES:END -->
