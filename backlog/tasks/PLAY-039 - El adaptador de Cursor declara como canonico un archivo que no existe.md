@@ -1,9 +1,10 @@
 ---
 id: PLAY-039
 title: "El adaptador de Cursor declara como canonico un archivo que no existe: .agents/rules/git-workflow.md"
-status: draft
+status: dismissed
+dismissed_reason: "Dismissed: premise false. The file .agents/rules/git-workflow.md exists on disk (5651 bytes). The report relied on a POSIX glob that omits dot-directories, so it under-reported. No defect."
 created_date: '2026-10-22'
-updated_date: '2026-10-22'
+updated_date: '2026-10-24'
 labels:
   - "cursor"
   - "adapters"
@@ -60,3 +61,40 @@ Este defecto se detecto de forma indirecta: al releer `GIT_RULES` para investiga
 
 **Por que es prioridad media y no alta.** El contenido de las reglas esta presente y es correcto; lo que falla es una instruccion de indireccion que un agente puede ignorar siguiendo el texto que le sigue. No bloquea ningun flujo mecanico.
 <!-- SECTION:NOTES:END -->
+
+## Verification (2026-10-24) - Premise false, dismissed
+
+<!-- SECTION:VERIFY:BEGIN -->
+The task's central claim - "`git-workflow.md` does not exist, glob returns 0 results" -
+is **false**. The file is present on disk:
+
+```
+C:\Users\Pablo\Proyectos\gripm-playbook\.agents\rules\git-workflow.md   (5651 bytes)
+```
+
+Opening lines confirm real content:
+
+```
+# Git Workflow & Commit Governance
+
+Strict rules governing Git operations to prevent unintentional code loss or vague commit histories.
+```
+
+**Why the original report missed it.** The report was produced with a POSIX-style glob
+(`**/git-workflow.md`) that returns "No files found". That pattern omits dot-directories:
+`.agents/` is a hidden folder, so `**/` never descends into it. A `Get-ChildItem -Recurse -Force`
+or any hidden-inclusive listing finds the file immediately. The diagnosis error was a tooling
+default, not a missing artifact.
+
+**Cross-checks that also confirm presence (all clean):**
+- `sync-playbook.mjs:70` lists it in `FALLBACK_CORE_FILES`; a dry-run sync into a temp repo
+  exits 0 with no "not found" / "upstream" warnings for this path.
+- `.playbook-manifest.json:7` declares it; the manifest is validated green by `validate-repo.mjs`.
+- `validate-repo.mjs:146,238` reference it; both loops `continue` when absent, but presence means
+  the core-purity and doc-claim checks actually run against it.
+
+**Conclusion.** The adapter's "Canonical source" line points to a file that exists and is
+installed. AC #1 (eliminate/replace the line) and AC #2 (grep returns empty) target a non-problem
+and would in fact *degrade* correctness by removing a valid pointer. No code change is warranted;
+the item is dismissed with a `dismissed_reason` per STATE_MACHINE T_dismiss.
+<!-- SECTION:VERIFY:END -->

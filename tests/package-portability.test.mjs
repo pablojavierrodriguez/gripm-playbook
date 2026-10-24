@@ -37,6 +37,24 @@ function runNode(script, args = [], options = {}) {
   };
 }
 
+// Copies the shipped package payload into a node_modules layout so the CLI
+// runs exactly as an installed dependency would: the auto-detection branch
+// (`shouldDefaultToLocalBundle`) keys off `.playbook-manifest.json` sitting at
+// the package root, next to scripts/. Without this, that branch is never taken.
+function installPackageInto(consumerDir) {
+  const pkgDir = path.join(consumerDir, 'node_modules', '@gripm', 'playbook');
+  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, '.playbook-manifest.json'), 'utf8'));
+  const entries = new Set([...(manifest.core || manifest.files || []), '.playbook-manifest.json']);
+  for (const rel of entries) {
+    const src = path.join(ROOT, rel);
+    if (!fs.existsSync(src) || !fs.statSync(src).isFile()) continue;
+    const dest = path.join(pkgDir, rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(src, dest);
+  }
+  return pkgDir;
+}
+
 describe('package portability & dynamic root resolution (PLAY-037)', () => {
   test('gate-qa resolves root to target consumer repo (not to package dir)', () => {
     const sandbox = createTempDir('consumer-gate-');
@@ -170,6 +188,47 @@ Feature ready for certification.
     // Assert file status mutated on disk
     const content = fs.readFileSync(taskPath, 'utf8');
     assert.match(content, /status:\s*ready/);
+  });
+
+  test('installed package auto-detects its own bundle with no --source and no network', () => {
+    const sandbox = createTempDir('consumer-autodetect-');
+    createFile(sandbox, 'package.json', JSON.stringify({ name: 'autodetect-app' }));
+    const pkgDir = installPackageInto(sandbox);
+
+    // Run the packaged CLI from inside node_modules, WITHOUT --source/--remote.
+    // This is the only way to exercise `shouldDefaultToLocalBundle`.
+    const cli = path.join(pkgDir, 'scripts', 'sync-playbook.mjs');
+    const res = runNode(cli, ['sync', '--repo', sandbox, '--yes', '--init-agents'], {
+      cwd: sandbox,
+      env: { ...process.env, HTTPS_PROXY: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9' },
+    });
+
+    assert.equal(res.status, 0, `auto-detected sync should succeed offline:\n${res.output}`);
+    assert.match(res.output, /@local/, 'must resolve to the local bundle, not raw.githubusercontent.com');
+    assert.ok(
+      !res.output.includes('raw.githubusercontent.com'),
+      'auto-detection fell back to the GitHub remote',
+    );
+    assert.ok(
+      fs.existsSync(path.join(sandbox, '.agents', 'TEAM_PLAYBOOK.md')),
+      'framework file was not installed via auto-detection',
+    );
+    assert.ok(fs.existsSync(path.join(sandbox, '.playbook-lock.json')), 'lockfile was not written');
+  });
+
+  test('the local-bundle path is not taken when the target IS the package root', () => {
+    // The guard `targetDir !== packageBundleRoot` only stops the bundle from
+    // being treated as its own source (a pointless self-copy). Upstream sync
+    // into the package root stays legitimate, so assert on the real contract:
+    // the `@local` path is skipped. Proxy-blocked so it fails fast, offline.
+    const pkgDir = installPackageInto(createTempDir('selfsync-'));
+    const cli = path.join(pkgDir, 'scripts', 'sync-playbook.mjs');
+    const res = runNode(cli, ['sync', '--repo', pkgDir, '--yes'], {
+      cwd: pkgDir,
+      env: { ...process.env, HTTPS_PROXY: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9' },
+    });
+    assert.ok(!res.output.includes('@local'), 'bundle root must not resolve to itself as a local source');
+    assert.notEqual(res.status, 0, 'blocked upstream must not report success');
   });
 
   test('init adds non-destructive scripts to consumer package.json', () => {

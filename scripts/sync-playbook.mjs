@@ -429,7 +429,8 @@ function parseArgs(argv) {
     repo: process.cwd(),
     source: null,
     tag: null,
-    remote: DEFAULT_REMOTE,
+    // null, not DEFAULT_REMOTE: `!options.remote` arms local-bundle auto-detect (PLAY-037 AC #2).
+    remote: null,
     stacks: [],
     initAgents: false,
     dryRun: false,
@@ -482,7 +483,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
     if (opts.help) {
       printUsage();
     } else if (opts.listStacks) {
-      listStacks(opts.remote, opts.source).catch((err) => {
+      // --list-stacks keeps its historical remote behaviour; auto-detect arms only sync/init.
+      listStacks(opts.remote || DEFAULT_REMOTE, opts.source).catch((err) => {
         console.error('Fatal:', err.message);
         process.exit(2);
       });

@@ -1,5 +1,5 @@
 # Backlog: gripm-playbook
-> Consolidado generado el 2026-10-23 por gripm
+> Consolidado generado el 2026-10-24 por gripm
 
 ## Resumen de Estados
 
@@ -88,7 +88,7 @@ Este item implementa el Modelo Hibrido: el consumidor puede optar por usar `@gri
 
 ---
 
-### 📋 Backlog / Draft (4)
+### 📋 Backlog / Draft (3)
 
 #### [PLAY-035] Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash
 - **Prioridad**: `p3` | **Tipo**: `improvement`
@@ -139,35 +139,6 @@ La condicion actual tampoco detecta la situacion real de colision. `claimed_by` 
 
 ---
 
-#### [PLAY-039] El adaptador de Cursor declara como canonico un archivo que no existe: .agents/rules/git-workflow.md
-- **Prioridad**: `p2` | **Tipo**: `bug`
-
-`scripts/lib/adapters.mjs:118-130` define `renderCursorGitRule()`, que genera para el consumidor un archivo de reglas de Cursor con este cuerpo:
-
-```
-# Git workflow
-
-Canonical source: `.agents/rules/git-workflow.md` - read it before any `git commit` or `git push`.
-
-<las cinco GIT_RULES, inline>
-```
-
-La linea "Canonical source" apunta a `.agents/rules/git-workflow.md`. **Ese archivo no existe.** Verificado con un glob sobre `**/git-workflow.md` en el repo de gripm: cero resultados.
-
-El efecto es que todo agente de Cursor recibe una orden explicita de leer un archivo ausente antes de cualquier `git commit` o `git push`. Las reglas si estan presentes, inline debajo de la referencia; pero la instruccion manda a buscarlas a otro lado.
-
-Es doblemente ironico porque el contenido es correcto: el archivo inventado se llamaria "canonical source" del mismo texto que ya esta embebido. La referencia no aporta nada aunque existiera, salvo un segundo lugar donde mantenerlo.
-
-Este defecto se detecto de forma indirecta: al releer `GIT_RULES` para investigar un problema de colision multi-agente (PLAY-038), la referencia canonica aparecio como primera linea de la regla generada, y su objetivo no estaba en el arbol.
-
-**Criterios de Aceptación:**
-- [ ] #1 La linea "Canonical source" se elimina de `renderCursorGitRule()`, o se sustituye por una ruta que exista y que el init realmente instale.
-- [ ] #2 No queda ninguna referencia a `.agents/rules/git-workflow.md` en el repo: `grep -r "git-workflow.md"` devuelve vacio en `scripts/` y en los templates.
-- [ ] #3 Si la decision es eliminar la linea, se documenta en las notas por que las reglas inline son la fuente unica y no un archivo aparte.
-- [ ] #4 `npm run check:all` sale con 0 tras el cambio.
-
----
-
 #### [PLAY-040] El gate escribe la transicion de estado sin regenerar el consolidado y el commit siguiente se rechaza
 - **Prioridad**: `p1` | **Tipo**: `bug`
 
@@ -197,6 +168,31 @@ El punto ciego es estructural. El gate escribe un archivo y no conoce el consoli
 - [ ] #3 El gate no stagea nada. La regla "un hook verifica, no muta" aplica tambien a la CLI: regenerar el consolidado no equivale a `git add BACKLOG.md`.
 - [ ] #4 Un consumidor sin `BACKLOG.md` en disco (proyecto que aun no lo genero) no recibe error: la regeneracion se omite en silencio.
 - [ ] #5 `npm run check:all` sale con 0 tras el cambio.
+
+---
+
+### 🚫 Dismissed (1)
+
+#### [PLAY-039] El adaptador de Cursor declara como canonico un archivo que no existe: .agents/rules/git-workflow.md
+- **Prioridad**: `p2` | **Tipo**: `bug` | **Estado**: `dismissed` (2026-10-24)
+
+**`dismissed_reason`:** premisa falsa. El archivo `.agents/rules/git-workflow.md` existe en el arbol (5651 bytes). El reporte se apoyo en un glob POSIX que omite directorios ocultos, asi que infra-reporto. Sin defecto.
+
+`scripts/lib/adapters.mjs:118-130` define `renderCursorGitRule()`, que genera para el consumidor un archivo de reglas de Cursor cuya primera linea apunta a `.agents/rules/git-workflow.md` como "canonical source". El reporte original afirmo que ese archivo no existia, verificado con un glob `**/git-workflow.md` que dio cero resultados.
+
+**Verificacion posterior (2026-10-24) desmintio la premisa.** El archivo esta en `.agents/rules/` con contenido real (`# Git Workflow & Commit Governance`). El glob `**/` no desciende a `.agents/` por ser un directorio oculto: el fallo fue del tooling, no del artefacto. Cruces que lo confirman:
+
+- `sync-playbook.mjs:70` lo declara en `FALLBACK_CORE_FILES`; un sync en dry-run a un repo temporal sale 0 sin avisos "not found".
+- `.playbook-manifest.json:7` lo declara; `validate-repo.mjs` lo valida en verde.
+- `validate-repo.mjs:146,238` lo referencian; ambos loops saltarian si faltara, pero al existir si corren contra el.
+
+**Por que se descarto en vez de "arreglarse":** los AC pedian eliminar la linea o dejar `grep -r "git-workflow.md"` vacio en `scripts/` y templates. Eso degradaria una puntera valida hacia un archivo que el init si instala, y ademas romperia la paridad del manifiesto. El T_dismiss desde `draft` exige `dismissed_reason`, aqui registrado.
+
+**Criterios de Aceptación** (anulados por la premisa falsa):
+- [ ] #1 La linea "Canonical source" se elimina de `renderCursorGitRule()`, o se sustituye por una ruta que exista y que el init realmente instale.
+- [ ] #2 No queda ninguna referencia a `.agents/rules/git-workflow.md` en el repo: `grep -r "git-workflow.md"` devuelve vacio en `scripts/` y en los templates.
+- [ ] #3 Si la decision es eliminar la linea, se documenta en las notas por que las reglas inline son la fuente unica y no un archivo aparte.
+- [ ] #4 `npm run check:all` sale con 0 tras el cambio.
 
 ---
 

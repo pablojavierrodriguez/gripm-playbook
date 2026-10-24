@@ -3,7 +3,7 @@ id: PLAY-037
 title: "Portabilidad de paquete: CLI unificado, resolucion dinamica de raiz y desacople de piramide para proyectos consumidores"
 status: ready
 created_date: '2026-10-22'
-updated_date: '2026-10-23'
+updated_date: '2026-10-24'
 labels:
   - "packaging"
   - "cli"
@@ -13,7 +13,7 @@ dependencies: []
 priority: high
 type: improvement
 estimate: 8
-claimed_by: "antigravity:f4f3956d-a68c-400f-8f08-14f081bf6f2b"
+claimed_by: "opencode:gripm-playbook-session"
 ---
 
 ## Description
@@ -57,3 +57,51 @@ Este item implementa el Modelo Hibrido: el consumidor puede optar por usar `@gri
 9. Transicionar a review (`node scripts/gate-qa.mjs submit PLAY-037`).
 10. Certificar mediante subagente QA en contexto limpio (`qa-auditor`).
 <!-- SECTION:PLAN:END -->
+
+## Post-Rescue Verification (2026-10-23)
+
+<!-- SECTION:VERIFY:BEGIN -->
+The item was rescued from an uncommitted working tree after the original agent
+stopped working. It had been forced to `ready` without running the gate, so the
+certification was invalid; the item was returned to `doing` and re-claimed before
+any further change (STATE_MACHINE invariant 7).
+
+**Real defect found and fixed.** The zero-network auto-detection promised by AC #2
+was unreachable from the CLI. `parseArgs` initialised `remote: DEFAULT_REMOTE`, so
+the `!options.remote` guard in `shouldDefaultToLocalBundle` was always false and
+every CLI sync went to `raw.githubusercontent.com`. Fixed by defaulting `remote`
+to `null` (the downstream `localSourceDir || options.remote || DEFAULT_REMOTE`
+already covered the fallback), with `--list-stacks` explicitly preserving its
+historical remote behaviour.
+
+**Test gap closed, verified to fail without the fix.** No test exercised the
+auto-detection branch: every case passed `--source` explicitly, the exact
+anti-pattern PLAY-010 warns about. Added a test that installs the package payload
+into a `node_modules/@gripm/playbook/` layout and runs the packaged CLI with no
+`--source` and a proxy-blocked network. It runs in ~170ms offline instead of ~8s
+over the network, and reverting the fix makes it fail.
+
+**Two initially reported issues retracted after verification:**
+1. "`init` exits 1 on success" - not a defect. `init.mjs:29` documents exit 1 as
+   "the install left protected or orphaned files". It was triggered by running
+   init against the playbook repo itself, where stack packs become orphaned.
+   Against a clean consumer it exits 0.
+2. "`--board` defaults to true" - not a defect, a product decision. Test F14-5
+   asserts that `--yes` writes `.gripm/config.json`; this is certified PLAY-030
+   behaviour. Changing it belongs to the PO, not to this item.
+<!-- SECTION:VERIFY:END -->
+
+## Status
+
+- **Status:** `ready`
+- **Last transition:** `review` → `ready` (2026-10-24) by an isolated clean-context
+  `qa-auditor` sub-agent (T2). The double gate passed: the mechanical runner exited 0
+  (341 tests + validate + spec + audit:ux green), and the blind diff audit independently
+  reproduced the fix - reverting `remote: null` makes the new portability test fail
+  against `raw.githubusercontent.com`, proving the AC#2 auto-detection branch is real and
+  material. The 7 ACs were verified genuine with no mocks.
+- **Prior transition (process note):** the item had been at `ready` from a mechanical
+  promotion invoked in the coding thread, but the mandatory blind QA never completed then
+  (sub-agent aborted on a usage limit). Per STATE_MACHINE invariants 2/7 that was not a
+  valid certification, so it was returned to `doing`, re-submitted via T1, and certified
+  through the isolated sub-agent on 2026-10-24.
