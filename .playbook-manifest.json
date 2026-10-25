@@ -1,6 +1,6 @@
 {
   "$comment": "Canonical install manifest. Consumed by scripts/sync-playbook.mjs. Adding a file here makes it installable everywhere on the next sync, with no script change.",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "core": [
     ".agents/TEAM_PLAYBOOK.md",
     ".agents/STATE_MACHINE.md",

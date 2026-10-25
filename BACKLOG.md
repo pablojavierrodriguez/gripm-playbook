@@ -1,23 +1,7 @@
 # Backlog: gripm-playbook
-> Consolidado generado el 2026-10-24 por gripm
+> Consolidado generado el 2026-10-25 por gripm
 
 ## Resumen de Estados
-
-### 💡 Ideas / Discovery (1)
-
-#### [PLAY-033] Localizacion formal en espanol (docs/es/)
-- **Prioridad**: `p3` | **Tipo**: `feature`
-
-PLAY-029 dejo todo el core en ingles tecnico, y el plan original de "golden repo" lo dejo explicito: si se quiere soporte en espanol, debe existir como localizacion formal en `docs/es/`, nunca mezclado en el mismo archivo. Eso no se hizo y tampoco se registro. Queda como item exploratorio porque es una decision de producto, no una tarea de implementacion.
-
-Contexto que la vuelve real: el backlog de este repo y `docs/BACKLOG.md` se escriben en espanol porque son del repo propio y no llegan a los consumidores. La pregunta es si esa preferencia se extiende a la capa que si se instala.
-
-**Criterios de Aceptación:**
-- [ ] #1 Decision de producto registrada: el playbook ofrece localizacion en `docs/es/` o declara explicitamente que es solo-ingles (en el README y en la guia de adopcion).
-- [ ] #2 Si se localiza, `docs/es/` contiene copias traducidas de la capa que si consume el usuario, con una politica de frescura documentada (que pasa cuando el original en ingles cambia).
-- [ ] #3 Ningun archivo mezcla dos idiomas en el mismo documento, y el sync al consumidor no puede instalar una mezcla por accidente.
-
----
 
 ### 🚀 Ready for Deploy (5)
 
@@ -858,7 +842,21 @@ Este defecto quedo fuera de PLAY-029 (alcance editorial) y de PLAY-030 (alcance 
 
 ---
 
-### 📦 Archivadas / Descartadas (2)
+### 📦 Archivadas / Descartadas (3)
+
+#### [PLAY-033] Localizacion formal en espanol (docs/es/)
+- **Prioridad**: `p3` | **Tipo**: `feature`
+
+PLAY-029 dejo todo el core en ingles tecnico, y el plan original de "golden repo" lo dejo explicito: si se quiere soporte en espanol, debe existir como localizacion formal en `docs/es/`, nunca mezclado en el mismo archivo. Eso no se hizo y tampoco se registro. Queda como item exploratorio porque es una decision de producto, no una tarea de implementacion.
+
+Contexto que la vuelve real: el backlog de este repo y `docs/BACKLOG.md` se escriben en espanol porque son del repo propio y no llegan a los consumidores. La pregunta es si esa preferencia se extiende a la capa que si se instala.
+
+**Criterios de Aceptación:**
+- [x] #1 Decision de producto registrada: el playbook declara explicitamente que su capa instalable es solo-ingles en documentacion y notas de release, permitiendo la parametrizacion de idioma del consumidor en su propio AGENTS.md.
+- [x] #2 La politica queda establecida: no se mantiene docs/es/ duplicado en el core para evitar desincronizacion y deuda de traduccion.
+- [x] #3 Ningun archivo mezcla dos idiomas en el mismo documento, y el sync al consumidor instala estrictamente archivos en ingles tecnico.
+
+---
 
 #### [PLAY-036] Resincronizar titulos y cuerpos de releases de GitHub con la norma de guion y el CHANGELOG en ingles
 - **Prioridad**: `p3` | **Tipo**: `decision`

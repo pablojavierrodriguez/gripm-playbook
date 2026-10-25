@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.0] - 2026-10-24
+
+`PLAY-007` · `PLAY-033` · `PLAY-035` · `PLAY-036` · `PLAY-037` · `PLAY-038` · `PLAY-039` · `PLAY-040`
+
+### Added
+
+- **Unified CLI Router and Standalone Package Binaries** (`PLAY-037`). Dedicated executable binaries in `package.json` (`playbook`, `gripm-playbook`, `gate-qa`, `audit-ux`, `check-loc`). A new CLI dispatcher in `scripts/lib/cli-router.mjs` handles subcommands (`init`, `sync`, `gate`, `audit`, `check-loc`, `review`, `help`), enabling zero-install execution via `npx @gripm/playbook <command>` across consumer repositories.
+- **Package Portability and Dynamic Root Resolution** (`PLAY-037`). Core tools (`gate-qa.mjs`, `audit-ux-code.cjs`, `gate-review-items.mjs`) resolve the target project root dynamically (`--root`, `--cwd`, `GRIPM_ROOT`, `AUDIT_UX_ROOT`, or `process.cwd()`), allowing seamless execution from `node_modules/@gripm/playbook/`. When running via `playbook gate <ID>`, the Verification Pyramid autonomously executes packaged UX auditing and backlog checks even if the consumer repository lacks internal npm scripts.
+- **Zero-Network Local Fallback for Sync and Init** (`PLAY-037`). `sync-playbook.mjs` and `init.mjs` automatically detect and synchronize from the local installed package bundle when `--remote` and `--source` are omitted, operating reliably in air-gapped, offline, and CI environments without network access.
+- **AST-Based Component Scoping in UX Auditor: `withinComponent` and `unlessComponent`** (`PLAY-007`). Custom UX audit rules can now scope checks to enclosing JSX component hierarchies (e.g. `check.withinComponent: ["Dialog", "Modal"]`) by inspecting the real AST ancestor tree rather than relying on fragile file names. Supports dotted compound components (e.g. `<Dialog.Content>`). `onlyFile` is preserved for file-path filtering.
+- **Ecosystem Focus and Polyglot Bridge Documentation** (`PLAY-035`, `PLAY-033`). Added explicit documentation in `README.md` defining the Node.js/TypeScript native foundation while providing lightweight `package.json` proxy recipes for Python, Go, Rust, and Makefile repositories. Established product policy keeping the framework core in technical English while allowing consumer projects to parametrize conversation and doc language in their `AGENTS.md`.
+
+### Fixed
+
+- **Automatic Consolidated Backlog Regeneration on Gate Transitions** (`PLAY-040`). `scripts/gate-qa.mjs` now automatically synchronizes `BACKLOG.md` upon state mutations (`start`, `submit`, `unblock`, and certification to `ready`) if `BACKLOG.md` exists, eliminating false rejections from pre-commit backlog hooks without manual sync interventions.
+- **Mandatory Worktree Isolation on Foreign Uncommitted Changes** (`PLAY-038`). Expanded `GIT_RULES` in `scripts/lib/adapters.mjs`, `AGENTS.md`, and `.agents/TEAM_PLAYBOOK.md` to mandate immediate `git worktree` isolation whenever uncommitted changes (`A `, `M `) not created by the active session are observed in `git status --porcelain`, preventing multi-agent index collisions even when tasks lack a declared `claimed_by`.
+- **Changelog Hygiene and Literal Hyphen Sanitization** (`PLAY-035`). Translated residual Spanish entries in section `2.0.1` and replaced literal em-dash characters with descriptive prose to ensure full compliance with the standard hyphen rule.
+- **Subprocess Deprecation Warning Cleanliness**. Removed unnecessary shell invocation on `node` executable calls in `scripts/gate-qa.mjs`, preventing Node.js `DEP0190` warnings on Windows.
+
+---
+
 ## [2.6.0] - 2026-10-21
 
 `PLAY-026` · `PLAY-027` · `PLAY-028` · `PLAY-029` · `PLAY-030` · `PLAY-031` · `PLAY-032` · `PLAY-034`
@@ -238,7 +259,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Configured for npm publication under `@gripm/playbook` supporting `npx @gripm/playbook sync`.
 
-[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.7.0
 [2.6.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.6.0
 [2.5.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.5.0
 [2.4.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.4.0

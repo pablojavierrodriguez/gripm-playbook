@@ -308,6 +308,7 @@ Gripm Playbook operates on a core craftsmanship invariant: **perfect the framewo
 ### Current Native Scope (Node.js & TypeScript)
 
 - **Distribution:** Distributed as an npm package ([`@gripm/playbook`](https://www.npmjs.com/package/@gripm/playbook)). Zero-install execution via `npx @gripm/playbook init` and `npx @gripm/playbook sync`.
+- **Technical English Standard & Consumer Customization:** Core framework files, skills, and templates are maintained strictly in professional technical English to avoid translation drift. Consumer projects parametrize their preferred conversational and documentation language directly in `AGENTS.md` during `npx @gripm/playbook init`.
 - **Mechanical Gates & Execution Engines:** All CLI tools (`gate-qa`, `sync-playbook`, `audit-ux`, `check-loc`) and consistency validators (`validate-repo.mjs`) are zero-dependency Node.js engines.
 - **Native Verification Pyramid:** Binds directly to standard npm scripts in `package.json` (`validate` or `typecheck`, `test`, `gate:review`, `build`).
 

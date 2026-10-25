@@ -1,6 +1,6 @@
 {
   "name": "@gripm/playbook",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Autonomous multi-agent agile framework for modern software development with dynamic modes, decoupled releases, and sub-agent orchestration.",
   "type": "module",
   "main": "./scripts/sync-playbook.mjs",

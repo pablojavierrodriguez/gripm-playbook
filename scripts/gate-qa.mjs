@@ -132,7 +132,6 @@ export function syncConsolidatedBacklog(projectRoot) {
       spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'sync-backlog.js')], {
         cwd: projectRoot,
         encoding: 'utf8',
-        shell: process.platform === 'win32',
         stdio: 'ignore',
       });
     } catch {}
@@ -141,7 +140,6 @@ export function syncConsolidatedBacklog(projectRoot) {
       spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'), '--export'], {
         cwd: projectRoot,
         encoding: 'utf8',
-        shell: process.platform === 'win32',
         stdio: 'ignore',
       });
     } catch {}
