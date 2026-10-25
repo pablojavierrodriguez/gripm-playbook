@@ -14,9 +14,14 @@ export function validateLocalCatalog(root, canonicalRoot = root, onFail = null) 
     if (onFail) onFail('local-catalog', msg);
   };
 
-  const gripmConfig = path.join(root, '.gripm', '.uxaudit.json');
+  const gripmConfigDot = path.join(root, '.gripm', '.uxaudit.json');
+  const gripmConfigNoDot = path.join(root, '.gripm', 'uxaudit.json');
   const rootConfig = path.join(root, '.uxaudit.json');
-  const configPath = fs.existsSync(gripmConfig) ? gripmConfig : rootConfig;
+  const configPath = fs.existsSync(gripmConfigDot)
+    ? gripmConfigDot
+    : fs.existsSync(gripmConfigNoDot)
+      ? gripmConfigNoDot
+      : rootConfig;
   if (!fs.existsSync(configPath)) return localErrors;
 
   let config;

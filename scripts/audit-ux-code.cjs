@@ -128,6 +128,10 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
+      case '--root':
+      case '--cwd':
+        i += 1;
+        break;
       case '--src': opts.src = argv[++i]; break;
       case '--config': opts.config = argv[++i]; break;
       case '--strict': opts.strict = true; break;
@@ -141,6 +145,9 @@ function parseArgs(argv) {
       case '--help':
       case '-h': opts.help = true; break;
       default:
+        if (arg.startsWith('--root=') || arg.startsWith('--cwd=')) {
+          break;
+        }
         if (arg.startsWith('--')) fatal(`Unknown option: ${arg}`);
     }
   }
@@ -275,8 +282,10 @@ function loadCatalog(config, root) {
 
 function resolveConfigFile(explicitPath, root = ROOT) {
   if (explicitPath) return path.resolve(root, explicitPath);
-  const gripmConfig = path.join(root, '.gripm', CONFIG_NAME);
-  if (fs.existsSync(gripmConfig)) return gripmConfig;
+  const gripmConfigDot = path.join(root, '.gripm', CONFIG_NAME);
+  if (fs.existsSync(gripmConfigDot)) return gripmConfigDot;
+  const gripmConfigNoDot = path.join(root, '.gripm', 'uxaudit.json');
+  if (fs.existsSync(gripmConfigNoDot)) return gripmConfigNoDot;
   return path.join(root, CONFIG_NAME);
 }
 

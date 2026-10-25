@@ -109,39 +109,20 @@ const ROOT = resolveProjectRoot();
 const TASKS_DIR = path.join(ROOT, 'backlog', 'tasks');
 
 export function syncConsolidatedBacklog(projectRoot) {
-  const backlogPath = path.join(projectRoot, 'BACKLOG.md');
-  if (!fs.existsSync(backlogPath)) {
-    return;
-  }
-
+  if (!fs.existsSync(path.join(projectRoot, 'BACKLOG.md'))) return;
   const scripts = readScripts(projectRoot);
-  const candidates = ['backlog:sync', 'sync:backlog', 'backlog:export', 'export:backlog'];
-  const scriptName = candidates.find((name) => Boolean(scripts[name]));
-
+  const scriptName = ['backlog:sync', 'sync:backlog', 'backlog:export', 'export:backlog'].find((name) => Boolean(scripts[name]));
   if (scriptName) {
     try {
-      spawnSync('npm', ['run', '--silent', scriptName], {
-        cwd: projectRoot,
-        encoding: 'utf8',
-        shell: process.platform === 'win32',
-        stdio: 'ignore',
-      });
+      spawnSync('npm', ['run', '--silent', scriptName], { cwd: projectRoot, encoding: 'utf8', shell: process.platform === 'win32', stdio: 'ignore' });
     } catch {}
   } else if (fs.existsSync(path.join(projectRoot, 'scripts', 'sync-backlog.js'))) {
     try {
-      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'sync-backlog.js')], {
-        cwd: projectRoot,
-        encoding: 'utf8',
-        stdio: 'ignore',
-      });
+      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'sync-backlog.js')], { cwd: projectRoot, encoding: 'utf8', stdio: 'ignore' });
     } catch {}
   } else if (fs.existsSync(path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'))) {
     try {
-      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'), '--export'], {
-        cwd: projectRoot,
-        encoding: 'utf8',
-        stdio: 'ignore',
-      });
+      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'), '--export'], { cwd: projectRoot, encoding: 'utf8', stdio: 'ignore' });
     } catch {}
   }
 }
@@ -171,11 +152,24 @@ const PYRAMID_STEPS = [
 ];
 
 export function resolvePyramid(root = resolveProjectRoot(), options = {}) {
-  const isAutonomous = options.autonomous || (process.argv && process.argv.includes('--autonomous'));
+  const isInNodeModules = SCRIPT_DIR.split(path.sep).includes('node_modules');
+  const scripts = readScripts(root);
+  const delegatesToPlaybook = (scriptName) => {
+    const cmd = scripts[scriptName];
+    return typeof cmd === 'string' && /\bplaybook\s+(audit|review)\b/.test(cmd);
+  };
+
+  const isAutonomous =
+    options.autonomous ||
+    (process.argv && process.argv.includes('--autonomous')) ||
+    isInNodeModules ||
+    delegatesToPlaybook('audit:ux:strict') ||
+    delegatesToPlaybook('gate:review');
+
   const steps = resolvePyramidSteps(root, PYRAMID_STEPS);
   if (isAutonomous) {
     for (const step of steps) {
-      if (!step.available && step.id === 'audit:ux') {
+      if ((!step.available || delegatesToPlaybook('audit:ux:strict')) && step.id === 'audit:ux') {
         step.available = true;
         step.runner = (r) => {
           const auditScript = path.resolve(SCRIPT_DIR, 'audit-ux-code.cjs');
@@ -191,7 +185,7 @@ export function resolvePyramid(root = resolveProjectRoot(), options = {}) {
           return { state: 'failed', detail: `audit-ux failed (exit code ${res.status})${tail ? `\n      ${tail}` : ''}` };
         };
       }
-      if (!step.available && step.id === 'spec') {
+      if ((!step.available || delegatesToPlaybook('gate:review')) && step.id === 'spec') {
         step.available = true;
         step.runner = (r) => {
           const tasksDir = path.join(r, 'backlog', 'tasks');

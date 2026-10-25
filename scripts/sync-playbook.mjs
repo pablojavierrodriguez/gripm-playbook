@@ -380,7 +380,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
   }
 
   if (isConsumerPackage && !isDryRun) {
-    const cleaned = pruneLegacyScripts(targetRepo, lock.files);
+    const cleaned = pruneLegacyScripts(targetRepo, lock.files, nextCustomizations, packageBundleRoot);
     if (cleaned.length) {
       console.log(`  ${c.green('✔')} ${c.green('cleaned'.padEnd(10))} ${cleaned.length} legacy script(s) from scripts/ (running via package)`);
     }

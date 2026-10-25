@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.7.0] - 2026-10-24
+## [2.7.0] - 2026-10-25
 
-`PLAY-007` · `PLAY-033` · `PLAY-035` · `PLAY-036` · `PLAY-037` · `PLAY-038` · `PLAY-039` · `PLAY-040`
+`PLAY-007` · `PLAY-033` · `PLAY-035` · `PLAY-036` · `PLAY-037` · `PLAY-038` · `PLAY-039` · `PLAY-040` · `PLAY-041`
 
 ### Added
 
+- **Zero-Clutter Architecture and Framework Confinement in `.gripm/`** (`PLAY-041`). Lockfiles (`.gripm/playbook-lock.json`), backups (`.gripm/backups/`), baseline snapshots, and audit configuration files are cleanly segregated into `.gripm/`, preventing pollution of consumer project roots while preserving full backward compatibility with root legacy files.
+- **Automated Orphan Pruning and Safe Legacy Script Cleanup** (`PLAY-041`). `sync-playbook.mjs` safely cleans obsolete unmodified skills upon rename and retires legacy runtime scripts previously copied to consumer `scripts/` directories, verifying unmanaged and customized files remain intact while eliminating manual maintenance debt.
 - **Unified CLI Router and Standalone Package Binaries** (`PLAY-037`). Dedicated executable binaries in `package.json` (`playbook`, `gripm-playbook`, `gate-qa`, `audit-ux`, `check-loc`). A new CLI dispatcher in `scripts/lib/cli-router.mjs` handles subcommands (`init`, `sync`, `gate`, `audit`, `check-loc`, `review`, `help`), enabling zero-install execution via `npx @gripm/playbook <command>` across consumer repositories.
 - **Package Portability and Dynamic Root Resolution** (`PLAY-037`). Core tools (`gate-qa.mjs`, `audit-ux-code.cjs`, `gate-review-items.mjs`) resolve the target project root dynamically (`--root`, `--cwd`, `GRIPM_ROOT`, `AUDIT_UX_ROOT`, or `process.cwd()`), allowing seamless execution from `node_modules/@gripm/playbook/`. When running via `playbook gate <ID>`, the Verification Pyramid autonomously executes packaged UX auditing and backlog checks even if the consumer repository lacks internal npm scripts.
 - **Zero-Network Local Fallback for Sync and Init** (`PLAY-037`). `sync-playbook.mjs` and `init.mjs` automatically detect and synchronize from the local installed package bundle when `--remote` and `--source` are omitted, operating reliably in air-gapped, offline, and CI environments without network access.

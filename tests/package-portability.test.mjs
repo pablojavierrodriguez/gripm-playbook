@@ -278,13 +278,14 @@ Feature ready for certification.
     // Simulate pre-existing legacy state: .playbook-lock.json in root, legacy skills and legacy scripts
     const legacySkillFile = '.agents/skills/worldclass-product-designer/SKILL.md';
     createFile(sandbox, legacySkillFile, '# Legacy Designer Skill\n');
-    createFile(sandbox, 'scripts/gate-qa.mjs', '// legacy script\n');
+    const legacyScriptContent = fs.readFileSync(path.join(ROOT, 'scripts', 'gate-qa.mjs'), 'utf8');
+    createFile(sandbox, 'scripts/gate-qa.mjs', legacyScriptContent);
     createFile(sandbox, '.playbook-lock.json', JSON.stringify({
       playbook: 'local',
       ref: 'v2.5.0',
       files: {
         [legacySkillFile]: 'legacy-hash',
-        'scripts/gate-qa.mjs': 'legacy-script-hash',
+        'scripts/gate-qa.mjs': 'some-older-hash',
       },
       customizations: [],
     }));
@@ -308,5 +309,79 @@ Feature ready for certification.
 
     // Assert: consumer does not get scripts/ directory populated, and legacy scripts were cleaned
     assert.ok(!fs.existsSync(path.join(sandbox, 'scripts', 'gate-qa.mjs')), 'legacy script in scripts/ must be removed');
+  });
+
+  test('playbook gate CLI router dispatches start, submit and unblock correctly', () => {
+    const sandbox = createTempDir('consumer-router-sub-');
+    createFile(sandbox, 'package.json', JSON.stringify({ name: 'router-sub-app' }));
+    const taskPath = createFile(
+      sandbox,
+      'backlog/tasks/TASK-100.md',
+      `---
+id: TASK-100
+status: draft
+dependencies: []
+---
+
+## Description
+Testing router dispatch.
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 Done
+<!-- AC:END -->
+`,
+    );
+
+    // 1. Dispatch start
+    const startRes = runNode(SYNC_CLI, ['gate', 'start', 'TASK-100', '--by', 'human:tester'], { cwd: sandbox });
+    assert.equal(startRes.status, 0, `gate start failed:\n${startRes.output}`);
+    assert.match(startRes.output, /START ALLOWED/);
+    assert.match(fs.readFileSync(taskPath, 'utf8'), /status:\s*doing/);
+
+    // 2. Dispatch submit
+    const submitRes = runNode(SYNC_CLI, ['gate', 'submit', 'TASK-100'], { cwd: sandbox });
+    assert.equal(submitRes.status, 0, `gate submit failed:\n${submitRes.output}`);
+    assert.match(submitRes.output, /SUBMIT ALLOWED/);
+    assert.match(fs.readFileSync(taskPath, 'utf8'), /status:\s*review/);
+
+    // 3. Mark blocked and dispatch unblock
+    fs.writeFileSync(taskPath, fs.readFileSync(taskPath, 'utf8').replace('status: review', 'status: blocked\nblocked_reason: "waiting"'));
+    const unblockRes = runNode(SYNC_CLI, ['gate', 'unblock', 'TASK-100'], { cwd: sandbox });
+    assert.equal(unblockRes.status, 0, `gate unblock failed:\n${unblockRes.output}`);
+    assert.match(unblockRes.output, /UNBLOCK ALLOWED/);
+    assert.match(fs.readFileSync(taskPath, 'utf8'), /status:\s*doing/);
+  });
+
+  test('audit-ux and check-loc accept --root and --cwd without fatal errors', () => {
+    const sandbox = createTempDir('consumer-explicit-root-');
+    createFile(sandbox, 'package.json', JSON.stringify({ name: 'explicit-root-app' }));
+    createFile(sandbox, 'src/Index.tsx', 'export const Index = () => <div>Hello</div>;\n');
+
+    // Run audit-ux with explicit --root
+    const auditRes = runNode(AUDIT_CLI, ['--root', sandbox, '--format', 'json']);
+    assert.equal(auditRes.status, 0, `audit-ux failed with --root:\n${auditRes.output}`);
+
+    // Run check-loc with explicit --root
+    const locRes = runNode(CHECK_LOC_CLI, ['--root', sandbox, '--json']);
+    assert.equal(locRes.status, 0, `check-loc failed with --root:\n${locRes.output}`);
+  });
+
+  test('pruneLegacyScripts preserves custom or unmanaged scripts in consumer repository', () => {
+    const sandbox = createTempDir('consumer-custom-script-');
+    createFile(sandbox, 'package.json', JSON.stringify({ name: 'consumer-custom' }));
+
+    // User's own custom script that happens to share name with framework file
+    createFile(sandbox, 'scripts/init.mjs', '// custom consumer init script\nconsole.log("mine");\n');
+    createFile(sandbox, 'scripts/custom-tool.js', '// other tool\n');
+
+    const res = runNode(SYNC_CLI, ['sync', '--repo', sandbox, '--source', ROOT, '--yes'], {
+      cwd: sandbox,
+    });
+    assert.equal(res.status, 0, `sync should succeed:\n${res.output}`);
+
+    // Assert: consumer's custom scripts/init.mjs was NOT deleted because it diverged from lock/canonical
+    assert.ok(fs.existsSync(path.join(sandbox, 'scripts', 'init.mjs')), 'custom scripts/init.mjs must be preserved');
+    assert.ok(fs.existsSync(path.join(sandbox, 'scripts', 'custom-tool.js')), 'unrelated scripts must be preserved');
   });
 });

@@ -136,9 +136,14 @@ export function checkFileBudget(options = {}) {
 
   // Aggregate ignore rules from .gitignore, .locignore (.gripm/locignore fallback) and custom excludes
   const gitignoreRules = parseIgnoreFile(path.join(root, '.gitignore'));
-  const gripmLocignore = path.join(root, '.gripm', 'locignore');
+  const gripmLocignoreNoDot = path.join(root, '.gripm', 'locignore');
+  const gripmLocignoreDot = path.join(root, '.gripm', '.locignore');
   const rootLocignore = path.join(root, '.locignore');
-  const locignorePath = fs.existsSync(gripmLocignore) ? gripmLocignore : rootLocignore;
+  const locignorePath = fs.existsSync(gripmLocignoreNoDot)
+    ? gripmLocignoreNoDot
+    : fs.existsSync(gripmLocignoreDot)
+      ? gripmLocignoreDot
+      : rootLocignore;
   const locignoreRules = parseIgnoreFile(locignorePath);
   const extraExcludes = Array.isArray(options.exclude)
     ? parseIgnoreLines(options.exclude)
@@ -270,8 +275,10 @@ export function runCli(argv = process.argv.slice(2)) {
       maxLines = parseInt(argv[++i], 10);
     } else if (arg === '--warn' || arg === '--warn-lines') {
       warnLines = parseInt(argv[++i], 10);
-    } else if (arg === '--path' || arg === '--src') {
+    } else if (arg === '--path' || arg === '--src' || arg === '--root' || arg === '--cwd') {
       targetPath = argv[++i];
+    } else if (arg.startsWith('--root=') || arg.startsWith('--cwd=') || arg.startsWith('--path=')) {
+      targetPath = arg.split('=')[1];
     } else if (arg === '--exclude') {
       excludes.push(argv[++i]);
     } else if (arg === '--strict') {

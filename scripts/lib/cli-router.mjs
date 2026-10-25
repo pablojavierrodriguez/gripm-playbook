@@ -49,11 +49,14 @@ export function routeCli(subcommand, rest, fallbackSync) {
   } else if (subcommand === 'gate' || subcommand === 'gate-qa') {
     import('../gate-qa.mjs')
       .then((module) => {
-        const args = rest.includes('--autonomous') ? rest : ['--autonomous', ...rest];
-        if (args[0] === 'unblock') module.unblockMain(args.slice(1));
-        else if (args[0] === 'start') module.startMain(args.slice(1));
-        else if (args[0] === 'submit') module.submitMain(args.slice(1));
-        else module.main(args);
+        const sub = rest[0];
+        if (sub === 'unblock') module.unblockMain(rest.slice(1));
+        else if (sub === 'start') module.startMain(rest.slice(1));
+        else if (sub === 'submit') module.submitMain(rest.slice(1));
+        else {
+          const args = rest.includes('--autonomous') ? rest : ['--autonomous', ...rest];
+          module.main(args);
+        }
       })
       .catch((err) => {
         console.error('Fatal:', err.message);

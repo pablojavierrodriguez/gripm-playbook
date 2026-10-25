@@ -55,7 +55,7 @@ export function findOrphanedFiles(targetRepo, plannedFiles, lockFiles = null) {
   return orphans;
 }
 
-export function pruneLegacyScripts(targetRepo, lockFiles = {}) {
+export function pruneLegacyScripts(targetRepo, lockFiles = {}, customizations = new Set(), packageBundleRoot = null) {
   const scriptsDir = path.join(targetRepo, 'scripts');
   if (!fs.existsSync(scriptsDir)) return [];
   const removed = [];
@@ -69,9 +69,33 @@ export function pruneLegacyScripts(targetRepo, lockFiles = {}) {
     'scripts/lib/doc-checks.mjs', 'scripts/lib/catalog-validator.mjs',
   ];
 
+  const customSet = customizations instanceof Set ? customizations : new Set(customizations || []);
+
   for (const rel of candidates) {
+    if (customSet.has(rel)) continue;
     const full = path.join(targetRepo, rel);
     if (!fs.existsSync(full)) continue;
+
+    let canPrune = false;
+    try {
+      const localContent = fs.readFileSync(full, 'utf8');
+      const localHash = sha256(localContent);
+
+      if (lockFiles && lockFiles[rel] && lockFiles[rel] === localHash) {
+        canPrune = true;
+      } else if (packageBundleRoot) {
+        const canonicalPath = path.join(packageBundleRoot, rel);
+        if (fs.existsSync(canonicalPath)) {
+          const canonicalHash = sha256(fs.readFileSync(canonicalPath, 'utf8'));
+          if (canonicalHash === localHash) {
+            canPrune = true;
+          }
+        }
+      }
+    } catch {}
+
+    if (!canPrune) continue;
+
     try {
       fs.unlinkSync(full);
       removed.push(rel);
