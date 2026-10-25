@@ -134,9 +134,12 @@ export function checkFileBudget(options = {}) {
   const customExts = options.extensions ? new Set(options.extensions) : DEFAULT_EXTENSIONS;
   const customIgnoredDirs = options.ignoredDirs ? new Set(options.ignoredDirs) : DEFAULT_IGNORED_DIRS;
 
-  // Aggregate ignore rules from .gitignore, .locignore and custom excludes
+  // Aggregate ignore rules from .gitignore, .locignore (.gripm/locignore fallback) and custom excludes
   const gitignoreRules = parseIgnoreFile(path.join(root, '.gitignore'));
-  const locignoreRules = parseIgnoreFile(path.join(root, '.locignore'));
+  const gripmLocignore = path.join(root, '.gripm', 'locignore');
+  const rootLocignore = path.join(root, '.locignore');
+  const locignorePath = fs.existsSync(gripmLocignore) ? gripmLocignore : rootLocignore;
+  const locignoreRules = parseIgnoreFile(locignorePath);
   const extraExcludes = Array.isArray(options.exclude)
     ? parseIgnoreLines(options.exclude)
     : options.exclude

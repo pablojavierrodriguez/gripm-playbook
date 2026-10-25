@@ -112,7 +112,8 @@ Consumer task.
     assert.equal(res.status, 0, `sync should succeed with local source:\n${res.output}`);
     assert.ok(fs.existsSync(path.join(sandbox, '.agents', 'TEAM_PLAYBOOK.md')), 'TEAM_PLAYBOOK.md was not synced');
     assert.ok(fs.existsSync(path.join(sandbox, 'AGENTS.md')), 'AGENTS.md was not initialized');
-    assert.ok(fs.existsSync(path.join(sandbox, '.playbook-lock.json')), '.playbook-lock.json was not created');
+    const lockExists = fs.existsSync(path.join(sandbox, '.gripm', 'playbook-lock.json')) || fs.existsSync(path.join(sandbox, '.playbook-lock.json'));
+    assert.ok(lockExists, 'lockfile was not created');
     assert.match(res.output, /@local/, 'upstream banner must reflect local source');
   });
 
@@ -213,7 +214,8 @@ Feature ready for certification.
       fs.existsSync(path.join(sandbox, '.agents', 'TEAM_PLAYBOOK.md')),
       'framework file was not installed via auto-detection',
     );
-    assert.ok(fs.existsSync(path.join(sandbox, '.playbook-lock.json')), 'lockfile was not written');
+    const lockExists = fs.existsSync(path.join(sandbox, '.gripm', 'playbook-lock.json')) || fs.existsSync(path.join(sandbox, '.playbook-lock.json'));
+    assert.ok(lockExists, 'lockfile was not written');
   });
 
   test('the local-bundle path is not taken when the target IS the package root', () => {
@@ -267,5 +269,44 @@ Feature ready for certification.
       const binPath = path.join(ROOT, pkg.bin[bin]);
       assert.ok(fs.existsSync(binPath), `bin target for "${bin}" does not exist: ${binPath}`);
     }
+  });
+
+  test('zero-clutter: consumer sync confines lockfile to .gripm/ and auto-prunes obsolete renamed skills', () => {
+    const sandbox = createTempDir('consumer-zeroclutter-');
+    createFile(sandbox, 'package.json', JSON.stringify({ name: 'consumer-legacy' }));
+
+    // Simulate pre-existing legacy state: .playbook-lock.json in root, legacy skills and legacy scripts
+    const legacySkillFile = '.agents/skills/worldclass-product-designer/SKILL.md';
+    createFile(sandbox, legacySkillFile, '# Legacy Designer Skill\n');
+    createFile(sandbox, 'scripts/gate-qa.mjs', '// legacy script\n');
+    createFile(sandbox, '.playbook-lock.json', JSON.stringify({
+      playbook: 'local',
+      ref: 'v2.5.0',
+      files: {
+        [legacySkillFile]: 'legacy-hash',
+        'scripts/gate-qa.mjs': 'legacy-script-hash',
+      },
+      customizations: [],
+    }));
+
+    // Run sync in consumer mode
+    const res = runNode(SYNC_CLI, ['sync', '--repo', sandbox, '--source', ROOT, '--yes'], {
+      cwd: sandbox,
+    });
+    assert.equal(res.status, 0, `sync should succeed:\n${res.output}`);
+
+    // Assert: lockfile migrated to .gripm/playbook-lock.json and removed from root
+    assert.ok(fs.existsSync(path.join(sandbox, '.gripm', 'playbook-lock.json')), '.gripm/playbook-lock.json must exist');
+    assert.ok(!fs.existsSync(path.join(sandbox, '.playbook-lock.json')), 'legacy root .playbook-lock.json must be removed');
+
+    // Assert: obsolete legacy skill pruned and empty folder removed
+    assert.ok(!fs.existsSync(path.join(sandbox, legacySkillFile)), 'obsolete skill file must be pruned');
+    assert.ok(!fs.existsSync(path.join(sandbox, '.agents', 'skills', 'worldclass-product-designer')), 'obsolete skill folder must be removed');
+
+    // Assert: canonical new skill installed
+    assert.ok(fs.existsSync(path.join(sandbox, '.agents', 'skills', 'product-designer', 'SKILL.md')), 'new skill must be installed');
+
+    // Assert: consumer does not get scripts/ directory populated, and legacy scripts were cleaned
+    assert.ok(!fs.existsSync(path.join(sandbox, 'scripts', 'gate-qa.mjs')), 'legacy script in scripts/ must be removed');
   });
 });

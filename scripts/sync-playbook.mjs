@@ -45,10 +45,14 @@ import {
   findCanonicalProvenance,
 } from './lib/provenance.mjs';
 import {
+  CANONICAL_LOCK_PATH,
+  LEGACY_LOCK_PATH,
   LOCK_PATH,
   sha256,
   classifyLocalFile,
   findOrphanedFiles,
+  pruneOrphanedFiles,
+  pruneLegacyScripts,
   readLock,
   planFiles,
 } from './lib/sync-classifier.mjs';
@@ -175,11 +179,13 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
     console.log(`  ${c.yellow('▲')}  ${c.yellow('Could not read the remote manifest; falling back to the built-in core list.')}\n`);
   }
 
+  const isConsumerPackage = targetDir !== packageBundleRoot && !options.installScripts;
   const { files, stackSource, unknown } = planFiles(
     manifest,
     stacks,
     FALLBACK_CORE_FILES,
     FALLBACK_STACKS,
+    { packageMode: isConsumerPackage }
   );
 
   for (const name of unknown) {
@@ -205,7 +211,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
     missingUpstream: 0,
   };
   const protectedFiles = [];
-  const backupRoot = path.join(targetRepo, '.playbook-backups');
+  const backupRoot = path.join(targetRepo, '.gripm', 'backups');
 
   for (const relativePath of files) {
     let remoteContent;
@@ -353,11 +359,32 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
       files: nextLockFiles,
       customizations: [...nextCustomizations].sort(),
     };
-    fs.writeFileSync(path.join(targetRepo, LOCK_PATH), `${JSON.stringify(lockPayload, null, 2)}\n`, 'utf8');
-    console.log(`  ${c.green('✔')} ${c.green('lockfile'.padEnd(10))} ${LOCK_PATH} ${c.dim(`(${Object.keys(nextLockFiles).length} files, ${nextCustomizations.size} customizations)`)}`);
+    const lockTarget = path.join(targetRepo, CANONICAL_LOCK_PATH);
+    fs.mkdirSync(path.dirname(lockTarget), { recursive: true });
+    fs.writeFileSync(lockTarget, `${JSON.stringify(lockPayload, null, 2)}\n`, 'utf8');
+    const legacyPath = path.join(targetRepo, LEGACY_LOCK_PATH);
+    if (fs.existsSync(legacyPath)) {
+      try { fs.unlinkSync(legacyPath); } catch {}
+    }
+    console.log(`  ${c.green('✔')} ${c.green('lockfile'.padEnd(10))} ${CANONICAL_LOCK_PATH} ${c.dim(`(${Object.keys(nextLockFiles).length} files, ${nextCustomizations.size} customizations)`)}`);
   }
 
-  const orphans = isDryRun ? [] : findOrphanedFiles(targetRepo, files, lock.files);
+  const rawOrphans = isDryRun ? [] : findOrphanedFiles(targetRepo, files, lock.files);
+  let orphans = rawOrphans;
+  if (!isDryRun && rawOrphans.length) {
+    const { pruned, kept } = pruneOrphanedFiles(targetRepo, rawOrphans, nextCustomizations);
+    if (pruned.length) {
+      console.log(`  ${c.green('✔')} ${c.green('pruned'.padEnd(10))} ${pruned.length} obsolete file(s): ${pruned.join(', ')}`);
+    }
+    orphans = kept;
+  }
+
+  if (isConsumerPackage && !isDryRun) {
+    const cleaned = pruneLegacyScripts(targetRepo, lock.files);
+    if (cleaned.length) {
+      console.log(`  ${c.green('✔')} ${c.green('cleaned'.padEnd(10))} ${cleaned.length} legacy script(s) from scripts/ (running via package)`);
+    }
+  }
 
   console.log(`
   ${c.bold('Summary')}
@@ -375,20 +402,11 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
   }
 
   if (protectedFiles.length) {
-    console.log(`
-  ${c.dim('Files with local changes (protected in .playbook-lock.json):')}
-${protectedFiles.map((file) => `    ${c.yellow('•')} ${file}`).join('\n')}
-
-  ${c.dim('Re-run with --force to replace them, or --adopt to accept them as')}
-  ${c.dim('the baseline you want to keep updating from.')}`);
+    console.log(`\n  ${c.dim('Files with local changes (protected in .gripm/playbook-lock.json):')}\n${protectedFiles.map((f) => `    ${c.yellow('•')} ${f}`).join('\n')}\n\n  ${c.dim('Re-run with --force to replace them, or --adopt to accept them as baseline.')}`);
   }
 
   if (orphans.length) {
-    console.log(`
-  ${c.yellow('▲')}  ${c.yellow('Framework files no longer part of the install plan (a previous')}
-  ${c.yellow('   version may have moved them). Nothing was deleted:')}
-${orphans.map((file) => `    ${c.dim('•')} ${file}`).join('\n')}
-  ${c.dim('Review and remove them manually if they are obsolete.')}`);
+    console.log(`\n  ${c.yellow('▲')}  ${c.yellow('Obsolete customized framework files retained in .agents/:')}\n${orphans.map((f) => `    ${c.dim('•')} ${f}`).join('\n')}\n  ${c.dim('Review and remove them if no longer needed.')}`);
   }
 
   if (orphans.length || (!isDryRun && protectedFiles.length)) {
@@ -407,40 +425,21 @@ async function listStacks(remote, sourceDir = null) {
   const { ref } = sourceDir ? { ref: 'local' } : await resolveRef(remote);
   const manifest = await loadManifest(remote, ref, sourceDir);
   const source = manifest && manifest.stacks ? manifest.stacks : FALLBACK_STACKS;
-
-  console.log(`
-  ${c.bold('gripm')} ${c.dim('· Playbook Stack Packs')}
-
-  ${c.dim('➜')}  ${c.dim('Upstream:')}  ${c.cyan(`${remote}@${ref}`)}
-`);
+  console.log(`\n  ${c.bold('gripm')} ${c.dim('· Playbook Stack Packs')}\n\n  ${c.dim('➜')}  ${c.dim('Upstream:')}  ${c.cyan(`${remote}@${ref}`)}\n`);
   for (const [name, pack] of Object.entries(source)) {
     const packFiles = Array.isArray(pack) ? pack : pack?.files ?? [];
     const skills = packFiles.filter((f) => f.endsWith('SKILL.md')).map((f) => path.basename(path.dirname(f)));
     console.log(`  • ${c.bold(name.padEnd(10))} ${skills.join(', ') || c.dim('(no skills)')}`);
   }
-  console.log(`
-  ${c.dim('Install with:')}  node scripts/sync-playbook.mjs --stack <name>
-  ${c.dim('Core only:')}     node scripts/sync-playbook.mjs
-`);
+  console.log(`\n  ${c.dim('Install with:')}  playbook sync --stack <name>\n  ${c.dim('Core only:')}     playbook sync\n`);
 }
 
 function parseArgs(argv) {
   const opts = {
-    repo: process.cwd(),
-    source: null,
-    tag: null,
-    // null, not DEFAULT_REMOTE: `!options.remote` arms local-bundle auto-detect (PLAY-037 AC #2).
-    remote: null,
-    stacks: [],
-    initAgents: false,
-    dryRun: false,
-    force: false,
-    yes: false,
-    manifest: true,
-    adopt: false,
-    history: true,
-    listStacks: false,
-    help: false,
+    repo: process.cwd(), source: null, tag: null, remote: null,
+    stacks: [], initAgents: false, dryRun: false, force: false,
+    yes: false, manifest: true, adopt: false, history: true,
+    listStacks: false, help: false, installScripts: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -450,11 +449,11 @@ function parseArgs(argv) {
       case 'sync': break;
       case '--repo': case '-r': opts.repo = path.resolve(next()); break;
       case '--source': case '--from': opts.source = path.resolve(next()); break;
-      case '--tag': case '-t': opts.tag = next(); break;
-      case '--branch': case '-b': opts.tag = next(); break;
+      case '--tag': case '-t': case '--branch': case '-b': opts.tag = next(); break;
       case '--remote': opts.remote = next(); break;
       case '--stack': case '-s': opts.stacks.push(next()); break;
       case '--init-agents': opts.initAgents = true; break;
+      case '--install-scripts': opts.installScripts = true; break;
       case '--dry-run': opts.dryRun = true; break;
       case '--force': opts.force = true; break;
       case '--adopt': opts.adopt = true; break;

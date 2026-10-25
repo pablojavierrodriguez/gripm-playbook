@@ -369,6 +369,7 @@ export async function runInit(argv = []) {
     initAgents: true,
     yes: opts.yes,
     force: opts.force,
+    installScripts: opts.installScripts,
   });
 
   if (!parametrizeAgentsMdFile(repo, answers)) return;
@@ -401,6 +402,7 @@ function parseArgs(argv) {
     yes: false,
     listHarnesses: false,
     help: false,
+    installScripts: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -418,6 +420,7 @@ function parseArgs(argv) {
       case '--lang': case '-l': opts.lang = next(); break;
       case '--board': opts.board = true; break;
       case '--no-board': opts.board = false; break;
+      case '--install-scripts': opts.installScripts = true; break;
       case '--force': case '-f': opts.force = true; break;
       case '--yes': case '-y': opts.yes = true; break;
       case '--list-harnesses': opts.listHarnesses = true; break;

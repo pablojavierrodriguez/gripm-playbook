@@ -273,10 +273,27 @@ function loadCatalog(config, root) {
   return { version: canonical.version, rules: merged, localRules: local.rules, localPath: local.localPath };
 }
 
+function resolveConfigFile(explicitPath, root = ROOT) {
+  if (explicitPath) return path.resolve(root, explicitPath);
+  const gripmConfig = path.join(root, '.gripm', CONFIG_NAME);
+  if (fs.existsSync(gripmConfig)) return gripmConfig;
+  return path.join(root, CONFIG_NAME);
+}
+
+function resolveBaselineFile(root = ROOT, forWrite = false) {
+  const gripmBaseline = path.join(root, '.gripm', BASELINE_NAME);
+  const rootBaseline = path.join(root, BASELINE_NAME);
+  if (forWrite) {
+    if (fs.existsSync(rootBaseline) && !fs.existsSync(gripmBaseline)) return rootBaseline;
+    if (fs.existsSync(path.join(root, '.gripm'))) return gripmBaseline;
+    return rootBaseline;
+  }
+  if (fs.existsSync(gripmBaseline)) return gripmBaseline;
+  return rootBaseline;
+}
+
 function loadConfig(opts, root = ROOT) {
-  const configPath = opts.config
-    ? path.resolve(root, opts.config)
-    : path.join(root, CONFIG_NAME);
+  const configPath = resolveConfigFile(opts.config, root);
 
   if (!fs.existsSync(configPath)) return { configPath, config: {} };
 
@@ -1055,7 +1072,7 @@ function fingerprint(finding) {
 }
 
 function loadBaseline(root = ROOT) {
-  const file = path.join(root, BASELINE_NAME);
+  const file = resolveBaselineFile(root, false);
   if (!fs.existsSync(file)) return { version: BASELINE_VERSION, entries: {} };
 
   try {
@@ -1101,7 +1118,9 @@ function writeBaseline(findings, root = ROOT, partialRuleIds = null) {
     entries,
   };
 
-  fs.writeFileSync(path.join(root || ROOT, BASELINE_NAME), `${JSON.stringify(payload, null, 2)}\n`);
+  const targetPath = resolveBaselineFile(root || ROOT, true);
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.writeFileSync(targetPath, `${JSON.stringify(payload, null, 2)}\n`);
   return entries;
 }
 

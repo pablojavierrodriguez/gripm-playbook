@@ -1729,9 +1729,9 @@ describe('Tier 3: Cross-Feature Combinations', () => {
     assert.ok(report.findings.some((f) => f.rule === 'UX-015'));
   });
 
-  test('T3-4: sync-playbook local sync installs all scripts needed by gate-qa', () => {
+  test('T3-4: sync-playbook local sync installs all scripts needed by gate-qa when --install-scripts requested', () => {
     const sandbox = createSandbox();
-    const res = runCmd(SYNC_BIN, ['--repo', sandbox, '--source', ROOT, '--init-agents']);
+    const res = runCmd(SYNC_BIN, ['--repo', sandbox, '--source', ROOT, '--init-agents', '--install-scripts']);
     assert.equal(res.status, 0, `Sync failed: ${res.output}`);
     assert.ok(fs.existsSync(path.join(sandbox, 'scripts', 'gate-qa.mjs')));
   });
@@ -2251,7 +2251,7 @@ describe('Tier 5: Zero-Friction Onboarding Init (PLAY-030)', () => {
     const dir = createSandbox('e2e-installed-');
     createFile(dir, 'package.json', JSON.stringify({ name: 'installed-app' }));
 
-    const install = runCmd(INIT_BIN, ['--repo', dir, '--source', ROOT, '--yes', '--harness', 'cursor', '--harness', 'claude']);
+    const install = runCmd(INIT_BIN, ['--repo', dir, '--source', ROOT, '--yes', '--install-scripts', '--harness', 'cursor', '--harness', 'claude']);
     assert.equal(install.status, 0, install.output);
 
     const installed = (script, args) => runCmd(path.join(dir, 'scripts', script), args, { cwd: ROOT });

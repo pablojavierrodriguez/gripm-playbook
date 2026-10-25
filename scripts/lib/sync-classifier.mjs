@@ -8,7 +8,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-export const LOCK_PATH = '.playbook-lock.json';
+export const CANONICAL_LOCK_PATH = '.gripm/playbook-lock.json';
+export const LEGACY_LOCK_PATH = '.playbook-lock.json';
+export const LOCK_PATH = CANONICAL_LOCK_PATH;
 
 export const sha256 = (content) => crypto.createHash('sha256').update(content).digest('hex');
 
@@ -53,8 +55,83 @@ export function findOrphanedFiles(targetRepo, plannedFiles, lockFiles = null) {
   return orphans;
 }
 
+export function pruneLegacyScripts(targetRepo, lockFiles = {}) {
+  const scriptsDir = path.join(targetRepo, 'scripts');
+  if (!fs.existsSync(scriptsDir)) return [];
+  const removed = [];
+
+  const candidates = [
+    'scripts/audit-ux-code.cjs', 'scripts/gate-qa.mjs', 'scripts/gate-review-items.mjs',
+    'scripts/check-loc.mjs', 'scripts/ux-rules.json', 'scripts/sync-playbook.mjs',
+    'scripts/init.mjs', 'scripts/lib/frontmatter.mjs', 'scripts/lib/terminal.mjs',
+    'scripts/lib/adapters.mjs', 'scripts/lib/pyramid.mjs', 'scripts/lib/task-inspection.mjs',
+    'scripts/lib/provenance.mjs', 'scripts/lib/sync-classifier.mjs', 'scripts/lib/cli-router.mjs',
+    'scripts/lib/doc-checks.mjs', 'scripts/lib/catalog-validator.mjs',
+  ];
+
+  for (const rel of candidates) {
+    const full = path.join(targetRepo, rel);
+    if (!fs.existsSync(full)) continue;
+    try {
+      fs.unlinkSync(full);
+      removed.push(rel);
+      pruneEmptyDirs(path.dirname(full), scriptsDir);
+    } catch {}
+  }
+
+  pruneEmptyDirs(scriptsDir, targetRepo);
+  return removed;
+}
+
+export function pruneEmptyDirs(dir, stopAt) {
+  if (!fs.existsSync(dir) || dir === stopAt) return;
+  try {
+    const entries = fs.readdirSync(dir);
+    if (entries.length === 0) {
+      fs.rmdirSync(dir);
+      const parent = path.dirname(dir);
+      if (parent && parent !== dir && parent !== stopAt) {
+        pruneEmptyDirs(parent, stopAt);
+      }
+    }
+  } catch {}
+}
+
+export function pruneOrphanedFiles(targetRepo, orphans, customizations = new Set()) {
+  const pruned = [];
+  const kept = [];
+  const agentsRoot = path.join(targetRepo, '.agents');
+
+  for (const rel of orphans) {
+    if (customizations.has(rel)) {
+      kept.push(rel);
+      continue;
+    }
+    const full = path.join(targetRepo, rel);
+    try {
+      if (fs.existsSync(full)) {
+        fs.unlinkSync(full);
+        pruned.push(rel);
+        pruneEmptyDirs(path.dirname(full), agentsRoot);
+      }
+    } catch {
+      kept.push(rel);
+    }
+  }
+
+  return { pruned, kept };
+}
+
+export function resolveLockPath(targetRepo) {
+  const canonical = path.join(targetRepo, CANONICAL_LOCK_PATH);
+  if (fs.existsSync(canonical)) return canonical;
+  const legacy = path.join(targetRepo, LEGACY_LOCK_PATH);
+  if (fs.existsSync(legacy)) return legacy;
+  return canonical;
+}
+
 export function readLock(targetRepo) {
-  const lockPath = path.join(targetRepo, LOCK_PATH);
+  const lockPath = resolveLockPath(targetRepo);
   const empty = { playbook: null, ref: null, version: null, files: {}, customizations: [] };
   if (!fs.existsSync(lockPath)) return empty;
   try {
@@ -65,13 +142,14 @@ export function readLock(targetRepo) {
       version: lock.version || null,
       files: lock.files || {},
       customizations: Array.isArray(lock.customizations) ? lock.customizations : [],
+      isLegacyPath: lockPath.endsWith(LEGACY_LOCK_PATH),
     };
   } catch {
     return empty;
   }
 }
 
-export function planFiles(manifest, stacks, fallbackCore = [], fallbackStacks = {}) {
+export function planFiles(manifest, stacks, fallbackCore = [], fallbackStacks = {}, options = {}) {
   const core = manifest ? manifest.core : fallbackCore;
   const stackSource = manifest && manifest.stacks ? manifest.stacks : fallbackStacks;
 
@@ -88,5 +166,9 @@ export function planFiles(manifest, stacks, fallbackCore = [], fallbackStacks = 
     files.push(...packFiles);
   }
 
-  return { files, stackSource, unknown };
+  const filtered = options.packageMode
+    ? files.filter((f) => !f.startsWith('scripts/'))
+    : files;
+
+  return { files: filtered, stackSource, unknown };
 }
