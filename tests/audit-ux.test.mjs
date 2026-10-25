@@ -501,6 +501,71 @@ describe('programmatic API (PLAY-005)', () => {
     fs.rmSync(temp, { recursive: true, force: true });
   });
 
+  test('withinComponent matches enclosing JSX parent regardless of file name (PLAY-007)', () => {
+    const temp = createProject();
+    // Overlays.tsx does not contain "Dialog" or "Modal" in its file name.
+    fs.writeFileSync(
+      path.join(temp, 'src', 'Overlays.tsx'),
+      'export const A = () => <Dialog><DialogContent><p className="truncate">inside dialog</p></DialogContent></Dialog>;\n' +
+      'export const B = () => <Card><p className="truncate">outside dialog</p></Card>;\n'
+    );
+    writeLocalCatalog(temp, {
+      version: 1,
+      rules: [{
+        id: 'ENV-003',
+        title: 'Truncated text in a dialog',
+        severity: 'WARNING',
+        message: '`truncate` in a dialog.',
+        check: { line: ['truncate'], withinComponent: ['Dialog'] },
+      }],
+    });
+    fs.writeFileSync(
+      path.join(temp, '.uxaudit.json'),
+      JSON.stringify({ src: 'src', rules: 'rules.json' }),
+    );
+
+    const { auditProject } = requireCjs(AUDITOR);
+    const report = auditProject({ root: temp, useBaseline: false });
+
+    assert.equal(report.findings.length, 1, 'only the element inside Dialog must be reported');
+    assert.ok(report.findings[0].file.endsWith('Overlays.tsx'));
+    assert.equal(report.findings[0].line, 1);
+    assert.equal(report.findings[0].rule, 'ENV-003');
+    fs.rmSync(temp, { recursive: true, force: true });
+  });
+
+  test('withinComponent supports dotted component notation and unlessComponent suppression (PLAY-007)', () => {
+    const temp = createProject();
+    fs.writeFileSync(
+      path.join(temp, 'src', 'Views.tsx'),
+      'export const A = () => <Modal.Root><Modal.Body><p className="truncate">warn</p></Modal.Body></Modal.Root>;\n' +
+      'export const B = () => <Modal.Root><Tooltip><p className="truncate">suppressed</p></Tooltip></Modal.Root>;\n'
+    );
+    writeLocalCatalog(temp, {
+      version: 1,
+      rules: [{
+        id: 'ENV-004',
+        title: 'Truncated text in modal except tooltip',
+        severity: 'WARNING',
+        message: '`truncate` in modal.',
+        check: { line: ['truncate'], withinComponent: ['Modal'], unlessComponent: ['Tooltip'] },
+      }],
+    });
+    fs.writeFileSync(
+      path.join(temp, '.uxaudit.json'),
+      JSON.stringify({ src: 'src', rules: 'rules.json' }),
+    );
+
+    const { auditProject } = requireCjs(AUDITOR);
+    const report = auditProject({ root: temp, useBaseline: false });
+
+    assert.equal(report.findings.length, 1);
+    assert.ok(report.findings[0].file.endsWith('Views.tsx'));
+    assert.equal(report.findings[0].line, 1);
+    assert.equal(report.findings[0].rule, 'ENV-004');
+    fs.rmSync(temp, { recursive: true, force: true });
+  });
+
   test('a local catalog runs alongside the canonical one', () => {
     const temp = createProject();
     fs.writeFileSync(path.join(temp, 'src', 'ConfirmDialog.tsx'), 'export const A = () => <p className="truncate">x</p>;\n');

@@ -3,30 +3,7 @@
 
 ## Resumen de Estados
 
-### 💡 Ideas / Discovery (2)
-
-#### [PLAY-007] onlyFile debería enganchar el componente renderizado y no el nombre del archivo
-- **Prioridad**: `p2` | **Tipo**: `improvement`
-
-`onlyFile` (PLAY-005) resuelve por **nombre de archivo**. Es lo que el consumidor necesitaba para expresar "`truncate` dentro de un diálogo", y funciona, pero la forma en que funciona es frágil:
-
-```json
-"check": { "line": ["truncate"], "onlyFile": ["Modal", "Dialog"] }
-```
-
-Un diálogo definido en `Overlays.tsx` no se ve. Uno en `ConfirmModal.tsx`, sí. El comportamiento depende de cómo el proyecto nombró sus archivos, no de qué renderiza el componente.
-
-La misma debilidad ya existía en el invariante `ENV-002` del consumidor, y fue parte de lo que abrió la pregunta de si debía promoverse al catálogo: el problema no es solo si una regla debe ser canónica, sino si la regla es correcta.
-
-**Criterios de Aceptación:**
-- [ ] #1 Un check kind filtra por el componente renderizado y no por el nombre del archivo
-- [ ] #2 Un `<Dialog>` declarado en un archivo con cualquier nombre queda cubierto
-- [ ] #3 `onlyFile` por nombre de archivo se mantiene o se deprecia de forma explícita
-- [ ] #4 La documentación de `authoring.checkSemantics` distingue ambos
-- [ ] #5 Un fixture con un diálogo en un archivo de nombre no obvio
-- [ ] #6 `npm run check:all` en verde
-
----
+### 💡 Ideas / Discovery (1)
 
 #### [PLAY-033] Localizacion formal en espanol (docs/es/)
 - **Prioridad**: `p3` | **Tipo**: `feature`
@@ -42,7 +19,32 @@ Contexto que la vuelve real: el backlog de este repo y `docs/BACKLOG.md` se escr
 
 ---
 
-### 🚀 Ready for Deploy (4)
+### 🚀 Ready for Deploy (5)
+
+#### [PLAY-007] onlyFile debería enganchar el componente renderizado y no el nombre del archivo
+- **Prioridad**: `p2` | **Tipo**: `improvement`
+
+`onlyFile` (PLAY-005) resuelve por **nombre de archivo**. Es lo que el consumidor necesitaba para expresar "`truncate` dentro de un diálogo", y funciona, pero la forma en que funciona es frágil:
+
+```json
+"check": { "line": ["truncate"], "onlyFile": ["Modal", "Dialog"] }
+```
+
+Un diálogo definido en `Overlays.tsx` no se ve. Uno en `ConfirmModal.tsx`, sí. El comportamiento depende de cómo el proyecto nombró sus archivos, no de qué renderiza el componente.
+
+La misma debilidad ya existía en el invariante `ENV-002` del consumidor, y fue parte de lo que abrió la pregunta de si debía promoverse al catálogo: el problema no es solo si una regla debe ser canónica, sino si la regla es correcta.
+
+La solución refinada y aprobada por el PO agrega la semántica declarativa `withinComponent` en `check`: el árbol de parseo de unidades de JSX conoce la jerarquía de ancestros (`frame.parent`), permitiendo verificar si un elemento está contenido dentro de un componente padre (ej. `<Dialog>`, `<Modal>`, `<Dialog.Content>`) sin importar el nombre del archivo en disco.
+
+**Criterios de Aceptación:**
+- [x] #1 El motor de auditoría (`scripts/audit-ux-code.cjs`) soporta `check.withinComponent` como array de nombres de componente (soporta matching de nombre exacto y componentes con notación de punto como `<Dialog.Content>`).
+- [x] #2 Un elemento o texto dentro de un componente objetivo (ej. `<Dialog>`) declarado en un archivo con cualquier nombre (ej. `src/Overlays.tsx`) es detectado y reportado si viola la condición.
+- [x] #3 `onlyFile` se mantiene 100% funcional y retrocompatible para filtrado por ruta de archivo.
+- [x] #4 La documentación de authoring en `.agents/skills/code-level-ux-auditor/SKILL.md` y `README.md` documenta la sintaxis y distingue `withinComponent` de `onlyFile`.
+- [x] #5 Tests automatizados en `tests/audit-ux.test.mjs` validando `withinComponent` con anidamientos profundos, nombres de archivo no obvios (`Overlays.tsx`), componentes con punto y coexistencia con `onlyFile`.
+- [x] #6 `npm run check:all` (`validate`, `check:loc`, `test`) en verde con 0 fallos.
+
+---
 
 #### [PLAY-035] Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash
 - **Prioridad**: `p3` | **Tipo**: `improvement`

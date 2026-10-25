@@ -667,7 +667,16 @@ function buildUnits(lines) {
     frame.closeAt = closeAt;
 
     const start = Math.min(frame.startLine, endLine);
+    const ancestors = [];
+    let curr = frame.parent;
+    while (curr) {
+      if (curr.name) ancestors.push(curr.name);
+      curr = curr.parent;
+    }
+
     const unit = {
+      name: frame.name || null,
+      ancestors,
       startLine: start + 1,
       headEndLine: frame.headEndLine,
       endLine: Math.max(start, endLine) + 1,
@@ -810,6 +819,8 @@ function buildUnits(lines) {
   for (let n = 0; n < lines.length; n += 1) {
     if (covered.has(n + 1) || !lines[n].trim()) continue;
     units.push({
+      name: null,
+      ancestors: [],
       startLine: n + 1,
       headEndLine: n,
       endLine: n + 1,
@@ -858,6 +869,35 @@ function hasVisibleText(unit) {
 }
 
 /**
+ * Checks if a JSX component name matches a target token.
+ * Matches exact name ("Dialog") or dotted compound names ("Dialog.Content" matches "Dialog" or "Dialog.Content").
+ */
+function matchesComponentName(componentName, token) {
+  if (!componentName || !token) return false;
+  if (componentName === token) return true;
+  if (componentName.startsWith(token + '.')) return true;
+  return false;
+}
+
+/**
+ * Checks whether an element unit is rendered inside ANY of the specified component tokens.
+ * Evaluates the element itself and all of its enclosing AST ancestors.
+ */
+function isWithinComponent(unit, tokens) {
+  if (!tokens || !tokens.length) return true;
+  const candidates = [];
+  if (unit && unit.name) candidates.push(unit.name);
+  if (unit && Array.isArray(unit.ancestors)) {
+    candidates.push(...unit.ancestors);
+  }
+  if (!candidates.length) return false;
+
+  return tokens.some((token) =>
+    candidates.some((candidate) => matchesComponentName(candidate, token))
+  );
+}
+
+/**
  * Decides whether a rule matches one element unit.
  *
  * The unit carries two granularities and each check kind reads the right one:
@@ -893,6 +933,8 @@ function lineMatches(rule, unit, lines, unitIndex, content) {
   if (anyInScope(check.unlessContent || [])) return false;
   if ((check.needsContent || []).length && !anyInScope(check.needsContent)) return false;
   if (check.unlessVisibleText && hasVisibleText(unit)) return false;
+  if ((check.withinComponent || []).length && !isWithinComponent(unit, check.withinComponent)) return false;
+  if ((check.unlessComponent || []).length && isWithinComponent(unit, check.unlessComponent)) return false;
 
   const radius = typeof check.window === 'number' ? check.window : 6;
   if ((check.nearby || []).length || (check.unlessNearby || []).length) {
@@ -1362,6 +1404,8 @@ module.exports = {
   buildUnits,
   lineMatches,
   hasVisibleText,
+  isWithinComponent,
+  matchesComponentName,
   fingerprint,
 };
 

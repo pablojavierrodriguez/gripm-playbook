@@ -410,11 +410,13 @@ A project that needs its own signatures names a catalog of its own in `"rules"` 
     "signature": "`truncate` inside a dialog component.",
     "impact": "The ellipsis hides the impact the user is being asked to confirm.",
     "fix": "Use `break-words leading-relaxed`.",
-    "check": { "line": ["truncate"], "onlyFile": ["Modal", "Dialog"] },
+    "check": { "line": ["truncate"], "withinComponent": ["Modal", "Dialog"] },
     "message": "`truncate` in a dialog."
   }]
 }
 ```
+
+Use `withinComponent` to target elements nested inside specific JSX components (inspecting the real AST ancestor tree rather than fragile file names; supports compound names like `<Dialog.Content>`). Use `onlyFile` when scoping rules strictly by directory or file path.
 
 **`UX-NNN` is reserved.** A local rule using that pattern is rejected with an error, because one id has to mean one thing across every consumer - a project reading its own `UX-009` as "touch target" while the skill documents something else is how catalogs stop being trustworthy. Pick your own prefix.
 
