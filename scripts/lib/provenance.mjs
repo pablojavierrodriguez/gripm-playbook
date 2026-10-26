@@ -28,6 +28,9 @@ export function makeBudget(limit = HISTORY_BUDGET) {
 }
 
 export async function fetchText(url, { retries = FETCH_RETRIES } = {}) {
+  if (process.env.PLAYBOOK_OFFLINE === '1' || process.env.PLAYBOOK_OFFLINE === 'true') {
+    throw new Error(`PLAYBOOK_OFFLINE: blocked network request to ${url}`);
+  }
   let lastError;
 
   for (let attempt = 1; attempt <= retries; attempt += 1) {
@@ -81,6 +84,9 @@ export async function resolveRef(remote, requested) {
 }
 
 export async function listFileHistory(remote, filePath, limit = HISTORY_LIMIT) {
+  if (process.env.PLAYBOOK_OFFLINE === '1' || process.env.PLAYBOOK_OFFLINE === 'true') {
+    return null;
+  }
   const url = `https://api.github.com/repos/${remote}/commits?path=${encodeURIComponent(filePath)}&per_page=${limit}`;
   try {
     const res = await fetch(url, {

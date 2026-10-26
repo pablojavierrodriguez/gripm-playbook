@@ -201,7 +201,7 @@ Feature ready for certification.
     const cli = path.join(pkgDir, 'scripts', 'sync-playbook.mjs');
     const res = runNode(cli, ['sync', '--repo', sandbox, '--yes', '--init-agents'], {
       cwd: sandbox,
-      env: { ...process.env, HTTPS_PROXY: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9' },
+      env: { ...process.env, PLAYBOOK_OFFLINE: '1', HTTPS_PROXY: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9' },
     });
 
     assert.equal(res.status, 0, `auto-detected sync should succeed offline:\n${res.output}`);
@@ -222,12 +222,12 @@ Feature ready for certification.
     // The guard `targetDir !== packageBundleRoot` only stops the bundle from
     // being treated as its own source (a pointless self-copy). Upstream sync
     // into the package root stays legitimate, so assert on the real contract:
-    // the `@local` path is skipped. Proxy-blocked so it fails fast, offline.
+    // the `@local` path is skipped. Blocked via PLAYBOOK_OFFLINE so it fails fast, offline.
     const pkgDir = installPackageInto(createTempDir('selfsync-'));
     const cli = path.join(pkgDir, 'scripts', 'sync-playbook.mjs');
     const res = runNode(cli, ['sync', '--repo', pkgDir, '--yes'], {
       cwd: pkgDir,
-      env: { ...process.env, HTTPS_PROXY: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9' },
+      env: { ...process.env, PLAYBOOK_OFFLINE: '1', HTTPS_PROXY: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9' },
     });
     assert.ok(!res.output.includes('@local'), 'bundle root must not resolve to itself as a local source');
     assert.notEqual(res.status, 0, 'blocked upstream must not report success');
