@@ -6,7 +6,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { readFrontmatter, readACs } from './frontmatter.mjs';
+import { checkDiffAntiSlop, inspectDiffText } from './anti-slop.mjs';
 
 const GATEABLE_STATUS = 'review';
 
@@ -164,9 +166,9 @@ export function inspectTask(task, tasks = new Map(), options = {}) {
       failures.push(`dependency "${dep}" does not exist in backlog/tasks/`);
       continue;
     }
-    if (resolved.frontmatter.status !== 'done') {
+    if (resolved.frontmatter.status !== 'done' && resolved.frontmatter.status !== 'ready') {
       failures.push(
-        `dependency "${dep}" is "${resolved.frontmatter.status ?? '(missing)'}" (${resolved.file}) but must be "done"`,
+        `dependency "${dep}" is "${resolved.frontmatter.status ?? '(missing)'}" (${resolved.file}) but must be "ready" or "done"`,
       );
     }
   }
@@ -181,13 +183,44 @@ export function inspectTask(task, tasks = new Map(), options = {}) {
         continue;
       }
       const depStatus = resolved.frontmatter.status;
-      if (depStatus !== 'done') {
+      if (depStatus !== 'done' && depStatus !== 'ready') {
         failures.push(
-          `unblock refused: dependency "${dep}" is "${depStatus ?? '(missing)'}"; it must be "done" or unlinked`,
+          `unblock refused: dependency "${dep}" is "${depStatus ?? '(missing)'}"; it must be "ready" or "done" or unlinked`,
         );
       }
     }
   }
 
+  if (options?.diffText) {
+    for (const f of inspectDiffText(options.diffText)) failures.push(f);
+  } else if (options?.projectRoot && options?.checkAntiSlop !== false) {
+    const antiSlop = checkDiffAntiSlop(options.projectRoot);
+    for (const f of antiSlop.failures) failures.push(f);
+  }
+
   return failures;
 }
+
+export function syncConsolidatedBacklog(projectRoot) {
+  if (!fs.existsSync(path.join(projectRoot, 'BACKLOG.md'))) return;
+  const pkgPath = path.join(projectRoot, 'package.json');
+  let scripts = {};
+  try {
+    scripts = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).scripts || {};
+  } catch {}
+  const scriptName = ['backlog:sync', 'sync:backlog', 'backlog:export', 'export:backlog'].find((name) => Boolean(scripts[name]));
+  if (scriptName) {
+    try {
+      spawnSync('npm', ['run', '--silent', scriptName], { cwd: projectRoot, encoding: 'utf8', shell: process.platform === 'win32', stdio: 'ignore' });
+    } catch {}
+  } else if (fs.existsSync(path.join(projectRoot, 'scripts', 'sync-backlog.js'))) {
+    try {
+      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'sync-backlog.js')], { cwd: projectRoot, encoding: 'utf8', stdio: 'ignore' });
+    } catch {}
+  } else if (fs.existsSync(path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'))) {
+    try {
+      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'), '--export'], { cwd: projectRoot, encoding: 'utf8', stdio: 'ignore' });
+    } catch {}
+  }
+}
+

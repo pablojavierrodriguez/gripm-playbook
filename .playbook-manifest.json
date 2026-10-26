@@ -1,6 +1,6 @@
 {
   "$comment": "Canonical install manifest. Consumed by scripts/sync-playbook.mjs. Adding a file here makes it installable everywhere on the next sync, with no script change.",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "core": [
     ".agents/TEAM_PLAYBOOK.md",
     ".agents/STATE_MACHINE.md",
@@ -9,11 +9,14 @@
     ".agents/skills/market-researcher/SKILL.md",
     ".agents/skills/product-designer/SKILL.md",
     ".agents/skills/principal-engineer/SKILL.md",
+    ".agents/skills/principal-engineer/references/oxlint-anti-slop.md",
     ".agents/skills/qa-auditor/SKILL.md",
     ".agents/skills/code-level-ux-auditor/SKILL.md",
     "scripts/audit-ux-code.cjs",
     "scripts/gate-qa.mjs",
+    "scripts/gate-review-items.mjs",
     "scripts/check-loc.mjs",
+    "scripts/validate-commit-msg.mjs",
     "scripts/ux-rules.json",
     "scripts/sync-playbook.mjs",
     "scripts/init.mjs",
@@ -22,8 +25,10 @@
     "scripts/lib/adapters.mjs",
     "scripts/lib/pyramid.mjs",
     "scripts/lib/task-inspection.mjs",
+    "scripts/lib/anti-slop.mjs",
     "scripts/lib/provenance.mjs",
     "scripts/lib/sync-classifier.mjs",
+    "scripts/lib/cli-router.mjs",
     "docs/sprints/SPRINT_SPEC_TEMPLATE.md",
     "docs/DOMAIN_TEMPLATE.md"
   ],
@@ -56,7 +61,8 @@
       "description": "Progressive Web App: manifest, icons, service worker and install configuration consistency.",
       "files": [
         ".agents/stacks/pwa/STACK.md",
-        ".agents/stacks/pwa/skills/pwa-assets-audit/SKILL.md"
+        ".agents/stacks/pwa/skills/pwa-assets-audit/SKILL.md",
+        ".agents/stacks/pwa/skills/pwa-assets-audit/scripts/validate-manifest.mjs"
       ]
     }
   },

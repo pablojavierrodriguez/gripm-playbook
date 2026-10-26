@@ -202,7 +202,7 @@ Cuando una página de lista tiene **3 o más filtros**, nunca renderizarlos inli
       <SlidersHorizontal className="h-4 w-4 mr-2" />
       <span className="text-xs font-bold">{t("common.filters")}</span>
       {cantidadFiltros > 0 && (
-        <span className="ml-1.5 h-4 w-4 rounded-full bg-primary text-[9px] font-black text-primary-foreground flex items-center justify-center">
+        <span className="ml-1.5 h-4 w-4 rounded-full bg-primary text-xs font-black text-primary-foreground flex items-center justify-center">
           {cantidadFiltros}
         </span>
       )}
@@ -226,7 +226,7 @@ Cuando una página de lista tiene **3 o más filtros**, nunca renderizarlos inli
 **Reglas del Popover de filtros:**
 - El botón usa `size="sm"` con `px-3` (no `size="icon"`). Mismo diseño en desktop y mobile.
 - El `PopoverContent` tiene `w-80 p-4 space-y-4 z-50`.
-- Cada filtro dentro del Popover lleva su label `text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70`.
+- Cada filtro dentro del Popover lleva su label `text-xs font-bold uppercase tracking-wider text-muted-foreground/70`.
 - Incluir siempre un botón `"Limpiar todo"` visible solo cuando hay filtros activos.
 - El badge contador es inline dentro del botón (no absoluto), con `ml-1.5`.
 
@@ -249,45 +249,44 @@ Para pantallas de preferencias, permisos o canales (ej. `/profile` notificacione
 
 ---
 
-## Componente `DateRangePicker`
+## Date Range Filter Pattern
 
-Existe el componente reutilizable `src/components/ui/date-range-picker.tsx` para seleccionar un rango de fechas. Usar **siempre** este componente en lugar de dos `<input type="date">` separados.
+For date interval selections, avoid using two separate raw `<input type="date">` fields. Use a combined Popover + Calendar range picker component (e.g., based on `react-day-picker` or standard design tokens):
 
 ```tsx
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { DateRange } from "react-day-picker";
+import { useState } from "react";
+import type { DateRange } from "react-day-picker";
 
 const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
-<DateRangePicker date={dateRange} setDate={setDateRange} />
+// Render component with range state
+<DateRangePicker date={dateRange} onDateChange={setDateRange} />
 ```
 
-**Para filtrar datos con el rango:**
+**Filtering data by date range:**
 ```tsx
-// En filtrado en memoria
+// In-memory collection filtering
 if (dateRange?.from) {
-  matchesDate = matchesDate && item.date >= dateRange.from.toISOString();
+  matches = matches && new Date(item.createdAt) >= dateRange.from;
 }
 if (dateRange?.to) {
-  const toDate = new Date(dateRange.to);
-  toDate.setHours(23, 59, 59, 999);
-  matchesDate = matchesDate && item.date <= toDate.toISOString();
+  const endOfDay = new Date(dateRange.to);
+  endOfDay.setHours(23, 59, 59, 999);
+  matches = matches && new Date(item.createdAt) <= endOfDay;
 }
 
-// En query de base de datos / cliente remoto (ej. Supabase, Prisma, TypeORM)
-if (dateRange?.from) query = query.gte("starts_at", dateRange.from.toISOString());
+// In database / remote query
+if (dateRange?.from) query = query.gte("created_at", dateRange.from.toISOString());
 if (dateRange?.to) {
-  const toDate = new Date(dateRange.to);
-  toDate.setHours(23, 59, 59, 999);
-  query = query.lte("starts_at", toDate.toISOString());
+  const endOfDay = new Date(dateRange.to);
+  endOfDay.setHours(23, 59, 59, 999);
+  query = query.lte("created_at", endOfDay.toISOString());
 }
 ```
 
-**Reglas:**
-- `numberOfMonths={1}` dentro de Popovers (2 meses no entra en el ancho estándar de 320px).
-- El componente usa `react-day-picker` en modo `range` con `locale={es}` de `date-fns/locale`.
-- El placeholder por defecto es `"Seleccionar fechas"`.
-- `date-fns` y `react-day-picker` ya están en `package.json` - no instalar alternativas.
+**Ergonomic Rules:**
+- Keep `numberOfMonths={1}` when placed inside compact Popovers or on mobile viewports (< 360px width budget).
+- When filtering bounded intervals, always adjust the `to` bound to the end of day (`23:59:59.999`) to prevent omitting events created during that final day.
 
 ---
 
@@ -317,10 +316,10 @@ Todos los modales de consulta o visualización de entidades (vistas de detalle, 
     <DialogHeader className="p-6 pb-4 shrink-0">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest bg-muted/40">
+          <Badge variant="secondary" className="text-xs font-black uppercase tracking-widest bg-muted/40">
             {categoryBadge}
           </Badge>
-          <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-primary/20 text-primary bg-primary/5">
+          <Badge variant="outline" className="text-xs font-black uppercase tracking-widest border-primary/20 text-primary bg-primary/5">
             {statusBadge}
           </Badge>
         </div>
@@ -340,7 +339,7 @@ Todos los modales de consulta o visualización de entidades (vistas de detalle, 
         <div className="p-3 rounded-xl border border-border/40 bg-muted/5">
           <div className="flex items-center gap-2 mb-2">
             <FileText className="h-4 w-4 text-muted-foreground" />
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">Notas</p>
+            <p className="text-xs font-black uppercase tracking-wider text-muted-foreground/60">Notas</p>
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{notes}</p>
         </div>
@@ -371,8 +370,8 @@ const InfoRow = ({ icon, label, value }: { icon: React.ReactNode; label: string;
       {icon}
     </div>
     <div className="flex-1 min-w-0">
-      <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60 mb-0.5">{label}</p>
-      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{value}</div>
+      <p className="text-xs font-black uppercase tracking-wider text-muted-foreground/60 mb-0.5">{label}</p>
+      <div className="text-sm font-semibold text-foreground truncate">{value}</div>
     </div>
   </div>
 );

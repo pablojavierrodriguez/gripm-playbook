@@ -27,6 +27,10 @@ export function resolvePyramidSteps(root, pyramidSteps = []) {
 }
 
 export function runPyramidStep(step, root) {
+  if (typeof step.runner === 'function') {
+    return step.runner(root);
+  }
+
   if (!step.available) {
     return step.optional
       ? { state: 'skipped', detail: `not applicable to this project (no "${step.script}" script)` }

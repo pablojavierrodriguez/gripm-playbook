@@ -20,6 +20,8 @@
       "unlessVisibleText": "true disables the rule when the element renders visible text. Tags, nested elements and {expressions} are excluded by construction.",
       "unlessFile": "Disable the whole rule when the file path contains ANY of these substrings.",
       "onlyFile": "Run the rule only when the file path contains ANY of these substrings. The positive counterpart of unlessFile; without it a rule scoped by context cannot be expressed.",
+      "withinComponent": "Fire only when the element is rendered inside ANY of these JSX component tags (e.g. [\"Dialog\", \"Modal\"]). Checks the real AST ancestor tree rather than file names, matching exact component names and dotted names (e.g. <Dialog.Content> matches \"Dialog\").",
+      "unlessComponent": "Suppress the finding when the element is rendered inside ANY of these JSX component tags (e.g. [\"Tooltip\"]).",
       "requires.deps": "Fire only when the dependency exists in the target package.json. Omit for stack-agnostic rules. Rules with no dependency gate run everywhere.",
       "window": "Line radius used by nearby / unlessNearby. Defaults to 6."
     },

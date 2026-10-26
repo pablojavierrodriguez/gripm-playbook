@@ -54,7 +54,9 @@ On the `<div>`, `needsContent: ["MMMM"]` matches (the `<span>` is its descendant
 That distinction is why `UX-004` reports the `<span>` that renders the date rather than the `<div>` wrapping it.
 
 - `unlessVisibleText: true` suppresses the rule when the element renders visible text. No token list can express that, and it is what separates a labelled button from an icon-only one: `<button><span>Save</span></button>` is accessible with no `aria-*` attribute at all.
-- `onlyFile` is the counterpart of `unlessFile`: the rule runs **only** when the path contains one of the tokens. Without it, a context-scoped rule (`truncate` inside a dialog) cannot be declared, because a file filter can only turn a rule off, never on.
+- `withinComponent: ["Dialog", "Modal"]` runs the rule only when the element is rendered inside one of the specified JSX components. It inspects the real AST ancestor tree rather than fragile file names, supporting dotted notation (e.g. `<Dialog.Content>` matches `"Dialog"`).
+- `unlessComponent: ["Tooltip"]` suppresses the finding when the element is rendered inside one of the specified components.
+- `onlyFile` is the counterpart of `unlessFile`: the rule runs **only** when the file path contains one of the substrings (e.g. scoping to specific folders or modules).
 
 ### Project-specific rules
 

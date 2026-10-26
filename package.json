@@ -1,18 +1,23 @@
 {
   "name": "@gripm/playbook",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Autonomous multi-agent agile framework for modern software development with dynamic modes, decoupled releases, and sub-agent orchestration.",
   "type": "module",
   "main": "./scripts/sync-playbook.mjs",
   "bin": {
     "playbook": "scripts/sync-playbook.mjs",
-    "gripm-playbook": "scripts/sync-playbook.mjs"
+    "gripm-playbook": "scripts/sync-playbook.mjs",
+    "gate-qa": "scripts/gate-qa.mjs",
+    "audit-ux": "scripts/audit-ux-code.cjs",
+    "check-loc": "scripts/check-loc.mjs",
+    "validate-commit": "scripts/validate-commit-msg.mjs"
   },
   "exports": {
     ".": "./scripts/sync-playbook.mjs",
     "./audit": "./scripts/audit-ux-code.cjs",
     "./gate": "./scripts/gate-qa.mjs",
     "./check-loc": "./scripts/check-loc.mjs",
+    "./validate-commit": "./scripts/validate-commit-msg.mjs",
     "./init": "./scripts/init.mjs",
     "./package.json": "./package.json",
     "./scripts/*": "./scripts/*"
@@ -32,6 +37,7 @@
     "check:loc:strict": "node scripts/check-loc.mjs --strict",
     "gate:qa": "node scripts/gate-qa.mjs",
     "gate:review": "node scripts/gate-review-items.mjs",
+    "validate:commit": "node scripts/validate-commit-msg.mjs",
     "check:all": "npm run validate && npm run check:loc && npm test"
   },
   "keywords": [

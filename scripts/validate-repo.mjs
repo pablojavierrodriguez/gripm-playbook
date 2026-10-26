@@ -55,12 +55,16 @@ const PYRAMID_ALIASES = {
   'headless tests': 'test',
   'tests headless': 'test',
   'spec - backlog consistency': 'spec',
+  'file budget & modularity (< 1000 loc)': 'loc',
+  'file budget & modularity': 'loc',
+  'file budget': 'loc',
   'static ux audit': 'audit:ux',
   'production build': 'build',
   // Spanish labels (legacy wording, kept so older snapshots still validate).
   'typecheck estricto': 'validate',
   'tests unitarios y de integración': 'test',
   'consistencia spec ↔ backlog': 'spec',
+  'presupuesto de archivo y modularidad': 'loc',
   'auditoría estática de ux': 'audit:ux',
   'build de producción': 'build',
 };
@@ -138,7 +142,20 @@ function checkDocsReferenceInstalledFiles(manifest) {
     ...Object.values(manifest.stacks || {}).flatMap((pack) => pack.files || []),
   ]);
 
-  const claim = /(?:node\s+)?(scripts\/[A-Za-z0-9._-]+\.(?:mjs|cjs))/g;
+  const claim = /(?:node\s+)?(scripts\/[A-Za-z0-9._-]+\.(?:mjs|cjs))|(?:node\s+)((?:\.agents\/[A-Za-z0-9._\-/]+\.(?:mjs|cjs)))/g;
+
+  const stackDocs = [];
+  const stacksDir = path.join(ROOT, '.agents/stacks');
+  if (fs.existsSync(stacksDir)) {
+    const walk = (d) => {
+      for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith('.md')) stackDocs.push(path.relative(ROOT, full).replace(/\\/g, '/'));
+      }
+    };
+    walk(stacksDir);
+  }
 
   const docs = [
     '.agents/TEAM_PLAYBOOK.md',
@@ -147,14 +164,15 @@ function checkDocsReferenceInstalledFiles(manifest) {
     ...fs.readdirSync(path.join(ROOT, '.agents/skills'), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => `.agents/skills/${entry.name}/SKILL.md`),
+    ...stackDocs,
   ];
 
   const reported = new Set();
   for (const doc of docs) {
     if (!exists(doc)) continue;
     for (const match of read(doc).matchAll(claim)) {
-      const target = match[1];
-      if (installed.has(target)) continue;
+      const target = match[1] || match[2];
+      if (!target || installed.has(target)) continue;
       const key = `${doc}::${target}`;
       if (reported.has(key)) continue;
       reported.add(key);

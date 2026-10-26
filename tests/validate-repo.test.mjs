@@ -99,6 +99,18 @@ describe('manifest ⇄ documentation (PLAY-020 AC #2)', () => {
       .filter((l) => l.includes('qa-auditor') && l.includes('does not install'));
     assert.equal(forThisDoc.length, 1, 'a command named three times in one document is one defect');
   });
+
+  test('fails when a stack skill documents a script the manifest does not install (PLAY-042)', () => {
+    const dir = sandbox((root) => {
+      const skill = path.join(root, '.agents', 'stacks', 'pwa', 'skills', 'pwa-assets-audit', 'SKILL.md');
+      fs.writeFileSync(skill, `${fs.readFileSync(skill, 'utf8')}\n\nnode scripts/ghost-script.mjs\n`);
+    });
+
+    const { code, stdout } = runValidator(dir);
+    assert.notEqual(code, 0, 'a stack skill referencing an uninstalled script must fail the build');
+    assert.match(stdout, /ghost-script\.mjs/);
+    assert.match(stdout, /manifest does not install it/);
+  });
 });
 
 describe('manifest ⇄ FALLBACK_CORE_FILES (PLAY-020 AC #1)', () => {
@@ -253,5 +265,27 @@ describe('gate-review-items (CI entry point)', () => {
     }
     assert.ok(failed, 'an unchecked acceptance criterion must break the CI gate');
     assert.match(output, /acceptance criteria are still unchecked/, 'CI output must include the specific failure reason from gate-qa.mjs');
+  });
+});
+
+describe('Anti-Dev-Production-Deploy and Release Protocol (PLAY-048)', () => {
+  test('STATE_MACHINE.md declares Anti-Dev-Production-Deploy invariant', () => {
+    const sm = fs.readFileSync(path.join(ROOT, '.agents', 'STATE_MACHINE.md'), 'utf8');
+    assert.match(sm, /Anti-Dev-Production-Deploy/);
+    assert.match(sm, /Prohibited to trigger production deployments.*from the `dev` branch/);
+  });
+
+  test('git-workflow.md defines Release Deployment Protocol with main fast-forward merge', () => {
+    const gw = fs.readFileSync(path.join(ROOT, '.agents', 'rules', 'git-workflow.md'), 'utf8');
+    assert.match(gw, /## Release Deployment Protocol & Anti-Dev-Production Invariant/);
+    assert.match(gw, /git merge dev --ff-only/);
+    assert.match(gw, /git checkout main/);
+    assert.match(gw, /git checkout dev/);
+  });
+
+  test('pm-orchestrator/SKILL.md documents Release Delivery guardrail', () => {
+    const pm = fs.readFileSync(path.join(ROOT, '.agents', 'skills', 'pm-orchestrator', 'SKILL.md'), 'utf8');
+    assert.match(pm, /Release Delivery & Anti-Dev-Production Guardrail/);
+    assert.match(pm, /Never execute production deploy commands from `dev`/);
   });
 });

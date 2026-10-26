@@ -81,10 +81,10 @@ Reglas:
 
 1. `blocked_reason` es **obligatorio** y no vacío. Un bloqueo sin motivo escrito es una tarea abandonada, no una tarea bloqueada.
 2. Solo se asigna con `blocked_reason`; el campo es inválido en cualquier otro status.
-3. Volver a `doing` o `draft` requiere que el impedimento se haya resuelto **o** que sus `dependencies:` bloqueantes estén en `done` o hayan sido desvinculadas explícitamente del array.
+3. Volver a `doing` o `draft` requiere que el impedimento se haya resuelto **o** que sus `dependencies:` bloqueantes estén en `done` o `ready` (mismo ciclo de release) o hayan sido desvinculadas explícitamente del array.
 4. Al ejecutar `node scripts/gate-qa.mjs unblock <ID>`, el runner verifica las dependencias, mueve el status a `doing` (o `draft` con `--to draft`) y limpia `blocked_reason` del frontmatter (el historial del impedimento queda en Git / Implementation Notes).
 
-> Un ítem no entra a `doing` ni se certifica en `ready` mientras alguna de sus `dependencies:` no esté en `done`. El gate runner (`npm run gate:qa <ID>`) rechaza la certificación mecánicamente.
+> Un ítem no entra a `doing` ni se certifica en `ready` mientras alguna de sus `dependencies:` no esté en `done` o `ready` (formando parte del mismo release). El gate runner (`npm run gate:qa <ID>`) rechaza la certificación mecánicamente si la dependencia está en `ideas`, `draft`, `doing` o `blocked`.
 
 ---
 

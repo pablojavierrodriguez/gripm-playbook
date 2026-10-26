@@ -278,6 +278,37 @@ function writeItemPool(repo) {
   }
 }
 
+function addPlaybookScripts(repo) {
+  const pkgFile = path.join(repo, 'package.json');
+  if (!fs.existsSync(pkgFile)) return;
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+    pkg.scripts = pkg.scripts || {};
+    let added = 0;
+    const scriptsToAdd = {
+      'gate:qa': 'playbook gate',
+      'gate:review': 'playbook review',
+      'audit:ux': 'playbook audit',
+      'audit:ux:strict': 'playbook audit --strict',
+      'check:loc': 'playbook check-loc',
+    };
+    for (const [key, cmd] of Object.entries(scriptsToAdd)) {
+      if (!pkg.scripts[key]) {
+        pkg.scripts[key] = cmd;
+        added += 1;
+      }
+    }
+    if (added > 0) {
+      fs.writeFileSync(pkgFile, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+      console.log(`  ${c.green('✔')} ${c.green('updated'.padEnd(10))} package.json ${c.dim(`(${added} playbook script${added > 1 ? 's' : ''} added)`)}`);
+    } else {
+      console.log(`  ${c.dim('•')} ${c.dim('preserved'.padEnd(10))} package.json ${c.dim('(scripts already present)')}`);
+    }
+  } catch {
+    // Non-fatal if package.json cannot be parsed or modified
+  }
+}
+
 function printHarnesses() {
   console.log(`\n  ${c.bold('gripm')} ${c.dim('· Playbook Harnesses')}\n`);
   for (const harness of HARNESS_CHOICES) {
@@ -338,12 +369,14 @@ export async function runInit(argv = []) {
     initAgents: true,
     yes: opts.yes,
     force: opts.force,
+    installScripts: opts.installScripts,
   });
 
   if (!parametrizeAgentsMdFile(repo, answers)) return;
 
   writeAdapters(repo, answers, opts);
   writeItemPool(repo);
+  addPlaybookScripts(repo);
   if (answers.board) writeBoardConfig(repo, answers, opts);
 
   console.log(`
@@ -369,6 +402,7 @@ function parseArgs(argv) {
     yes: false,
     listHarnesses: false,
     help: false,
+    installScripts: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -386,6 +420,7 @@ function parseArgs(argv) {
       case '--lang': case '-l': opts.lang = next(); break;
       case '--board': opts.board = true; break;
       case '--no-board': opts.board = false; break;
+      case '--install-scripts': opts.installScripts = true; break;
       case '--force': case '-f': opts.force = true; break;
       case '--yes': case '-y': opts.yes = true; break;
       case '--list-harnesses': opts.listHarnesses = true; break;

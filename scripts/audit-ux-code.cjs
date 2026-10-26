@@ -49,12 +49,27 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// ROOT is the project being audited. When the script is synced into a target
-// repo it lands in <target>/scripts/, so __dirname/.. is already correct.
-// AUDIT_UX_ROOT allows pointing the auditor at another project explicitly.
-const ROOT = process.env.AUDIT_UX_ROOT
-  ? path.resolve(process.env.AUDIT_UX_ROOT)
-  : path.resolve(__dirname, '..');
+// ROOT is the project being audited. AUDIT_UX_ROOT or --root/--cwd points explicitly.
+// Defaults to process.cwd() for consumer portability.
+function resolveAuditRoot() {
+  if (process.env.AUDIT_UX_ROOT) return path.resolve(process.env.AUDIT_UX_ROOT);
+  for (let i = 2; i < process.argv.length; i++) {
+    if ((process.argv[i] === '--root' || process.argv[i] === '--cwd') && process.argv[i + 1]) {
+      return path.resolve(process.argv[i + 1]);
+    }
+    if (process.argv[i].startsWith('--root=')) return path.resolve(process.argv[i].split('=')[1]);
+    if (process.argv[i].startsWith('--cwd=')) return path.resolve(process.argv[i].split('=')[1]);
+  }
+  const isInNodeModules = __dirname.split(path.sep).includes('node_modules');
+  const scriptParent = path.resolve(__dirname, '..');
+  const cwd = process.cwd();
+  if (isInNodeModules) return cwd;
+  if (cwd !== scriptParent && (fs.existsSync(path.join(cwd, 'package.json')) || fs.existsSync(path.join(cwd, 'src')))) {
+    return cwd;
+  }
+  return scriptParent;
+}
+const ROOT = resolveAuditRoot();
 const RULES_PATH = path.join(__dirname, 'ux-rules.json');
 const CONFIG_NAME = '.uxaudit.json';
 const BASELINE_NAME = 'audit-ux-baseline.json';
@@ -113,6 +128,10 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
+      case '--root':
+      case '--cwd':
+        i += 1;
+        break;
       case '--src': opts.src = argv[++i]; break;
       case '--config': opts.config = argv[++i]; break;
       case '--strict': opts.strict = true; break;
@@ -126,6 +145,9 @@ function parseArgs(argv) {
       case '--help':
       case '-h': opts.help = true; break;
       default:
+        if (arg.startsWith('--root=') || arg.startsWith('--cwd=')) {
+          break;
+        }
         if (arg.startsWith('--')) fatal(`Unknown option: ${arg}`);
     }
   }
@@ -258,10 +280,29 @@ function loadCatalog(config, root) {
   return { version: canonical.version, rules: merged, localRules: local.rules, localPath: local.localPath };
 }
 
+function resolveConfigFile(explicitPath, root = ROOT) {
+  if (explicitPath) return path.resolve(root, explicitPath);
+  const gripmConfigDot = path.join(root, '.gripm', CONFIG_NAME);
+  if (fs.existsSync(gripmConfigDot)) return gripmConfigDot;
+  const gripmConfigNoDot = path.join(root, '.gripm', 'uxaudit.json');
+  if (fs.existsSync(gripmConfigNoDot)) return gripmConfigNoDot;
+  return path.join(root, CONFIG_NAME);
+}
+
+function resolveBaselineFile(root = ROOT, forWrite = false) {
+  const gripmBaseline = path.join(root, '.gripm', BASELINE_NAME);
+  const rootBaseline = path.join(root, BASELINE_NAME);
+  if (forWrite) {
+    if (fs.existsSync(rootBaseline) && !fs.existsSync(gripmBaseline)) return rootBaseline;
+    if (fs.existsSync(path.join(root, '.gripm'))) return gripmBaseline;
+    return rootBaseline;
+  }
+  if (fs.existsSync(gripmBaseline)) return gripmBaseline;
+  return rootBaseline;
+}
+
 function loadConfig(opts, root = ROOT) {
-  const configPath = opts.config
-    ? path.resolve(root, opts.config)
-    : path.join(root, CONFIG_NAME);
+  const configPath = resolveConfigFile(opts.config, root);
 
   if (!fs.existsSync(configPath)) return { configPath, config: {} };
 
@@ -652,7 +693,16 @@ function buildUnits(lines) {
     frame.closeAt = closeAt;
 
     const start = Math.min(frame.startLine, endLine);
+    const ancestors = [];
+    let curr = frame.parent;
+    while (curr) {
+      if (curr.name) ancestors.push(curr.name);
+      curr = curr.parent;
+    }
+
     const unit = {
+      name: frame.name || null,
+      ancestors,
       startLine: start + 1,
       headEndLine: frame.headEndLine,
       endLine: Math.max(start, endLine) + 1,
@@ -795,6 +845,8 @@ function buildUnits(lines) {
   for (let n = 0; n < lines.length; n += 1) {
     if (covered.has(n + 1) || !lines[n].trim()) continue;
     units.push({
+      name: null,
+      ancestors: [],
       startLine: n + 1,
       headEndLine: n,
       endLine: n + 1,
@@ -843,6 +895,35 @@ function hasVisibleText(unit) {
 }
 
 /**
+ * Checks if a JSX component name matches a target token.
+ * Matches exact name ("Dialog") or dotted compound names ("Dialog.Content" matches "Dialog" or "Dialog.Content").
+ */
+function matchesComponentName(componentName, token) {
+  if (!componentName || !token) return false;
+  if (componentName === token) return true;
+  if (componentName.startsWith(token + '.')) return true;
+  return false;
+}
+
+/**
+ * Checks whether an element unit is rendered inside ANY of the specified component tokens.
+ * Evaluates the element itself and all of its enclosing AST ancestors.
+ */
+function isWithinComponent(unit, tokens) {
+  if (!tokens || !tokens.length) return true;
+  const candidates = [];
+  if (unit && unit.name) candidates.push(unit.name);
+  if (unit && Array.isArray(unit.ancestors)) {
+    candidates.push(...unit.ancestors);
+  }
+  if (!candidates.length) return false;
+
+  return tokens.some((token) =>
+    candidates.some((candidate) => matchesComponentName(candidate, token))
+  );
+}
+
+/**
  * Decides whether a rule matches one element unit.
  *
  * The unit carries two granularities and each check kind reads the right one:
@@ -878,6 +959,8 @@ function lineMatches(rule, unit, lines, unitIndex, content) {
   if (anyInScope(check.unlessContent || [])) return false;
   if ((check.needsContent || []).length && !anyInScope(check.needsContent)) return false;
   if (check.unlessVisibleText && hasVisibleText(unit)) return false;
+  if ((check.withinComponent || []).length && !isWithinComponent(unit, check.withinComponent)) return false;
+  if ((check.unlessComponent || []).length && isWithinComponent(unit, check.unlessComponent)) return false;
 
   const radius = typeof check.window === 'number' ? check.window : 6;
   if ((check.nearby || []).length || (check.unlessNearby || []).length) {
@@ -998,7 +1081,7 @@ function fingerprint(finding) {
 }
 
 function loadBaseline(root = ROOT) {
-  const file = path.join(root, BASELINE_NAME);
+  const file = resolveBaselineFile(root, false);
   if (!fs.existsSync(file)) return { version: BASELINE_VERSION, entries: {} };
 
   try {
@@ -1044,7 +1127,9 @@ function writeBaseline(findings, root = ROOT, partialRuleIds = null) {
     entries,
   };
 
-  fs.writeFileSync(path.join(root || ROOT, BASELINE_NAME), `${JSON.stringify(payload, null, 2)}\n`);
+  const targetPath = resolveBaselineFile(root || ROOT, true);
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.writeFileSync(targetPath, `${JSON.stringify(payload, null, 2)}\n`);
   return entries;
 }
 
@@ -1347,6 +1432,8 @@ module.exports = {
   buildUnits,
   lineMatches,
   hasVisibleText,
+  isWithinComponent,
+  matchesComponentName,
   fingerprint,
 };
 

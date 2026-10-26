@@ -1,7 +1,7 @@
 ---
 id: PLAY-034
 title: "La instruccion `npm run gate:qa` falla para el consumidor (el alias npm no esta instalado)"
-status: ready
+status: done
 created_date: '2026-10-21'
 updated_date: '2026-10-21'
 labels:

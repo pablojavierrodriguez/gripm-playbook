@@ -32,7 +32,7 @@ Guía de estándares para garantizar que la aplicación ofrezca una experiencia 
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
   ```
 - **Botones Flotantes (FAB) y Bottom Bar:**
-  Asegurar un margen inferior de al menos `pb-20` o `pb-24` en contenedores desplazables para que el contenido no quede oculto detrás de barras inferiores o botones flotantes de acción principal.
+  Asegurar un margen inferior de al menos `pb-32` más `env(safe-area-inset-bottom)` (o `pb-[calc(8rem+env(safe-area-inset-bottom))]`) en contenedores desplazables con barras inferiores fijas o FAB para garantizar que el último contenido nunca quede oculto detrás del footer (conforme a la regla `UX-006`).
 
 ---
 
@@ -127,58 +127,38 @@ export const triggerWarningHaptic = async () => {
 
 Para permitir que los usuarios instalen la aplicación como una Progressive Web App (PWA) independiente:
 
-- **Hook de Instalación Centralizado (`usePWAInstall`):**
-  - Capturar el evento `beforeinstallprompt` a nivel de ventana global y compartir el estado `isGuideOpen` y `promptAvailable` mediante un bus de listeners global para evitar instancias aisladas desincronizadas.
-  - Ocultar **estrictamente** cualquier banner o prompt de instalación en pantallas de autenticación inicial o para usuarios no autenticados.
-- **Diferenciación por Plataforma en el Modal de Ayuda:**
-  - **Android (Chrome/Edge):** Indicar el menú superior de tres puntos (⋮) $\rightarrow$ *Instalar aplicación* / *Agregar a la pantalla principal*. Recordar que en entornos de desarrollo por IP (`192.168.x.x`), Chrome requiere habilitar el origen en `chrome://flags` (*Insecure origins treated as secure*) para compilar el WebAPK nativo en vez de un marcador web.
-  - **iOS / iPadOS (Safari):** Indicar el botón Compartir $\rightarrow$ *Agregar al inicio*.
-  - **macOS / Desktop:** Indicar el menú *Archivo* $\rightarrow$ *Agregar al Dock...* o el botón de instalación en la barra de direcciones.
-- **Scroll Resiliente en Pantallas de Autenticación:**
-  - En formularios móviles de acceso, asegurar `overflow-y-auto min-h-full pb-12` sin spacers rígidos ni `overscroll-y-none` para que el botón de submit siempre sea accesible cuando el teclado virtual esté desplegado.
+- **Centralized PWA Installation Event Handling:**
+  - Capture the `beforeinstallprompt` event at the window level using a shared hook or context provider to keep install prompt availability reactive across views.
+  - Never trigger install banners or modal prompts during unauthenticated screens or critical onboarding flows.
+- **Platform-Specific Help Guides:**
+  - **Android (Chrome/Edge):** Point users to the top menu (⋮) -> *Install app* / *Add to Home screen*.
+  - **iOS / iPadOS (Safari):** Point users to the Share icon -> *Add to Home Screen*.
+  - **macOS / Desktop:** Point users to the browser install pill in the address bar or File -> *Install*.
+- **Scroll Resiliency on Authentication Screens:**
+  - For mobile login/signup forms, ensure `overflow-y-auto min-h-full pb-12` without rigid vertical spacers or `overscroll-y-none`, so the submit button remains visible when the virtual keyboard is open.
 
 ---
 
-## 8. Experiencia en Tablets (768px a 1024px) y Botoneras Simétricas
+## 8. Tablet Experience (768px - 1024px) & Symmetric Action Toolbars
 
-En dispositivos intermedios (iPads, tablets Android, pantallas con sidebar expandible):
+In intermediate viewports (tablets, collapsible sidebar layouts):
 
-### A. Desacople Estructural de Cabeceras (Zero-Truncate Rule)
-- **Prohibido colocar `<Sheet>` envolviendo botones de acción:** Los componentes de diálogo/sheet deben vivir fuera del `<div>` que contiene los botones (`Button`, export dropdown). De lo contrario, rompen el flujo `flex-wrap` natural.
-- **Evitar `truncate` en títulos `h1`:** Los títulos principales de vista deben fluir de manera natural para acomodarse en dos líneas si es necesario, sin truncarse con puntos suspensivos ("Gestión...", "Config...").
+### A. Structural Decoupling of Headers (Zero-Truncate Rule)
+- **Do not wrap action buttons in `<Sheet>` components inside the flex row:** Modals and Sheets must live outside the action button container to prevent breaking natural `flex-wrap` layout.
+- **Avoid `truncate` in main `h1` titles:** Let titles wrap naturally into two lines when constrained, rather than truncating with ellipses ("Manage...", "Config...").
 
-### B. Patrón Canónico de Botoneras Simétricas (`.btn-action-label`)
-- **Problema:** Al expandir la barra lateral en tablet (768px), el sidebar roba 256px de ancho, apretando la cabecera. Si un botón de creación tiene texto largo (*"Crear Elemento"*) mientras los de Importar/Exportar son solo icono, el layout queda desbalanceado y asimétrico.
-- **Solución Canónica:**
-  1. Envolver el texto de todo botón de creación principal con `<span className="btn-action-label whitespace-nowrap">...</span>`:
+### B. Responsive Action Toolbars and Collapsible Button Labels
+- **Problem:** On intermediate viewports or when a sidebar expands, horizontal header space shrinks. If primary action buttons hold long text while secondary actions are icon-only, toolbars become asymmetrical and cause horizontal overflow.
+- **Canonical Pattern:**
+  1. Use responsive utility classes to collapse text labels on intermediate viewports while keeping an accessible label for screen readers:
      ```tsx
-     <Button className="bg-primary text-primary-foreground shadow-md h-10 px-3.5">
-       <Plus className="mr-1.5 h-4 w-4" />
-       <span className="btn-action-label whitespace-nowrap">{t("common.create")}</span>
+     <Button className="h-10 px-3.5 bg-primary text-primary-foreground shadow-sm flex items-center gap-1.5" aria-label={createLabel}>
+       <Plus className="h-4 w-4 shrink-0" />
+       <span className="hidden xl:inline whitespace-nowrap">{createLabel}</span>
      </Button>
      ```
-  2. En CSS, el selector reactivo del sidebar expandido en tablet colapsa automáticamente todas las etiquetas a modo icono cuadrado `40px × 40px` (`min-width: 2.5rem; height: 2.5rem;`) con icono perfectamente centrado (`margin: 0 !important;`):
-     ```css
-     @media (max-width: 1023px) {
-       .peer[data-state="expanded"] ~ div .btn-action-label,
-       body:has([data-state="expanded"]) .btn-action-label {
-         display: none !important;
-       }
-       .peer[data-state="expanded"] ~ div button:has(.btn-action-label),
-       body:has([data-state="expanded"]) button:has(.btn-action-label) {
-         min-width: 2.5rem !important;
-         height: 2.5rem !important;
-         padding-left: 0.75rem !important;
-         padding-right: 0.75rem !important;
-       }
-       .peer[data-state="expanded"] ~ div button:has(.btn-action-label) svg,
-       body:has([data-state="expanded"]) button:has(.btn-action-label) svg {
-         margin-right: 0 !important;
-         margin-left: 0 !important;
-       }
-     }
-     ```
-  3. **Resultado:** Al expandir el sidebar, toda la botonera (*Crear (+)*, *Importar*, *Exportar*) adopta proporciones cuadradas idénticas y simétricas, y al colapsar el sidebar vuelven a mostrar sus etiquetas de texto completas sin romper el diseño.
+  2. For icon-only states, ensure the tap target remains strictly $\ge 40 \times 40\text{px}$ (ideally $\ge 44 \times 44\text{px}$) with centered icons.
+  3. **Outcome:** Symmetric, predictable action rows that adapt smoothly across viewports without fragile DOM-coupled CSS selectors.
 
 ---
 

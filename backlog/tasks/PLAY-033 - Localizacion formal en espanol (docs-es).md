@@ -1,9 +1,10 @@
 ---
 id: PLAY-033
 title: "Localizacion formal en espanol (docs/es/)"
-status: ideas
+status: dismissed
+dismissed_reason: "Decision de PO registrada: el core del framework y la capa instalable se mantienen en ingles tecnico unico como standard universal para evitar deriva y desfase de traducciones; el soporte de idioma local para conversaciones y documentacion del proyecto consumidor se parametriza de forma personalizada en su propio AGENTS.md mediante el asistente npx playbook init."
 created_date: '2026-10-21'
-updated_date: '2026-10-21'
+updated_date: '2026-10-24'
 labels:
   - "localization"
   - "decision"
@@ -24,15 +25,15 @@ Contexto que la vuelve real: el backlog de este repo y `docs/BACKLOG.md` se escr
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] #1 Decision de producto registrada: el playbook ofrece localizacion en `docs/es/` o declara explicitamente que es solo-ingles (en el README y en la guia de adopcion).
-- [ ] #2 Si se localiza, `docs/es/` contiene copias traducidas de la capa que si consume el usuario, con una politica de frescura documentada (que pasa cuando el original en ingles cambia).
-- [ ] #3 Ningun archivo mezcla dos idiomas en el mismo documento, y el sync al consumidor no puede instalar una mezcla por accidente.
+- [x] #1 Decision de producto registrada: el playbook declara explicitamente que su capa instalable es solo-ingles en documentacion y notas de release, permitiendo la parametrizacion de idioma del consumidor en su propio AGENTS.md.
+- [x] #2 La politica queda establecida: no se mantiene docs/es/ duplicado en el core para evitar desincronizacion y deuda de traduccion.
+- [x] #3 Ningun archivo mezcla dos idiomas en el mismo documento, y el sync al consumidor instala estrictamente archivos en ingles tecnico.
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-1. Resolver la decision de producto con el PO.
-2. Si es "solo-ingles", cerrar este item y dejar la declaracion escrita.
-3. Si es "localizar", refinar alcance y politica de frescura antes de moverlo a `draft`.
+1. Resolver la decision de producto con el PO: adoptada la postura de mantener el core en ingles tecnico unico.
+2. Registrar la declaracion en README.md en la seccion de Ecosystem Scope.
+3. Marcar el item como dismissed con dismissed_reason explicitando la decision.
 <!-- SECTION:PLAN:END -->

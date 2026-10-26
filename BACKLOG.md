@@ -1,12 +1,12 @@
-# Backlog: @gripm/playbook
-> Consolidado generado el 2026-10-21 por gripm
+# Backlog: gripm-playbook
+> Consolidado generado el 2026-10-26 por gripm
 
 ## Resumen de Estados
 
-### 💡 Ideas / Discovery (2)
+### 🚀 Ready for Deploy (7)
 
 #### [PLAY-007] onlyFile debería enganchar el componente renderizado y no el nombre del archivo
-- **Prioridad**: `medium` | **Tipo**: `improvement`
+- **Prioridad**: `p2` | **Tipo**: `improvement`
 
 `onlyFile` (PLAY-005) resuelve por **nombre de archivo**. Es lo que el consumidor necesitaba para expresar "`truncate` dentro de un diálogo", y funciona, pero la forma en que funciona es frágil:
 
@@ -18,159 +18,243 @@ Un diálogo definido en `Overlays.tsx` no se ve. Uno en `ConfirmModal.tsx`, sí.
 
 La misma debilidad ya existía en el invariante `ENV-002` del consumidor, y fue parte de lo que abrió la pregunta de si debía promoverse al catálogo: el problema no es solo si una regla debe ser canónica, sino si la regla es correcta.
 
+La solución refinada y aprobada por el PO agrega la semántica declarativa `withinComponent` en `check`: el árbol de parseo de unidades de JSX conoce la jerarquía de ancestros (`frame.parent`), permitiendo verificar si un elemento está contenido dentro de un componente padre (ej. `<Dialog>`, `<Modal>`, `<Dialog.Content>`) sin importar el nombre del archivo en disco.
+
 **Criterios de Aceptación:**
-- [ ] #1 Un check kind filtra por el componente renderizado y no por el nombre del archivo
-- [ ] #2 Un `<Dialog>` declarado en un archivo con cualquier nombre queda cubierto
-- [ ] #3 `onlyFile` por nombre de archivo se mantiene o se deprecia de forma explícita
-- [ ] #4 La documentación de `authoring.checkSemantics` distingue ambos
-- [ ] #5 Un fixture con un diálogo en un archivo de nombre no obvio
-- [ ] #6 `npm run check:all` en verde
+- [x] #1 El motor de auditoría (`scripts/audit-ux-code.cjs`) soporta `check.withinComponent` como array de nombres de componente (soporta matching de nombre exacto y componentes con notación de punto como `<Dialog.Content>`).
+- [x] #2 Un elemento o texto dentro de un componente objetivo (ej. `<Dialog>`) declarado en un archivo con cualquier nombre (ej. `src/Overlays.tsx`) es detectado y reportado si viola la condición.
+- [x] #3 `onlyFile` se mantiene 100% funcional y retrocompatible para filtrado por ruta de archivo.
+- [x] #4 La documentación de authoring en `.agents/skills/code-level-ux-auditor/SKILL.md` y `README.md` documenta la sintaxis y distingue `withinComponent` de `onlyFile`.
+- [x] #5 Tests automatizados en `tests/audit-ux.test.mjs` validando `withinComponent` con anidamientos profundos, nombres de archivo no obvios (`Overlays.tsx`), componentes con punto y coexistencia con `onlyFile`.
+- [x] #6 `npm run check:all` (`validate`, `check:loc`, `test`) en verde con 0 fallos.
 
 ---
 
-#### [PLAY-033] Localizacion formal en espanol (docs/es/)
-- **Prioridad**: `low` | **Tipo**: `feature`
+#### [PLAY-035] Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash
+- **Prioridad**: `p3` | **Tipo**: `improvement`
 
-PLAY-029 dejo todo el core en ingles tecnico, y el plan original de "golden repo" lo dejo explicito: si se quiere soporte en espanol, debe existir como localizacion formal en `docs/es/`, nunca mezclado en el mismo archivo. Eso no se hizo y tampoco se registro. Queda como item exploratorio porque es una decision de producto, no una tarea de implementacion.
+La revision de `dev` tras el commit `2b56029` ("eradicate em-dash from live files, english 2.6.0 entries") dejo dos residuos verificables en `CHANGELOG.md`, ambos fuera del alcance de ese commit pero inconsistentes con el estandar que el propio repo declara:
 
-Contexto que la vuelve real: el backlog de este repo y `docs/BACKLOG.md` se escriben en espanol porque son del repo propio y no llegan a los consumidores. La pregunta es si esa preferencia se extiende a la capa que si se instala.
+1. **Dos entradas en espanol sin traducir** en la seccion `2.0.1`:
+   - L186: "- **Saneamiento P0 de skills de stacks**: Eliminadas todas las referencias residuales..."
+   - L187: "- **Formato regional estandar**: Reemplazado el valor invalido `'regional-locale'`..."
+   El commit tradujo las entradas espanolas de `2.6.0` pero no hizo un barrido completo del archivo.
+
+2. **Una referencia literal a em-dash/en-dash** en L58 (entrada `PLAY-022`): "`Replaced artificial AI em-dashes (—) and en-dashes (–) with standard hyphens`". Es una meta-referencia entre backticks a los caracteres que la regla combate, no prosa con guion prohibido. Es defendible, pero cualquier escaneo automatico futuro la cazaria.
+
+El file es la fuente de la que salen las notas de release publicadas (ver PLAY-036), asi que lo que quede aqui termina en GitHub/npm.
 
 **Criterios de Aceptación:**
-- [ ] #1 Decision de producto registrada: el playbook ofrece localizacion en `docs/es/` o declara explicitamente que es solo-ingles (en el README y en la guia de adopcion).
-- [ ] #2 Si se localiza, `docs/es/` contiene copias traducidas de la capa que si consume el usuario, con una politica de frescura documentada (que pasa cuando el original en ingles cambia).
-- [ ] #3 Ningun archivo mezcla dos idiomas en el mismo documento, y el sync al consumidor no puede instalar una mezcla por accidente.
+- [x] #1 Las lineas L186 y L187 de `CHANGELOG.md` quedan en ingles tecnico, fiel al sentido original (saneamiento P0 de skills de stacks; formato regional BCP-47 `es-ES`), sin tocar el resto de la seccion 2.0.1.
+- [x] #2 Decision del PO registrada sobre L58: adoptada la Opcion A (se reescribe para erradicar caracteres literales U+2014/U+2013, usando texto descriptivo 'em-dash and en-dash characters' y separador estandar '-' con espacios).
+- [x] #3 Decidida la politica sobre L58: erradicacion total de caracteres literales en live docs sin necesidad de exenciones; la norma se mantiene rigurosa para toda documentacion y releases futuros.
+- [x] #4 `npm run validate` y `npm test` en verde tras el cambio.
 
 ---
 
-### 🚀 Ready for Deploy (6)
+#### [PLAY-037] Portabilidad de paquete: CLI unificado, resolucion dinamica de raiz y desacople de piramide para proyectos consumidores
+- **Prioridad**: `p1` | **Tipo**: `improvement`
 
-#### [PLAY-026] Refactorizacion modular de scripts del core bajo umbral preventivo de 500 LOC (scripts/lib)
-- **Prioridad**: `high` | **Tipo**: `refactor`
+`@gripm/playbook` no puede utilizarse como paquete en proyectos consumidores por acoplamientos internos a rutas relativas fijas y llamadas de red forzadas:
 
-Descomponer los tres scripts principales del repositorio (`scripts/gate-qa.mjs`, `scripts/sync-playbook.mjs` y `scripts/validate-repo.mjs`) que superaban el umbral de aviso preventivo (500 LOC) extrayendo submodulos de alta cohesion en `scripts/lib/` y garantizando 100% de compatibilidad hacia atras en el CLI y API programatica:
+1. **Rutas fijadas a `__dirname/..`:** `scripts/gate-qa.mjs`, `scripts/audit-ux-code.cjs` y `scripts/gate-review-items.mjs` calculan su raíz como `path.resolve(__dirname, '..')`. Cuando corren instalados dentro de `node_modules/@gripm/playbook/`, intentan inspeccionar tareas y correr validaciones dentro de la carpeta del propio paquete instalado y no en la del proyecto consumidor (`process.cwd()`).
+2. **Descarga obligatoria de GitHub en `init` y `sync`:** `scripts/sync-playbook.mjs` y `scripts/init.mjs` descargan archivos desde `raw.githubusercontent.com` por defecto, ignorando que el paquete instalado ya contiene todos los archivos canónicos. Esto rompe entornos offline, CI/CD cerrados, proxies y versiones fijas.
+3. **Bloqueo de la Pirámide de Verificación:** `gate-qa.mjs` exige que el `package.json` del consumidor declare `gate:review` y `audit:ux:strict` como pasos bloqueantes. Un proyecto consumidor no tiene estos scripts internos, por lo que `gate-qa` falla siempre con código 1.
+4. **Falta de CLI router y binarios expuestos:** `package.json` solo tiene `playbook` atado a `sync-playbook.mjs` que solo acepta `init`. No hay binarios expuestos para `gate-qa`, `audit-ux`, `check-loc` ni subcomandos en el CLI.
+5. **Instrucciones hardcodeadas a `node scripts/...`:** Skills, adaptadores y documentación instruyen ejecutar `node scripts/gate-qa.mjs <ID>`, obligando a copiar los scripts al proyecto consumidor en vez de permitir consumirlos como paquete npm.
+6. **Residuo `human:pablo`:** `.agents/TEAM_PLAYBOOK.md` incluye el usuario `pablo` en los ejemplos de lease.
 
-1. **Extraccion de submodulos en `scripts/lib/`:**
-   - `frontmatter.mjs`: parser de YAML plano, extraccion de ACs y mutacion determinista de frontmatter.
-   - `terminal.mjs`: formateo ANSI y cabeceras de terminal.
-   - `pyramid.mjs`: resolucion y ejecucion de la Piramide de Verificacion.
-   - `task-inspection.mjs`: carga de tareas, resolucion de rutas e inspeccion pura de invariantes.
-   - `provenance.mjs`: fetch con reintentos/backoff y verificacion de historial upstream en GitHub.
-   - `sync-classifier.mjs`: hashing SHA-256, clasificacion de archivos locales y deteccion de huerfanos.
-   - `catalog-validator.mjs`: validacion de catalogos locales `.uxaudit.json`.
-   - `doc-checks.mjs`: validacion de links Markdown, frontmatter de skills y vocabulario de estados.
-2. **Paridad de instalacion:** Registro de los submodulos runtime requeridos por `gate-qa.mjs` en `.playbook-manifest.json` y `FALLBACK_CORE_FILES`.
+Este item implementa el Modelo Hibrido: el consumidor puede optar por usar `@gripm/playbook` como dependencia de npm pura mediante su CLI (`npx playbook <cmd>` o `npx gate-qa`) o sincronizar archivos a su repositorio, funcionando de manera transparente y desacoplada en ambos casos.
 
 **Criterios de Aceptación:**
-- [x] #1 Extraer submodulos cohesivos en `scripts/lib/` (`frontmatter.mjs`, `terminal.mjs`, `pyramid.mjs`, `task-inspection.mjs`, `provenance.mjs`, `sync-classifier.mjs`, `catalog-validator.mjs`, `doc-checks.mjs`)
-- [x] #2 Reducir `scripts/gate-qa.mjs`, `scripts/sync-playbook.mjs` y `scripts/validate-repo.mjs` por debajo de las 500 LOC eliminando el 100% de los warnings en `node scripts/check-loc.mjs`
-- [x] #3 Registrar los submodulos requeridos por el gate en `.playbook-manifest.json` (`core`) y `FALLBACK_CORE_FILES` manteniendo paridad total
-- [x] #4 Preservar el 100% de compatibilidad de exports y comportamiento CLI validado por `npm run check:all`
+- [x] #1 **Resolucion dinamica de raiz en herramientas centrales:** `scripts/gate-qa.mjs`, `scripts/audit-ux-code.cjs` y `scripts/gate-review-items.mjs` resuelven la raiz del proyecto de trabajo dinamicamente (`--root`/`--cwd`, `process.env.GRIPM_ROOT`/`process.env.AUDIT_UX_ROOT`, o `process.cwd()`), permitiendo su ejecucion correcta desde `node_modules/@gripm/playbook/` contra el proyecto consumidor.
+- [x] #2 **Zero-network local fallback en `init` y `sync`:** Si no se pasa `--remote` ni `--source`, `scripts/sync-playbook.mjs` e `init.mjs` detectan automaticamente los archivos del paquete local instalado (mediante `.playbook-manifest.json` en la raiz del paquete) y sincronizan localmente sin llamadas a GitHub ni requerir conexion a internet.
+- [x] #3 **Desacople autonomo de la Piramide de Verificación en `gate-qa`:** Si el `package.json` del proyecto consumidor carece de scripts `audit:ux:strict` o `gate:review`, `gate-qa` ejecuta el motor empaquetado directamente (auditoria UX en modo estricto y validacion del backlog local) sin fallar falsamente por ausencia de scripts en `package.json`.
+- [x] #4 **CLI Router unificado y binarios de paquete:** `package.json` expone los binarios `playbook`, `gripm-playbook`, `gate-qa`, `audit-ux` y `check-loc`. `scripts/sync-playbook.mjs` funciona como despachador para los subcomandos `init`, `sync`, `gate`, `audit`, `check-loc` y `review`.
+- [x] #5 **Limpieza de residuos y adaptacion documental:** Se erradica la referencia `human:pablo` de `.agents/TEAM_PLAYBOOK.md` (sustituida por `human:<username>`). La documentacion y adaptadores (`CLAUDE.md`, `.cursor/rules/*.mdc`) instruyen la ejecucion canonica mediante el CLI `playbook gate <ID>` (y alias `gate-qa <ID>`), manteniendo retrocompatibilidad con la invocacion directa `node scripts/gate-qa.mjs <ID>`.
+- [x] #6 **Suite de pruebas de portabilidad:** Se agrega `tests/package-portability.test.mjs` verificando la ejecucion de `gate-qa` y `audit-ux` simulando una instalacion en `node_modules`, la sincronizacion local zero-network, los subcomandos del router CLI y el paso de la piramide en un proyecto consumidor limpio.
+- [x] #7 **Validacion integral del repositorio:** `npm run check:all` pasa con 0 errores (332+ tests, validacion de manifiesto y paridad de reglas).
 
 ---
 
-#### [PLAY-027] Expansion del motor de auditoria UX con firmas canonicas UX-014 y UX-015
-- **Prioridad**: `high` | **Tipo**: `feature`
+#### [PLAY-038] El trigger de aislamiento es demasiado estrecho: GIT_RULES no cubre un arbol sucio sin lease
+- **Prioridad**: `p1` | **Tipo**: `bug`
 
-Ampliar el catalogo canonico de reglas de auditoria estatica de UX (`scripts/ux-rules.json`) de 13 a 15 firmas y sincronizar la documentacion en `.agents/skills/code-level-ux-auditor/SKILL.md`:
+`scripts/lib/adapters.mjs:39-47` define `GIT_RULES`, el set de cinco reglas de git que el init inyecta en todo consumidor. Dos de ellas forman un par incompleto:
 
-1. **`UX-014` (Anti-em-dash / anti-AI cliche in UI or metadata):** Detecta caracteres em-dash (`\u2014`) o en-dash (`\u2013`) en nodos de texto JSX y atributos de UI/metadata para hacer cumplir mecanicamente la regla global de guion simple (` - `).
-2. **`UX-015` (Viewport touch zoom lock):** Detecta configuraciones de viewport (`maximum-scale=1`, `user-scalable=no`, `user-scalable=0`, `userScalable: false`) que bloquean el pinch-to-zoom en dispositivos tactiles y violan WCAG 1.4.4.
+- Regla 4: *"A `doing` item carrying a foreign `claimed_by` owns the tree: never revert or clean it."* Es **prohibicion negativa**: no hagas nada destructivo.
+- Regla 5: *"Parallel work runs in isolated worktrees: `git worktree add -b <branch> ../<repo>-<task>`."* Es **mecanismo**: aislate y trabaja igual.
+
+Ninguna de las dos dice **cuando se pasa de modo normal a modo aislado**. El unico disparador explicito es la regla 4, y su condicion es estrecha: un item en `doing` con `claimed_by` ajeno.
+
+Incidente medido (2026-10-22, repo gripm): otro agente dejo **seis** archivos stageados (`A `) en `backlog/tasks/` con `status: ideas` y **sin `claimed_by`**. Ninguna condicion existente disparo, asi que el agente en curso se quedo en el arbol principal y lucho contra el indice compartido durante toda la certificacion de DEV-326.
+
+El costo no fue cosmético. `BACKLOG.md` es un agregado que referencia **todas** las tareas del arbol, y el Backlog Guard exige que no referencie tareas fantasma. Con seis tareas ajenas sin commitear, **todo** commit que incluyera el consolidado quedaba bloqueado. El agente tuvo que decidir entre incluir trabajo ajeno en su commit o romper la coherencia del consolidado, y pregunto al PO porque no habia regla que lo resolviera.
+
+Un worktree lo habria resuelto limpiamente: la rama sale de HEAD, no ve las tareas sin trackear del otro agente, y su `BACKLOG.md` no las referencia. **La cura ya esta escrita en la regla 5; lo que falta es el disparador que active la regla 5.**
+
+La condicion actual tampoco detecta la situacion real de colision. `claimed_by` es un lease declarado; los archivos stageados en el indice de git son **estado observable**. El segundo es una evidencia mas fuerte que el primero: no requiere que el otro agente haya sido disciplinoso, solo que exista.
 
 **Criterios de Aceptación:**
-- [x] #1 Incorporar las firmas `UX-014` y `UX-015` con severidad `WARNING` en `scripts/ux-rules.json`
-- [x] #2 Documentar `UX-014` y `UX-015` en `.agents/skills/code-level-ux-auditor/SKILL.md` y actualizar `README.md` manteniendo paridad con `validate-repo.mjs`
-- [x] #3 Agregar casos de violacion en `tests/fixtures/react-app/src/components/Violations.tsx` y tests unitarios/E2E en `tests/audit-ux.test.mjs` y `tests/e2e-delivery.test.mjs`
-- [x] #4 Verificar que `node scripts/audit-ux-code.cjs --list-rules` reporte las 15 firmas canonicas y `npm run check:all` pase en verde
+- [x] #1 `GIT_RULES` declara un disparador adicional: archivos `A ` o `M ` en `git status --porcelain` que el agente en curso no creo.
+- [x] #2 Ese disparador **obliga al aislamiento en worktree** (regla 5), no solo a no revertir (regla 4). La prohibicion negativa no basta: deja al agente paralizado en el arbol principal, que es exactamente lo que ocurrio.
+- [x] #3 La regla distingue explicitamente entre cambios propios del agente en curso y suciedad ajena. El disparador no puede exigir aislamiento ante los propios cambios.
+- [x] #4 `AGENTS.md` y `.agents/TEAM_PLAYBOOK.md` reflejan el mismo disparador **solo si** reproducen esta seccion. Verificar antes de tocar: si la norma vive unicamente en `GIT_RULES`, no duplicarla.
+- [x] #5 `npm run check:all` sale con 0 tras el cambio (validate + check:loc + test).
 
 ---
 
-#### [PLAY-028] Compuerta mecanica anti-auto-certificacion y resolucion de actor en gate-qa
-- **Prioridad**: `high` | **Tipo**: `feature`
+#### [PLAY-040] El gate escribe la transicion de estado sin regenerar el consolidado y el commit siguiente se rechaza
+- **Prioridad**: `p1` | **Tipo**: `bug`
 
-Blindar mecanicamente la separacion de contextos entre desarrollo (`doing` -> `review`) y certificacion QA (`review` -> `ready`) en `scripts/gate-qa.mjs`:
+`scripts/gate-qa.mjs` escribe `status` en disco en dos transiciones: T1 (`submit`, doing a review) y T2 (review a ready), ambas via `mutateTaskFrontmatter`. **Ninguna de las dos regenera `BACKLOG.md`.**
 
-1. **Resolucion jerarquica de identidad (`resolveActor`):** Soporta flags CLI (`--by`, `--as`), variables de entorno (`GRIPM_ACTOR`, `QA_ACTOR`, `CLAIMED_BY`), variables de sesion de harness (`ANTIGRAVITY_CONVERSATION_ID`, `CURSOR_SESSION_ID`, `CLAUDE_SESSION_ID`) y fallback `human:<user>`.
-2. **Comparacion normalizada (`isSameActor`):** Compara identidades de forma case-insensitive e ignorando espacios marginales.
-3. **Bloqueo mecanico en T2 (`inspectTask` & `gate-qa.mjs`):** Si el actor que ejecuta la certificacion coincide con el `claimed_by` registrado en la tarea, `gate-qa.mjs` rechaza la promocion con `exit code 1`, emite el diagnostico `anti-self-certification` y preserva el estado `review` en disco.
+El Backlog Guard del consumidor (`verify-backlog-sync.js`, hook `--hook`) rechaza cualquier commit cuyo `BACKLOG.md` este desfasado respecto a las tareas. Asi que el flujo mecanico completo queda roto en un punto que nadie documenta:
+
+```
+node scripts/gate-qa.mjs submit DEV-326    -> escribe doing a review. EXIT 0.
+npm run backlog:check                      -> EXIT 1: BACKLOG.md desactualizado.
+npm run backlog:sync                        -> EXIT 0.
+node scripts/gate-qa.mjs DEV-326           -> GATE PASSED, escribe ready. EXIT 0.
+npm run backlog:check                       -> EXIT 1: BACKLOG.md desactualizado otra vez.
+npm run backlog:sync                        -> EXIT 0.
+git commit                                  -> recien aqui pasa el guard.
+```
+
+Medido en gripm el 2026-10-22 durante la certificacion de DEV-326: **dos** syncs de mas, ambos provocados por el propio gate. El gate es la herramienta que certifica que el repo esta listo para commitear, y cada corrida lo deja en un estado que el hook de pre-commit rechaza.
+
+El punto ciego es estructural. El gate escribe un archivo y no conoce el consolidado que lo refleja. No es un bug de implementacion puntual: es que la transicion y el consolidado estan en capas que no se hablan.
+
+**Nota de alcance:** `scripts/gate-qa.mjs` tiene 147 lineas de diff sin commitear en este repo por PLAY-037 (portabilidad de rutas para consumidores). Ese trabajo es ortogonal a este hallazgo, pero comparte archivo: verificar el estado antes de tocar, y re-sincronizar el alcance si PLAY-037 lo reubica.
 
 **Criterios de Aceptación:**
-- [x] #1 Implementar `resolveActor` e `isSameActor` en `scripts/lib/task-inspection.mjs` y re-exportarlos desde `scripts/gate-qa.mjs`
-- [x] #2 Bloquear con `exit code 1` en `gate-qa.mjs` e `inspectTask` cualquier intento de certificar una tarea cuando el certificador coincide con `claimed_by`
-- [x] #3 Permitir la certificacion (`exit code 0` y promocion a `ready`) cuando el certificador es un subagente QA con contexto limpio o par distinto
-- [x] #4 Añadir cobertura de tests unitarios y E2E en `tests/gate-qa.test.mjs` y `tests/e2e-delivery.test.mjs` validando el bloqueo y la aprobacion por pares
+- [x] #1 Despues de que el gate escribe una transicion (`submit` o T2), `npm run backlog:check` sale con codigo 0 sin que el usuario corra `backlog:sync` a mano.
+- [x] #2 La regeneracion del consolidado ocurre solo si la verificacion previa paso, respetando el contrato ya documentado en `verify-backlog-sync.js:363-365`: un commit rechazado nunca deja el consolidado reescrito como efecto secundario.
+- [x] #3 El gate no stagea nada. La regla "un hook verifica, no muta" aplica tambien a la CLI: regenerar el consolidado no equivale a `git add BACKLOG.md`.
+- [x] #4 Un consumidor sin `BACKLOG.md` en disco (proyecto que aun no lo genero) no recibe error: la regeneracion se omite en silencio.
+- [x] #5 `npm run check:all` sale con 0 tras el cambio.
 
 ---
 
-#### [PLAY-029] Editorial Refactoring and Technical English Standardization for Core and Skills
-- **Prioridad**: `high` | **Tipo**: `refactor`
+#### [PLAY-041] Zero-Clutter architecture: confinamiento de metadata en .gripm/, erradicacion de scripts/ en consumidor y auto-poda de huérfanos
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
-Complete editorial refactoring of gripm-playbook core to eliminate language mixing (Spanglish), replace informal prompt-engineering buzzwords with industry-standard terminology, and clean unparametrized template leftovers.
+Hoy `@gripm/playbook` invade la raíz del repositorio consumidor y el directorio `scripts/`:
+1. **Contaminación de raíz:** Planta archivos sueltos como `.playbook-lock.json`, `.uxaudit.json`, `audit-ux-baseline.json`, `.locignore` y `.playbook-backups/`.
+2. **Contaminación de `scripts/`:** Copia 16 archivos ejecutables de infraestructura a `scripts/` del consumidor, pese a que PLAY-037 ya implementó la ejecución vía binarios de npm en `node_modules`.
+3. **Duplicación por renombre de skills:** Cuando el framework renombra un skill (como en PLAY-029: `worldclass-product-designer` a `product-designer`), el sincronizador deja ambos directorios vivos en `.agents/skills/`, forzando al desarrollador a borrar archivos obsoletos a mano.
+
+### Principio Arquitectónico Zero-Clutter
+
+1. **La raíz le pertenece al proyecto:** Solo conviven `package.json` y `AGENTS.md`.
+2. **Metadata confinada en `.gripm/`:** Lockfiles, backups, baselines y configs del framework viven en `.gripm/`. Si el proyecto usa `gripm-board`, comparte naturalmente esa misma carpeta. Si no usa el board, la carpeta sigue siendo el namespace limpio de la suite.
+3. **Ejecución desde `node_modules`:** Cero scripts copiados a `scripts/` del consumidor.
+4. **Auto-poda segura de huérfanos:** Archivos y directorios de skills obsoletos que fueron instalados por el playbook y no presentan modificaciones del usuario se eliminan automáticamente durante el sync sin dejar carpetas duplicadas.
 
 **Criterios de Aceptación:**
-- [x] #1 All core framework files (AGENTS.md, TEAM_PLAYBOOK.md, STATE_MACHINE.md, core skills) are written strictly in idiomatic, professional technical English.
-- [x] #2 Zero mixed-language paragraphs or residual Spanish sentences in core guidelines and skills.
-- [x] #3 Role names and skills standardized (e.g. product-designer, qa-auditor) across manifest, scripts, and documentation.
-- [x] #4 Esoteric slang removed and replaced with standard engineering practices (Honest Scope & Residual Risk, Refinement Gate).
-- [x] #5 All template placeholders ([PROJECT_NAME], [e.g., ...]) cleaned and parametrized.
-- [x] #6 npm run check:all passes with 0 errors in gripm-playbook.
+- [x] #1 **Metadata confinada en `.gripm/`:** `scripts/sync-playbook.mjs` lee y escribe el lockfile en `.gripm/playbook-lock.json` y los backups en `.gripm/backups/`. Mantiene retrocompatibilidad leyendo `.playbook-lock.json` en la raíz si existe y migrándolo a `.gripm/`.
+- [x] #2 **Auditor UX y Check-LOC confinados:** `scripts/audit-ux-code.cjs` y `scripts/check-loc.mjs` buscan `.uxaudit.json`, `audit-ux-baseline.json` y `.locignore` preferentemente dentro de `.gripm/`, manteniendo fallback a la raíz del proyecto.
+- [x] #3 **Erradicación de `scripts/` en consumidor:** `sync-playbook.mjs` e `init.mjs` no copian archivos ejecutables a la carpeta `scripts/` de proyectos consumidores. La pirámide y los scripts de `package.json` invocan exclusivamente los binarios CLI (`playbook gate`, `playbook audit`, etc.).
+- [x] #4 **Auto-poda de huérfanos y renombres obsoletos:** `sync-playbook.mjs` elimina automáticamente archivos de `.agents/` presentes en el lockfile anterior que ya no formen parte del plan instalado, siempre que no registren modificaciones locales (`customizations`). Si el directorio contenedor queda vacío, es removido de disco.
+- [x] #5 **Limpieza de scripts legados en actualización:** Durante `sync`, si existen scripts en `scripts/` del consumidor que coincidan con los hashes canónicos del framework, se eliminan limpiamente para retirar la deuda técnica previa.
+- [x] #6 **Suite de pruebas de migración e2e:** `tests/` incluye tests que validan una actualización desde un repositorio con estructura legada (scripts en raíz y skills con nombre antiguo), verificando que la raíz quede limpia, `.gripm/` contenga el lockfile y los skills viejos sean podados sin duplicaciones.
+- [x] #7 **Validación total:** `npm run check:all` pasa con 0 errores y 100% de coherencia.
 
 ---
 
-#### [PLAY-030] Zero-Friction Onboarding CLI and Multi-Harness Adapters (Cursor, Claude Code, Antigravity)
-- **Prioridad**: `high` | **Tipo**: `feature`
+#### [PLAY-046] Protocolo de systematic debugging y root cause tracing en principal-engineer
+- **Prioridad**: `p2` | **Tipo**: `enhancement`
 
-Implementar un onboarding sin friccion (`npx @gripm/playbook init`) con adaptadores nativos para los tres harnesses que el framework ya declara soportar (Antigravity, Cursor, Claude Code). Es el item que ejecuta los pasos 2 y 3 del plan original de "golden repo" y cierra el ultimo pendiente del paso 1.
+Actualmente, `principal-engineer/SKILL.md` define excelentes lineamientos de arquitectura, tipado e invariantes, pero carece de un protocolo sistematico de diagnostico y resolucion de defectos ("Systematic Debugging"). 
+Los modelos de lenguaje ante un bug complejo tienden a "adivinar", alterando componentes o envolviendo codigo en condicionales defensivos sin haber aislado la causa raiz, lo que degrada la base de codigo con parches de sintomas.
 
-Por que importa: el playbook promete compatibilidad universal pero hoy su arquitectura depende conceptualmente de `invoke_subagent`, que es primitiva exclusiva del runtime de Antigravity. Un usuario de Cursor o Claude Code no tiene camino de ejecucion. Ademas, la adopcion manual hoy exige clonar el repo y copiar carpetas a mano.
-
-Historial: creada el 2026-10-20 por una sesion que se interrumpio por cuota, sin refinement y sin ACs verificables. Re-refinada el 2026-10-21 al tomar control del repo.
+Inspirado en los estandares de la industria (como los protocolos de `obra/superpowers`), este skill debe incorporar:
+1. Protocolo de 4 fases para investigacion de defectos: Reproduccion aislada -> Rastreo del flujo hacia atras -> Hipotesis unica -> Test rojo.
+2. Prohibicion explicita de tocar codigo de produccion antes de que exista un test que reproduzca y falle con el bug.
+3. Mecanismo de disyuntor ("circuit breaker"): si tras 2 intentos de fix la prueba sigue fallando, el agente debe detenerse, revertir los parches experimentales y reevaluar supuestos o consultar al usuario.
 
 **Criterios de Aceptación:**
-- [x] #1 `npx @gripm/playbook init` ejecuta un asistente interactivo que pregunta harnesses (multi-seleccion), stack principal e integracion opcional del Board, y expone un flag no interactivo equivalente al `--yes` que ya tiene `sync-playbook.mjs`.
-- [x] #2 Deteccion automatica de stack: el init lee el `package.json` del proyecto destino y propone los stack packs disponibles de `.agents/stacks/` (react, mobile, pwa), dejando al usuario confirmar o sobreescribir.
-- [x] #3 Genera los archivos nativos del harness elegido: `.agents/` (Antigravity), `.cursor/rules/*.mdc` (Cursor) y `CLAUDE.md` (Claude Code).
-- [x] #4 El `AGENTS.md` que llega al consumidor viene parametrizado con el nombre, stack e idioma reales elegidos en el asistente: no queda ningun texto-guia tipo `[PROJECT_NAME]` o `[Specify Language, ...]` sin resolver.
-- [x] #5 Existe un test e2e que corre el init no interactivamente en un directorio temporal y afirma que los archivos generados existen y son validos (extiende `tests/e2e-delivery.test.mjs`).
-- [x] #6 `npm run check:all` pasa con 0 errores y el nuevo archivo del CLI esta registrado en `.playbook-manifest.json` y en `FALLBACK_CORE_FILES` con paridad verificada.
+- [x] #1 Incorporar la seccion "Systematic Debugging Protocol" en `principal-engineer/SKILL.md` con las fases de investigacion, reproduccion previa e hipotesis comprobable.
+- [x] #2 Agregar la directiva de disyuntor ("circuit breaker" tras 2 intentos fallidos de fix) para evitar "thrashing" y parches de sintomas.
+- [x] #3 Mover el bloque de configuracion `.oxlintrc.json` (lineas 153-216 de `principal-engineer/SKILL.md`) a una referencia complementaria o archivo dedicado bajo `references/oxlint-anti-slop.md` para reducir consumo de contexto.
+- [x] #4 `npm run validate` valida enlaces y sintaxis con 0 errores.
 
 ---
 
-#### [PLAY-032] Mencion breve de gripm Board como complemento en el README
-- **Prioridad**: `medium` | **Tipo**: `improvement`
+### 📋 Backlog / Draft (4)
 
-El README no menciona `gripm` en ninguna linea. Quien aterriza aqui no tiene por que saber que existe un board visual que lee el mismo backlog. Se agrega **una sola linea** de mencion, como complemento opcional.
+#### [PLAY-042] Resolver contradicciones y bugs criticos en skills de stacks y auditoria
+- **Prioridad**: `p1` | **Tipo**: `bug`
 
-**Rescoping decidido por el PO durante la implementacion.** El alcance original pedia una seccion completa con tabla comparando ambos proyectos y explicando la integracion. El PO lo rechazo: el README del playbook debe concentrarse en el playbook, sin enroscarse, y `gripm` solo vale como una mencion de complemento. La seccion grande se elimino y se dejo un unico tip. El PO dejo ademas claro que este repo no debe ir al repo de `gripm` a investigar: el foco es el playbook.
+Existen contradicciones directas entre los skills de stacks y las reglas deterministas del core, ademas de un script fantasma que causa fallos inmediatos:
+1. `mobile-ux-design/SKILL.md` prescribe `pb-20` / `pb-24` para contenedores desplazables con barras inferiores fijas, cuando la regla `UX-006` en `scripts/ux-rules.json` penaliza explicitamente `pb-20` y `pb-24` como WARNING y exige `pb-32` + `safe-area-inset-bottom`.
+2. `ui-radix-tailwind/SKILL.md` utiliza `text-[9px]` y `text-[10px]` en su seccion de modales oficiales, lo que dispara la regla `UX-011` (`Arbitrary font size outside the canonical type scale`) en `audit-ux-code.cjs`, y hardcodea clases de color (`text-slate-800 dark:text-slate-200`) violando su propia regla de tokens semanticos.
+3. `pwa-assets-audit/SKILL.md` instruye ejecutar `node .agents/skills/pwa-assets-audit/scripts/validate-manifest.mjs`, pero dicho script no existe en el repositorio ni en `.playbook-manifest.json`. Ademas, `scripts/validate-repo.mjs` no audita los scripts referenciados dentro de `.agents/stacks/`.
 
 **Criterios de Aceptación:**
-- [x] #1 El README menciona `gripm` como board visual opcional que lee el mismo backlog, en una sola linea (un tip), sin seccion ni tabla comparativa.
-- [x] #2 La mencion no califica a ninguno de los dos proyectos de confuso ni establece una comparacion extensa; el texto se mantiene breve.
-- [x] #3 `npm run check:all` pasa con 0 errores y el unico link agregado (a `https://github.com/pablojavierrodriguez/gripm`) es externo, por lo que no introduce rutas relativas que el validador tenga que resolver.
+- [ ] #1 Corregir `mobile-ux-design/SKILL.md` para prescribir `pb-32` + `env(safe-area-inset-bottom)` alineado con `UX-006`.
+- [ ] #2 Corregir `ui-radix-tailwind/SKILL.md` eliminando `text-[9px]` / `text-[10px]` y sustituyendo colores hardcodeados por tokens semanticos del design system.
+- [ ] #3 Proveer la implementacion real de `validate-manifest.mjs` (o registrarla e instalarla via manifest) o corregir la invocacion documental en `pwa-assets-audit/SKILL.md`.
+- [ ] #4 Extender `scripts/validate-repo.mjs` en `checkDocsReferenceInstalledFiles()` para que inspeccione tambien los archivos de documentacion dentro de `.agents/stacks/`.
+- [ ] #5 `npm run validate` y `npm test` pasan en verde con 0 errores.
 
 ---
 
-### 📋 Backlog / Draft (1)
+#### [PLAY-043] Purga de project bleed y acoplamiento residual en stack packs de react y mobile
+- **Prioridad**: `p1` | **Tipo**: `chore`
 
-#### [PLAY-031] Demo en terminal (GIF/VHS) en el primer fold del README
-- **Prioridad**: `medium` | **Tipo**: `improvement`
+Los stack packs (`.agents/stacks/react`, `.agents/stacks/mobile`) presentan fuga de contexto y acoplamiento ("project bleed") procedente de una aplicacion SaaS anterior sin sanitizar:
+- `forms-rhf-zod/SKILL.md` hace referencia a una skill inexistente `i18next-namespaces`, asume rutas fijas `src/locales/es.json` e importa helpers (`formatThousandsInput`, `parseThousandsInput`) desde `@/lib/utils` sin proveer su definicion.
+- `ui-radix-tailwind/SKILL.md` impone que existe un componente preexistente `src/components/ui/date-range-picker.tsx`, muestra queries acopladas a columnas como `"starts_at"`, y prescribe modales rigidos propios de un producto especifico.
+- `mobile-ux-design/SKILL.md` prescribe hooks internos como `usePWAInstall` y estilos CSS ultra-acoplados (`.peer[data-state="expanded"] ~ div .btn-action-label`) pertenecientes al layout de una aplicacion externa.
 
-El valor central del framework (dev tilda ACs -> QA ciego certifica -> item en `ready`) no es visible en el README: un lector tiene que leer tres documentos para entender el loop. El plan original de "golden repo" pedia un hook visual en el primer fold. Registro este item porque quedo fuera de PLAY-029 (alcance editorial) y fuera de PLAY-030 (alcance CLI/adaptadores).
-
-Depende de PLAY-030 porque el demo debe grabar el CLI y el quickstart finales: grabarlo antes obligaria a re-grabar todo cuando cambie el onboarding, que es trabajo tirado.
+Es necesario sanitizar estos skills para que provean patrones canonicos autocontenidos y portables para cualquier proyecto React / Mobile.
 
 **Criterios de Aceptación:**
-- [ ] #1 Un tape de VHS reproducible, commiteado en `docs/demo/`, que graba el loop de entrega completo en 15 segundos o menos (reporte del usuario -> dev tilda ACs y corre tests headless -> QA en contexto limpio corre `gate:qa` -> item en `ready`).
-- [ ] #2 El render (GIF o MP4) queda commiteado y embebido en el primer fold del README, debajo del titular, con ancho acotado para no romper el render en mobile.
-- [ ] #3 El demo usa unicamente comandos que existen en este repo y salidas reales: sin terminal ficticia ni output maquetado.
-- [ ] #4 Queda documentado el comando exacto para regenerar el render cuando cambie el CLI o la salida de los scripts.
-- [ ] #5 `npm run check:all` pasa con 0 errores (el asset no debe romper link checks ni limits de LOC).
+- [ ] #1 Sanitizar `forms-rhf-zod/SKILL.md` removiendo la dependencia a la skill inexistente `i18next-namespaces` y encapsulando los helpers de entrada de miles/decimales o documentando su contrato generico.
+- [ ] #2 Desacoplar `ui-radix-tailwind/SKILL.md` de rutas fijas inexistentes (`date-range-picker.tsx`) convirtiendo los ejemplos en snippets autocontenidos y neutrales.
+- [ ] #3 Eliminar selectores CSS hiper-especificos y referencias de hooks privados de `mobile-ux-design/SKILL.md`.
+- [ ] #4 Estandarizar el idioma de los skills de stacks al estandar ingles (alineado con los demas skills del playbook) o documentar formalmente su alcance.
+- [ ] #5 `npm run validate` ejecuta y aprueba con 0 errores.
 
 ---
 
-### ✅ Done / Deployed (24)
+#### [PLAY-044] Unificacion de formato de tareas y reduccion de duplicacion DRY en documentacion troncal
+- **Prioridad**: `p2` | **Tipo**: `refactor`
+
+Existen dos problemas de coherencia y sobrecarga de contexto en la documentacion troncal del framework:
+1. En `pm-orchestrator/SKILL.md` (lineas 33-37) y `STATE_MACHINE.md` (lineas 46-50), los ejemplos de refinamiento muestran un formato plano markdown (`### [BACKLOG-001] ... - **Status:** draft`), mientras que `gate-qa.mjs` y `BACKLOG.md` operan obligatoriamente con archivos individuales en `backlog/tasks/*.md` que llevan YAML frontmatter (`id`, `status`, `dependencies`, etc.) y bloques `<!-- AC:BEGIN -->`. Esto confunde a los modelos cuando generan nuevas tareas.
+2. La maquina de estados, el protocolo `claimed_by` con `git worktree`, y las politicas de `< 1000 LOC` estan duplicadas palabra por palabra a lo largo de `AGENTS.md`, `TEAM_PLAYBOOK.md`, `STATE_MACHINE.md` y las skills principales. Esto consume miles de tokens innecesarios por sesion de agente.
+
+**Criterios de Aceptación:**
+- [ ] #1 Actualizar los ejemplos de definicion de tareas en `pm-orchestrator/SKILL.md` y `STATE_MACHINE.md` para reflejar fielmente la estructura real de archivo `backlog/tasks/*.md` con YAML frontmatter y bloques de criterios de aceptacion.
+- [ ] #2 Aplicar DRY en `AGENTS.md`, `TEAM_PLAYBOOK.md` y `pm-orchestrator/SKILL.md`, consolidando `STATE_MACHINE.md` y `git-workflow.md` como unicas fuentes de verdad referenciadas por vinculos.
+- [ ] #3 Reducir la sobrecarga de tokens de contexto sin debilitar las directivas no negociables del framework.
+- [ ] #4 `npm run validate` valida con exito enlaces y vocabulario de estados.
+
+---
+
+#### [PLAY-045] Enforcement mecanico de presupuesto de archivo y reglas anti-slop en gate-qa
+- **Prioridad**: `p2` | **Tipo**: `feature`
+
+Las skills `principal-engineer` y `qa-auditor` declaran reglas estrictas que hoy descansan unicamente en la inspeccion humana o semantica del subagente, sin respaldo mecanico en `scripts/gate-qa.mjs`:
+1. `PYRAMID_STEPS` en `gate-qa.mjs` no incluye la ejecucion de `check-loc.mjs` ni define formalmente si el exceso de lineas (>= 1000 LOC) bloquea la certificacion o emite un aviso segun la soberania del PO.
+2. No existe un chequeo mecanico rapido en el runner para detectar evasiones de tipado en el diff (`as unknown as`, `as any as`) o mocks globales de modulo (`vi.mock(` / `jest.mock(`) que simulan cobertura sin ejercitar la integracion.
+
+Integrar estas verificaciones mecanicas en el ciclo de promocion robustece la garantia de calidad eliminando atajos inadvertidos.
+
+**Criterios de Aceptación:**
+- [ ] #1 Incorporar el paso de chequeo de modularidad (`check-loc.mjs`) o inspeccion de presupuesto dentro de `scripts/gate-qa.mjs` o la piramide de verificacion, con comportamiento configurable o claramente documentado.
+- [ ] #2 Incorporar chequeo estatico o regex en `scripts/gate-qa.mjs` / `inspectTask` para advertir o bloquear la presencia de `as unknown as` y `as any as` en archivos modificados.
+- [ ] #3 Actualizar la documentacion de `qa-auditor/SKILL.md` para reflejar con precision los pasos y exit codes reales del runner mecanico.
+- [ ] #4 `npm test` y `npm run validate` pasan en verde.
+
+---
+
+### ✅ Done / Deployed (32)
 
 #### [PLAY-001] Anatomía de unidad en el motor de reglas: text, ownContent y scopeText
-- **Prioridad**: `high` | **Tipo**: `bug`
+- **Prioridad**: `p1` | **Tipo**: `bug`
 
 Causa raíz de los defectos DEV-187 #1 y #2. `needsContent` se evaluaba contra `content`, el **archivo entero**, así que un solo `const Icon = () => null` en cualquier línea convertía a todos los botones del archivo en botones "icon-only". En `gripm` eso producía 127 hallazgos de UX-010 en 13 archivos, de los cuales ~101 son falsos positivos.
 
@@ -189,7 +273,7 @@ La causa no era el `lineMatches` sino `buildUnits`. El segmentador anterior cont
 ---
 
 #### [PLAY-002] UX-010: nombre visible como escape, y reporte de toda ocurrencia en vez de una por archivo
-- **Prioridad**: `high` | **Tipo**: `bug`
+- **Prioridad**: `p1` | **Tipo**: `bug`
 
 Dos defectos reportados por el dev de `gripm` en el retro `2026-10-06-auditoria-real-code-level-ux-auditor`.
 
@@ -211,7 +295,7 @@ El defecto 2 era además la razón por la que el defecto 1 pasaba desapercibido 
 ---
 
 #### [PLAY-003] Baseline de observaciones aceptadas como capacidad genérica del auditor
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 El motor reportaba una ocurrencia por regla por archivo. Ese `break` era un parche para el ruido, y como parche era falso: ocultaba el 90% de las observaciones reales, y a la vez enmascaraba los falsos positivos porque cortaba el recorrido.
 
@@ -237,7 +321,7 @@ El baseline es genérico: cualquier proyecto con ruido cosmático acumulado lo n
 ---
 
 #### [PLAY-004] Retirar el bin agentic-team-playbook, residuo del renombre a gripm-playbook
-- **Prioridad**: `medium` | **Tipo**: `chore`
+- **Prioridad**: `p2` | **Tipo**: `chore`
 
 `DEV-179` renombró el proyecto a `gripm-playbook` y limpió README, `sync-playbook.mjs` y los badges. Se le olvidó `package.json`: el bin `agentic-team-playbook` siguió apuntando al sync, de modo que el nombre viejo seguía siendo invocable después de haber sido declarado muerto.
 
@@ -253,7 +337,7 @@ Es un residuo de bajo impacto pero con costo de mantenimiento real: mientras exi
 ---
 
 #### [PLAY-005] Punto de extensión del auditor: API pública, onlyFile y catálogo local por proyecto
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 El consumidor `gripm` bifurca `scripts/audit-ux-code.cjs` y su divergencia pasó de 302 a 779 líneas. La causa no es una decisión de `gripm`: **es que no hay forma de extender el auditor sin reescribirlo.**
 
@@ -285,7 +369,7 @@ Esto también products el problema de nombres que el consumidor ya sufrió: 5 de
 ---
 
 #### [PLAY-006] UX-010: el texto visible de un descendiente cuenta, y los custom controls entran en la firma
-- **Prioridad**: `high` | **Tipo**: `bug`
+- **Prioridad**: `p1` | **Tipo**: `bug`
 
 Dos defectos residuales de `UX-010` reportados por el consumidor contra el tarball de `2.1.0` (`DEV-188`). Verificados y reproducidos acá antes de tocar nada.
 
@@ -314,7 +398,7 @@ se reportaba como botón icon-only sin nombre. Un control que le muestra "Guarda
 ---
 
 #### [PLAY-008] Exports map y verificacion del catalogo local en validate-repo
-- **Prioridad**: `medium` | **Tipo**: `improvement`
+- **Prioridad**: `p2` | **Tipo**: `improvement`
 
 Dos huecos que aparecieron al publicar el punto de extension (PLAY-005).
 
@@ -341,7 +425,7 @@ Ademas, el error de colision actual dice "reserved canonical pattern" incluso cu
 ---
 
 #### [PLAY-009] La puerta de salida del motor debe separar findings canonicos de locales
-- **Prioridad**: `medium` | **Tipo**: `improvement`
+- **Prioridad**: `p2` | **Tipo**: `improvement`
 
 `--strict` decide el codigo de salida sobre **todos** los hallazgos reportados. Con un catalogo local activo, un consumidor tiene tres clases de observacion mezcladas en un solo contador:
 
@@ -364,7 +448,7 @@ El baseline tiene el mismo problema, que es mas caro: la fingerprint es `regla|a
 ---
 
 #### [PLAY-010] Enviar una firma nueva exige un test que falle sin el fix
-- **Prioridad**: `high` | **Tipo**: `process`
+- **Prioridad**: `p1` | **Tipo**: `process`
 
 `PLAY-006` llegó al release con la capacidad rota, y la causa no fue una falta de revisión: **el test pasaba por la razón equivocada**.
 
@@ -390,7 +474,7 @@ La regla que sale de acá: **un caso de regresión para una capacidad nueva tien
 ---
 
 #### [PLAY-011] Sync local zero-network, smart orphan detection y State Machine canónica
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 Mejorar el sincronizador `sync-playbook.mjs` y consolidar la taxonomía de la State Machine para permitir que cualquier proyecto consumidor (incluyendo repositorios hermanos en desarrollo local) sincronice sin fricción y sin falsos positivos:
 
@@ -408,7 +492,7 @@ Mejorar el sincronizador `sync-playbook.mjs` y consolidar la taxonomía de la St
 ---
 
 #### [PLAY-012] Aislamiento de agentes concurrentes mediante git worktree para prevenir colisiones de rama y working tree
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 Cuando múltiples agentes de IA (o hilos paralelos) operan de forma concurrente sobre un mismo repositorio local en ramas distintas, el uso tradicional de `git checkout <branch>` dentro del mismo directorio de trabajo produce colisiones críticas:
 
@@ -438,7 +522,7 @@ Incorporar al Playbook (`.agents/rules/git-workflow.md`, `AGENTS.md` y `TEAM_PLA
 ---
 
 #### [PLAY-013] Reglas deterministas de linter anti-slop (Oxlint/AST) contra vicios de código y comentarios generados por IA
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 Los agentes de IA tienden a incurrir en vicios repetitivos de codificación ("code slop") que degradan silenciosamente la integridad técnica de las aplicaciones TypeScript y JavaScript:
 
@@ -461,7 +545,7 @@ Inspirado en el enfoque determinista de `dmmulroy/anti-slop` y la higiene de `mi
 ---
 
 #### [PLAY-014] Filtro anti-slop en UI, copy y diseño: Purpose Test y erradicación de clichés estéticos de IA
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 El diseño y contenido generado por IA adolece de patrones cliché repetitivos ("UI slop") que le dan un aspecto genérico y carente de identidad propia:
 
@@ -483,7 +567,7 @@ Inspirado en los principios de filtro de `miqdadbadjuber/anti-slop`:
 ---
 
 #### [PLAY-015] Compuertas de certificación de QA ejecutables (gate runner) para erradicar la auto-certificación por simulación
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 Uno de los mayores puntos de fricción y escepticismo en los marcos de trabajo para agentes de IA es la degradación de las reglas en "teatro cognitivo". Cuando un único agente asume la conversación:
 - La instrucción *"un desarrollador nunca se auto-certifica"* suele ser esquivada por el LLM simulando ser el "QA Auditor" en el mismo mensaje o turno de chat.
@@ -510,7 +594,7 @@ Sustituir la simulación de roles por **compuertas mecánicas ejecutables**:
 ---
 
 #### [PLAY-016] Estado 'blocked' con motivo obligatorio y gate de resolución de dependencias
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 En el flujo actual de entrega (`STATE_MACHINE.md`), cuando una tarea en desarrollo (`doing`) o planificada (`draft`) no puede avanzar debido a un impedimento externo (definición de producto pendiente, bloqueo de infraestructura, API de terceros rota o dependencia de otra tarea no liberada), no existe una forma normalizada de registrar el bloqueo:
 
@@ -543,7 +627,7 @@ En el flujo actual de entrega (`STATE_MACHINE.md`), cuando una tarea en desarrol
 ---
 
 #### [PLAY-017] Disciplina de ingeniería senior y diff mínimo (ponytail): erradicación de la sobre-ingeniería en Principal Engineer
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 Los agentes de IA sufren de una tendencia compulsiva hacia la sobre-ingeniería especulativa ("code inflation"): cuando se les pide un cambio o corrección puntual, con frecuencia introducen adaptadores innecesarios, factories abstractas, helpers no solicitados e instalan dependencias de terceros para resolver operaciones que requieren apenas unas pocas líneas de código nativo. Esto incrementa el consumo de tokens, eleva los costos operativos y amplía el radio de impacto (*blast radius*) de posibles regresiones.
 
@@ -564,7 +648,7 @@ Inspirado en la filosofía de `DietrichGebert/ponytail` (*"The lazy senior dev: 
 ---
 
 #### [PLAY-018] Gate de refinamiento R1 interactivo (grill-me) y glosario ubicuo de dominio (DOMAIN.md) para especificaciones sin asunciones
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 El modo de fallo más crítico y destructivo al desarrollar con agentes de IA es la desalineación inicial: cuando el usuario plantea una necesidad, el agente con frecuencia asume silenciosamente requerimientos no especificados, proyecta soluciones sobre premisas falsas y comienza a programar código desconectado de la intención real del producto. Adicionalmente, la ausencia de un vocabulario formal compartido provoca que el agente responda con párrafos inflados y confusos donde un término preciso del negocio bastaría.
 
@@ -586,7 +670,7 @@ Inspirado en las skills de ingeniería de `mattpocock/skills` (Total TypeScript)
 ---
 
 #### [PLAY-019] Subagent-Driven Development (SDD): orquestación de subagentes en contexto fresco con TDD atómico paso a paso
-- **Prioridad**: `medium` | **Tipo**: `feature`
+- **Prioridad**: `p2` | **Tipo**: `feature`
 
 Cuando un único hilo de conversación de IA intenta ejecutar un plan de implementación extenso, sufre inevitablemente de fatiga de contexto: olvida instrucciones tempranas, confunde estados, introduce regresiones silenciosas en tests que previamente pasaban y comienza a aplicar parches improvisados.
 
@@ -610,7 +694,7 @@ Inspirado en el modelo de *Subagent-Driven Development (SDD)* de `obra/superpowe
 ---
 
 #### [PLAY-020] El manifest y su fallback deben tener un unico origen de verdad
-- **Prioridad**: `medium` | **Tipo**: `improvement`
+- **Prioridad**: `p2` | **Tipo**: `improvement`
 
 Al publicar `gate:qa` en 2.3.0, el gate se desarrollo y se documento en tres skills del nucleo, pero **no se registro en `.playbook-manifest.json`**. Como `planFiles()` arma el plan de instalacion desde `manifest.core`, un consumidor que corria `npx @gripm/playbook sync` recibia skills que le ordenaban correr `npm run gate:qa` en un repo donde ese comando no existia.
 
@@ -633,7 +717,7 @@ Corregido en 2.3.0 con dos checks nuevos (`checkDocsReferenceInstalledFiles` y `
 ---
 
 #### [PLAY-021] Purificacion del core agnostico a dominio y erradicacion de prefijos hardcodeados
-- **Prioridad**: `high` | **Tipo**: `tech_debt`
+- **Prioridad**: `p1` | **Tipo**: `tech_debt`
 
 Auditar y sanear exhaustivamente el framework `@gripm/playbook` para garantizar que sea 100% agnostico al producto, dominio de negocio y stack tecnologico del consumidor:
 1. Erradicar sesgos de dominio especificos (terminologia bancaria/financiera como balance negativo, pasivo, patrimonio, API de pagos o importes en ejemplos de invariantes y contratos).
@@ -649,7 +733,7 @@ Auditar y sanear exhaustivamente el framework `@gripm/playbook` para garantizar 
 ---
 
 #### [PLAY-022] Erradicacion de remanentes anti-em-dash y estandarizacion de guion simple
-- **Prioridad**: `medium` | **Tipo**: `tech_debt`
+- **Prioridad**: `p2` | **Tipo**: `tech_debt`
 
 Erradicacion integral de caracteres em-dash (—, U+2014) y en-dash (–, U+2013) en toda la documentacion, encabezados, plantillas, tablas y ejemplos de `@gripm/playbook`.
 El uso de guiones largos artificiales es un cliche de IA que degrada la artesanía del producto y rompe convenciones tipograficas sobrias en herramientas de ingenieria. Esta tarea estandariza el uso exclusivo del guion simple estandar `-` con espacios (` - `).
@@ -663,7 +747,7 @@ El uso de guiones largos artificiales es un cliche de IA que degrada la artesan�
 ---
 
 #### [PLAY-023] Protocolo de Peer Discovery dinamico y Handshake sincronico inter-agente
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 Institucionalizar el Protocolo Autonomo de Coordinacion Inter-Agente (IACP) en `@gripm/playbook` para eliminar el riesgo de colisiones en el working tree compartido y evitar que el usuario deba actuar como intermediario o pasamanos de IDs de conversacion:
 1. **Single Source of Truth en Backlog:** El ítem de tarea es el unico lease del sistema. Al transicionar a `status: doing`, el agente estampa atómicamente en el frontmatter YAML `claimed_by: "<provider>:<session_or_agent_id>"` (ej. `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) y `worktree: "main"` (o la ruta a su worktree).
@@ -682,7 +766,7 @@ Institucionalizar el Protocolo Autonomo de Coordinacion Inter-Agente (IACP) en `
 ---
 
 #### [PLAY-024] Modularizacion estricta, arquitectura previa y limite de 1000 lineas por archivo
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 Establecer en el core agnóstico de `@gripm/playbook` las reglas universales de modularización y arquitectura previa para garantizar soluciones robustas, escalables y mantenibles, eliminando de raíz los archivos monolíticos gigantes (God Files / God Objects) que concentran múltiples responsabilidades y actúan como punto único de falla (SPoF) en las aplicaciones:
 
@@ -702,7 +786,7 @@ Establecer en el core agnóstico de `@gripm/playbook` las reglas universales de 
 ---
 
 #### [PLAY-025] Compuerta mecanica de presupuesto de archivo y visibilidad de limites modulares (check-loc)
-- **Prioridad**: `high` | **Tipo**: `feature`
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
 Materializar de forma ejecutable y automatizada la regla de modularidad introducida en PLAY-024 mediante un script de inspeccion de presupuesto de lineas de codigo (`scripts/check-loc.mjs`):
 
@@ -720,5 +804,219 @@ Materializar de forma ejecutable y automatizada la regla de modularidad introduc
 - [x] #4 El script se incluye en el core del `.playbook-manifest.json` y en `FALLBACK_CORE_FILES` de `sync-playbook.mjs`
 - [x] #5 Suite de tests unitarios en `tests/check-loc.test.mjs` validando CLI y API programatica
 - [x] #6 `npm run check:all` en verde
+
+---
+
+#### [PLAY-026] Refactorizacion modular de scripts del core bajo umbral preventivo de 500 LOC (scripts/lib)
+- **Prioridad**: `p1` | **Tipo**: `refactor`
+
+Descomponer los tres scripts principales del repositorio (`scripts/gate-qa.mjs`, `scripts/sync-playbook.mjs` y `scripts/validate-repo.mjs`) que superaban el umbral de aviso preventivo (500 LOC) extrayendo submodulos de alta cohesion en `scripts/lib/` y garantizando 100% de compatibilidad hacia atras en el CLI y API programatica:
+
+1. **Extraccion de submodulos en `scripts/lib/`:**
+   - `frontmatter.mjs`: parser de YAML plano, extraccion de ACs y mutacion determinista de frontmatter.
+   - `terminal.mjs`: formateo ANSI y cabeceras de terminal.
+   - `pyramid.mjs`: resolucion y ejecucion de la Piramide de Verificacion.
+   - `task-inspection.mjs`: carga de tareas, resolucion de rutas e inspeccion pura de invariantes.
+   - `provenance.mjs`: fetch con reintentos/backoff y verificacion de historial upstream en GitHub.
+   - `sync-classifier.mjs`: hashing SHA-256, clasificacion de archivos locales y deteccion de huerfanos.
+   - `catalog-validator.mjs`: validacion de catalogos locales `.uxaudit.json`.
+   - `doc-checks.mjs`: validacion de links Markdown, frontmatter de skills y vocabulario de estados.
+2. **Paridad de instalacion:** Registro de los submodulos runtime requeridos por `gate-qa.mjs` en `.playbook-manifest.json` y `FALLBACK_CORE_FILES`.
+
+**Criterios de Aceptación:**
+- [x] #1 Extraer submodulos cohesivos en `scripts/lib/` (`frontmatter.mjs`, `terminal.mjs`, `pyramid.mjs`, `task-inspection.mjs`, `provenance.mjs`, `sync-classifier.mjs`, `catalog-validator.mjs`, `doc-checks.mjs`)
+- [x] #2 Reducir `scripts/gate-qa.mjs`, `scripts/sync-playbook.mjs` y `scripts/validate-repo.mjs` por debajo de las 500 LOC eliminando el 100% de los warnings en `node scripts/check-loc.mjs`
+- [x] #3 Registrar los submodulos requeridos por el gate en `.playbook-manifest.json` (`core`) y `FALLBACK_CORE_FILES` manteniendo paridad total
+- [x] #4 Preservar el 100% de compatibilidad de exports y comportamiento CLI validado por `npm run check:all`
+
+---
+
+#### [PLAY-027] Expansion del motor de auditoria UX con firmas canonicas UX-014 y UX-015
+- **Prioridad**: `p1` | **Tipo**: `feature`
+
+Ampliar el catalogo canonico de reglas de auditoria estatica de UX (`scripts/ux-rules.json`) de 13 a 15 firmas y sincronizar la documentacion en `.agents/skills/code-level-ux-auditor/SKILL.md`:
+
+1. **`UX-014` (Anti-em-dash / anti-AI cliche in UI or metadata):** Detecta caracteres em-dash (`\u2014`) o en-dash (`\u2013`) en nodos de texto JSX y atributos de UI/metadata para hacer cumplir mecanicamente la regla global de guion simple (` - `).
+2. **`UX-015` (Viewport touch zoom lock):** Detecta configuraciones de viewport (`maximum-scale=1`, `user-scalable=no`, `user-scalable=0`, `userScalable: false`) que bloquean el pinch-to-zoom en dispositivos tactiles y violan WCAG 1.4.4.
+
+**Criterios de Aceptación:**
+- [x] #1 Incorporar las firmas `UX-014` y `UX-015` con severidad `WARNING` en `scripts/ux-rules.json`
+- [x] #2 Documentar `UX-014` y `UX-015` en `.agents/skills/code-level-ux-auditor/SKILL.md` y actualizar `README.md` manteniendo paridad con `validate-repo.mjs`
+- [x] #3 Agregar casos de violacion en `tests/fixtures/react-app/src/components/Violations.tsx` y tests unitarios/E2E en `tests/audit-ux.test.mjs` y `tests/e2e-delivery.test.mjs`
+- [x] #4 Verificar que `node scripts/audit-ux-code.cjs --list-rules` reporte las 15 firmas canonicas y `npm run check:all` pase en verde
+
+---
+
+#### [PLAY-028] Compuerta mecanica anti-auto-certificacion y resolucion de actor en gate-qa
+- **Prioridad**: `p1` | **Tipo**: `feature`
+
+Blindar mecanicamente la separacion de contextos entre desarrollo (`doing` -> `review`) y certificacion QA (`review` -> `ready`) en `scripts/gate-qa.mjs`:
+
+1. **Resolucion jerarquica de identidad (`resolveActor`):** Soporta flags CLI (`--by`, `--as`), variables de entorno (`GRIPM_ACTOR`, `QA_ACTOR`, `CLAIMED_BY`), variables de sesion de harness (`ANTIGRAVITY_CONVERSATION_ID`, `CURSOR_SESSION_ID`, `CLAUDE_SESSION_ID`) y fallback `human:<user>`.
+2. **Comparacion normalizada (`isSameActor`):** Compara identidades de forma case-insensitive e ignorando espacios marginales.
+3. **Bloqueo mecanico en T2 (`inspectTask` & `gate-qa.mjs`):** Si el actor que ejecuta la certificacion coincide con el `claimed_by` registrado en la tarea, `gate-qa.mjs` rechaza la promocion con `exit code 1`, emite el diagnostico `anti-self-certification` y preserva el estado `review` en disco.
+
+**Criterios de Aceptación:**
+- [x] #1 Implementar `resolveActor` e `isSameActor` en `scripts/lib/task-inspection.mjs` y re-exportarlos desde `scripts/gate-qa.mjs`
+- [x] #2 Bloquear con `exit code 1` en `gate-qa.mjs` e `inspectTask` cualquier intento de certificar una tarea cuando el certificador coincide con `claimed_by`
+- [x] #3 Permitir la certificacion (`exit code 0` y promocion a `ready`) cuando el certificador es un subagente QA con contexto limpio o par distinto
+- [x] #4 Añadir cobertura de tests unitarios y E2E en `tests/gate-qa.test.mjs` y `tests/e2e-delivery.test.mjs` validando el bloqueo y la aprobacion por pares
+
+---
+
+#### [PLAY-029] Editorial Refactoring and Technical English Standardization for Core and Skills
+- **Prioridad**: `p1` | **Tipo**: `refactor`
+
+Complete editorial refactoring of gripm-playbook core to eliminate language mixing (Spanglish), replace informal prompt-engineering buzzwords with industry-standard terminology, and clean unparametrized template leftovers.
+
+**Criterios de Aceptación:**
+- [x] #1 All core framework files (AGENTS.md, TEAM_PLAYBOOK.md, STATE_MACHINE.md, core skills) are written strictly in idiomatic, professional technical English.
+- [x] #2 Zero mixed-language paragraphs or residual Spanish sentences in core guidelines and skills.
+- [x] #3 Role names and skills standardized (e.g. product-designer, qa-auditor) across manifest, scripts, and documentation.
+- [x] #4 Esoteric slang removed and replaced with standard engineering practices (Honest Scope & Residual Risk, Refinement Gate).
+- [x] #5 All template placeholders ([PROJECT_NAME], [e.g., ...]) cleaned and parametrized.
+- [x] #6 npm run check:all passes with 0 errors in gripm-playbook.
+
+---
+
+#### [PLAY-030] Zero-Friction Onboarding CLI and Multi-Harness Adapters (Cursor, Claude Code, Antigravity)
+- **Prioridad**: `p1` | **Tipo**: `feature`
+
+Implementar un onboarding sin friccion (`npx @gripm/playbook init`) con adaptadores nativos para los tres harnesses que el framework ya declara soportar (Antigravity, Cursor, Claude Code). Es el item que ejecuta los pasos 2 y 3 del plan original de "golden repo" y cierra el ultimo pendiente del paso 1.
+
+Por que importa: el playbook promete compatibilidad universal pero hoy su arquitectura depende conceptualmente de `invoke_subagent`, que es primitiva exclusiva del runtime de Antigravity. Un usuario de Cursor o Claude Code no tiene camino de ejecucion. Ademas, la adopcion manual hoy exige clonar el repo y copiar carpetas a mano.
+
+Historial: creada el 2026-10-20 por una sesion que se interrumpio por cuota, sin refinement y sin ACs verificables. Re-refinada el 2026-10-21 al tomar control del repo.
+
+**Criterios de Aceptación:**
+- [x] #1 `npx @gripm/playbook init` ejecuta un asistente interactivo que pregunta harnesses (multi-seleccion), stack principal e integracion opcional del Board, y expone un flag no interactivo equivalente al `--yes` que ya tiene `sync-playbook.mjs`.
+- [x] #2 Deteccion automatica de stack: el init lee el `package.json` del proyecto destino y propone los stack packs disponibles de `.agents/stacks/` (react, mobile, pwa), dejando al usuario confirmar o sobreescribir.
+- [x] #3 Genera los archivos nativos del harness elegido: `.agents/` (Antigravity), `.cursor/rules/*.mdc` (Cursor) y `CLAUDE.md` (Claude Code).
+- [x] #4 El `AGENTS.md` que llega al consumidor viene parametrizado con el nombre, stack e idioma reales elegidos en el asistente: no queda ningun texto-guia tipo `[PROJECT_NAME]` o `[Specify Language, ...]` sin resolver.
+- [x] #5 Existe un test e2e que corre el init no interactivamente en un directorio temporal y afirma que los archivos generados existen y son validos (extiende `tests/e2e-delivery.test.mjs`).
+- [x] #6 `npm run check:all` pasa con 0 errores y el nuevo archivo del CLI esta registrado en `.playbook-manifest.json` y en `FALLBACK_CORE_FILES` con paridad verificada.
+
+---
+
+#### [PLAY-031] Diagrama del loop de entrega en el primer fold del README (sin vhs)
+- **Prioridad**: `p2` | **Tipo**: `improvement`
+
+El valor central del framework (dev tilda ACs -> QA ciego certifica -> item en `ready`) no es visible en un solo vistazo en el README: un lector tiene que leer varios documentos para entender el loop de entrega. Este item agrega un diagrama ASCII estático en el primer fold que muestra el ciclo de vida de un backlog item desde `draft` hasta `done`, destacando el gate ciego de QA como paso crítico entre `review` y `ready`. No depende de herramienta alguna (vhs/ffmpeg/gif no están disponibles en la máquina), solo diagramado ASCII.
+
+**Criterios de Aceptación:**
+- [x] #1 Diagrama ASCII de 5 estados (draft → doing → review → ready → done) ubicado en el primer fold del README, justo después del diagrama de arquitectura "Hub Orchestrator + Sub-Agentes".
+- [x] #2 El diagrama usa solo caracteres box-drawing y flechas ASCII, sin binarios, sin GIF/VHS, sin herramientas externas.
+- [x] #3 El diagrama resalta el gate ciego de QA (revisión en contexto aislado por sub-agente) como la flecha crítica que separa `review` de `ready`.
+- [x] #4 PLAY-030 está desvinculado (removed de `dependencies:`), pues el gate exige dependencias en `done` y PLAY-030 está en `ready`.
+- [x] #5 `npm run check:all` pasa (332/332 tests, 72 suites) sin errores de Lint ni LOC.
+- [x] #6 `node scripts/gate-qa.mjs submit PLAY-031` completa y pasa a `review`.
+- [x] #7 QA ciego en sub-agente limpio certifica a `ready` con 7 ACs mínimas (loop visible, gate destacado, sin vhs, PLAY-030 desvinculado).
+
+---
+
+#### [PLAY-032] Mencion breve de gripm Board como complemento en el README
+- **Prioridad**: `p2` | **Tipo**: `improvement`
+
+El README no menciona `gripm` en ninguna linea. Quien aterriza aqui no tiene por que saber que existe un board visual que lee el mismo backlog. Se agrega **una sola linea** de mencion, como complemento opcional.
+
+**Rescoping decidido por el PO durante la implementacion.** El alcance original pedia una seccion completa con tabla comparando ambos proyectos y explicando la integracion. El PO lo rechazo: el README del playbook debe concentrarse en el playbook, sin enroscarse, y `gripm` solo vale como una mencion de complemento. La seccion grande se elimino y se dejo un unico tip. El PO dejo ademas claro que este repo no debe ir al repo de `gripm` a investigar: el foco es el playbook.
+
+**Criterios de Aceptación:**
+- [x] #1 El README menciona `gripm` como board visual opcional que lee el mismo backlog, en una sola linea (un tip), sin seccion ni tabla comparativa.
+- [x] #2 La mencion no califica a ninguno de los dos proyectos de confuso ni establece una comparacion extensa; el texto se mantiene breve.
+- [x] #3 `npm run check:all` pasa con 0 errores y el unico link agregado (a `https://github.com/pablojavierrodriguez/gripm`) es externo, por lo que no introduce rutas relativas que el validador tenga que resolver.
+
+---
+
+#### [PLAY-034] La instruccion `npm run gate:qa` falla para el consumidor (el alias npm no esta instalado)
+- **Prioridad**: `p2` | **Tipo**: `bug`
+
+Los archivos de instrucciones que el consumidor recibe le ordenan correr `npm run gate:qa <ID>`, pero ese comando no existe en su repo. El alias npm `gate:qa` vive en `package.json`, y `package.json` **no esta en `manifest.core`**, por lo que `sync` nunca lo instala en el repo del consumidor.
+
+Verificado en el repo fuente:
+
+- `scripts/gate-qa.mjs` **si esta en `core`**, junto con sus modulos `lib/frontmatter.mjs`, `lib/pyramid.mjs`, `lib/task-inspection.mjs` y `lib/terminal.mjs`. El archivo del gate si llega al consumidor.
+- `package.json` **no esta en `core`** (esta fuera del manifest), asi que el script npm `gate:qa` no se instala.
+- `scripts/init.mjs` (PLAY-030) **no inyecta** el script en el `package.json` del consumidor; solo lo lee para detectar stack.
+
+Resultado: un consumidor que sigue la instruccion recibe `Missing script: gate:qa`. Es un defecto documental y de packaging a la vez: la doc invoca un alias que nunca se instala, aunque el binario subyacente si esta presente. `node scripts/gate-qa.mjs <ID>` funcionaria hoy mismo.
+
+Este defecto quedo fuera de PLAY-029 (alcance editorial) y de PLAY-030 (alcance CLI/adaptadores): los adaptadores nuevos si usan `node scripts/gate-qa.mjs`, pero `AGENTS.md` y los skills del core conservan la instruccion vieja.
+
+**Criterios de Aceptación:**
+- [x] #1 Resolucion elegida y registrada: **(a) sustituir la invocacion npm por la forma `node`** en la documentacion cara al consumidor. `npm run gate:qa <ID>` pasa a `node scripts/gate-qa.mjs <ID>`. Se descarto (b) inyectar el script en el `package.json` del consumidor porque exige mutar un archivo que es del consumidor, con riesgo de pisar sus propios scripts.
+- [x] #2 La sustitucion se aplica a **todas** las invocaciones de `npm run gate:qa` en los archivos que el consumidor recibe (`AGENTS.md`, `.agents/TEAM_PLAYBOOK.md`, `.agents/STATE_MACHINE.md`, skills `pm-orchestrator` y `qa-auditor`) **y** en `README.md`. El README entra en el alcance: aunque documenta este repo, es lo primero que lee un consumidor en npm/GitHub y ya usa la forma `node` en L116-117 (`node scripts/gate-qa.mjs start`), asi que unificarla elimina la inconsistencia interna.
+- [x] #3 `npm run audit:ux` (TEAM_PLAYBOOK L46) sufre la misma causa raiz y se sustituye igual por `node scripts/audit-ux-code.cjs`, porque `scripts/audit-ux-code.cjs` si esta en `core`. Dejarlo roto al lado del gate arreglado seria incoherente.
+- [x] #4 Las referencias de **concepto** (no invocacion) al gate quedan como `gate:qa`: `AGENTS.md` L36 (`still requires gate:qa`), `pm-orchestrator` L115 y `README` L62. Cambiarlas produciria prosa ilegible (`requires node scripts/gate-qa.mjs`).
+- [x] #5 La sustitucion arregla **unicamente** comandos cuyo binario esta en `core`. `npm run validate` en `.agents/TEAM_PLAYBOOK.md` L142 (un archivo que el consumidor **si** recibe) comparte la misma causa raiz pero **no** admite el fix: `scripts/validate-repo.mjs` no esta en `core`, asi que ni `npm run validate` ni `node scripts/validate-repo.mjs` funcionarian en el consumidor. Queda **fuera** y se reporta como hallazgo que necesita decision propia (anadir el binario al core, o dejar de prometerlo).
+- [x] #6 `README.md` se aclara como **landing page de npm, no archivo instalado**: no esta ni en `core` ni en `preserved`. Sus comandos (`validate`, `gate:review`, `check:all`, `audit:ux:strict`, `audit:ux:baseline`) **si** funcionan en este repo. Solo se unifico `npm run gate:qa` a la forma `node` por consistencia interna con L116-117, que ya usan `node scripts/gate-qa.mjs start`/`unblock`. `gate:review` y `check:all` permanecen en forma npm porque su binario no esta en core: unificarlos daria una falsa apariencia de que el README es 100% copy-pasteable para el consumidor, cosa que no es.
+- [x] #7 `npm run build` (AGENTS L63, TEAM_PLAYBOOK L145, README L272) **no** se toca: es el build del propio proyecto del consumidor, no un script de gripm.
+- [x] #8 `npm run check:all` pasa con 0 errores tras el cambio (332/332 tests, 72 suites).
+- [x] #9 **Fix post-QA (invariante T_ready-immutability).** La QA ciego (subagente limpio) hallo que el barrido inicial subescalo el alcance: el inventario solo cubrio los 5 archivos donde aparecia `npm run gate:qa`, no **todos** los archivos core. Se reabrio el item a `doing` (STATE_MACHINE L77: un fix post-QA invalida la certificacion y debe recorrer T1/T2 de nuevo) y se sustituyeron las 4 lineas restantes de **mismo defecto** en archivos que el consumidor **si** recibe y cuyo binario **si** esta en core: `.agents/skills/code-level-ux-auditor/SKILL.md` L26 (forma `node scripts/audit-ux-code.cjs --update-baseline`, ya usada en L21-25) y L32 (prosa), mas `scripts/audit-ux-code.cjs` L1009 y L1204 (la **propia salida del binario** instruia `npm run audit:ux` al consumidor).
+- [x] #10 **Hallazgos reportados, deliberadamente fuera de este fix** (mismo origen: `package.json` no viaja al consumidor, pero no admiten sustitucion porque su binario no esta en core o es ambiguo): (a) `npm run validate` en `TEAM_PLAYBOOK.md` L142; (b) `npm run lint:anti-slop` en `principal-engineer/SKILL.md` L215, que ademas no existe ni en este `package.json` (lectura ambigua: recomendacion de CI propia del consumidor vs script ausente); (c) en `README.md` (landing page, no instalado) `validate`, `gate:review` y `check:all`. Todos requieren decision propia del PO, no se resuelven por sustitucion.
+
+---
+
+### 📦 Archivadas / Descartadas (3)
+
+#### [PLAY-033] Localizacion formal en espanol (docs/es/)
+- **Prioridad**: `p3` | **Tipo**: `feature`
+
+PLAY-029 dejo todo el core en ingles tecnico, y el plan original de "golden repo" lo dejo explicito: si se quiere soporte en espanol, debe existir como localizacion formal en `docs/es/`, nunca mezclado en el mismo archivo. Eso no se hizo y tampoco se registro. Queda como item exploratorio porque es una decision de producto, no una tarea de implementacion.
+
+Contexto que la vuelve real: el backlog de este repo y `docs/BACKLOG.md` se escriben en espanol porque son del repo propio y no llegan a los consumidores. La pregunta es si esa preferencia se extiende a la capa que si se instala.
+
+**Criterios de Aceptación:**
+- [x] #1 Decision de producto registrada: el playbook declara explicitamente que su capa instalable es solo-ingles en documentacion y notas de release, permitiendo la parametrizacion de idioma del consumidor en su propio AGENTS.md.
+- [x] #2 La politica queda establecida: no se mantiene docs/es/ duplicado en el core para evitar desincronizacion y deuda de traduccion.
+- [x] #3 Ningun archivo mezcla dos idiomas en el mismo documento, y el sync al consumidor instala estrictamente archivos en ingles tecnico.
+
+---
+
+#### [PLAY-036] Resincronizar titulos y cuerpos de releases de GitHub con la norma de guion y el CHANGELOG en ingles
+- **Prioridad**: `p3` | **Tipo**: `decision`
+
+La revision de `dev` tras la v2.6.0 verifico que lo publicado en GitHub diverge del CHANGELOG ya corregido:
+
+1. **El cuerpo del release v2.6.0** todavia contiene las entradas originales en espanol de PLAY-031 ("ASCII diagrama estatico en el primer fold...") y PLAY-034 ("QA Ciega y Anti-Self-Certification..."), mientras que `CHANGELOG.md` ya las tiene en ingles tras `2b56029`. Verificado con `gh release view v2.6.0 --json body`.
+
+2. **Cinco titulos de release usan em-dash como separador**, lo que la Standard Hyphen Rule de AGENTS.md cubre explicitamente ("release titles"): `v2.2.2 — Zero-network sync...`, `v2.2.1 — UX-010...`, `v2.2.0 — Punto de extension...`, `v2.1.0 — Anatomia de unidad...`, `v2.0.0 — Agentic Team Playbook`. Los releases desde v2.3.0 usan solo el numero, sin separador.
+
+Los releases de GitHub son artefactos publicados e inmutables por convencion; corregirlos es decision del PO, no una consecuencia mecanica de arreglar el CHANGELOG local. Este item existe para que la decision quede registrada y no se pierda.
+
+**Criterios de Aceptación:**
+- [x] #1 Decision del PO registrada sobre el cuerpo de v2.6.0: (b) se deja como quedo en el momento de publicacion y se anota que el CHANGELOG es la fuente canonica vigente.
+- [x] #2 Decision del PO registrada sobre los 5 titulos con em-dash (v2.0.0, v2.1.0, v2.2.0, v2.2.1, v2.2.2): (b) se declaran exemptos como historico inmutable y la norma aplica desde v2.3.0 en adelante.
+- [x] #3 La decision tomada queda reflejada en la documentacion que el consumidor ve: los releases historicos quedan como registro historico inmutable y CHANGELOG.md rige como fuente canonica.
+- [x] #4 Los cambios, si los hay, no tocan tags ni el paquete npm publicado; solo metadatos del release en GitHub.
+
+---
+
+#### [PLAY-039] El adaptador de Cursor declara como canonico un archivo que no existe: .agents/rules/git-workflow.md
+- **Prioridad**: `p2` | **Tipo**: `bug`
+
+`scripts/lib/adapters.mjs:118-130` define `renderCursorGitRule()`, que genera para el consumidor un archivo de reglas de Cursor con este cuerpo:
+
+```
+# Git workflow
+
+Canonical source: `.agents/rules/git-workflow.md` - read it before any `git commit` or `git push`.
+
+<las cinco GIT_RULES, inline>
+```
+
+La linea "Canonical source" apunta a `.agents/rules/git-workflow.md`. **Ese archivo no existe.** Verificado con un glob sobre `**/git-workflow.md` en el repo de gripm: cero resultados.
+
+El efecto es que todo agente de Cursor recibe una orden explicita de leer un archivo ausente antes de cualquier `git commit` o `git push`. Las reglas si estan presentes, inline debajo de la referencia; pero la instruccion manda a buscarlas a otro lado.
+
+Es doblemente ironico porque el contenido es correcto: el archivo inventado se llamaria "canonical source" del mismo texto que ya esta embebido. La referencia no aporta nada aunque existiera, salvo un segundo lugar donde mantenerlo.
+
+Este defecto se detecto de forma indirecta: al releer `GIT_RULES` para investigar un problema de colision multi-agente (PLAY-038), la referencia canonica aparecio como primera linea de la regla generada, y su objetivo no estaba en el arbol.
+
+**Criterios de Aceptación:**
+- [ ] #1 La linea "Canonical source" se elimina de `renderCursorGitRule()`, o se sustituye por una ruta que exista y que el init realmente instale.
+- [ ] #2 No queda ninguna referencia a `.agents/rules/git-workflow.md` en el repo: `grep -r "git-workflow.md"` devuelve vacio en `scripts/` y en los templates.
+- [ ] #3 Si la decision es eliminar la linea, se documenta en las notas por que las reglas inline son la fuente unica y no un archivo aparte.
+- [ ] #4 `npm run check:all` sale con 0 tras el cambio.
 
 ---

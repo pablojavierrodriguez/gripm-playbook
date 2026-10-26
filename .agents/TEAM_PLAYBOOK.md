@@ -81,15 +81,15 @@ To prevent agents from colliding blindly or requiring human intervention as an i
 
 1. **Pre-Flight Concurrency Probe (Synchronous & Mandatory):**  
    Before editing code or altering branches, every newly invoked agent inspects the backlog for items with `status: doing` and runs `git status --porcelain`.  
-   - If it detects an item in `doing` with a `claimed_by` different from its own identity, it **dynamically discovers its active peer**.
-   - **Shared Tree Safeguard:** Prohibited to execute `git checkout .`, `git restore .`, or `git clean` on a working tree with in-flight changes from another agent.
+   - If it detects an item in `doing` with a `claimed_by` different from its own identity, or uncommitted changes (`A `, `M `) in `git status --porcelain` not authored by the current session, it **dynamically discovers an active peer or foreign in-flight changes**.
+   - **Shared Tree Safeguard & Mandatory Isolation:** Prohibited to execute `git checkout .`, `git restore .`, or `git clean` on a working tree with in-flight changes from another agent. The detecting agent immediately self-isolates in a worktree.
 2. **Dynamic Task Claiming Namespaced (`claimed_by`):**  
    When moving an item to `status: doing`, the agent atomically stamps its complete identity in the YAML frontmatter under the canonical format `<provider_or_harness>:<session_or_agent_id>`:
    - `antigravity:7e5f1a7d-1f19-46fd-bb33-baa4c0394372`
    - `cursor:composer-b82f1...`
    - `claude-code:session_01...`
    - `copilot:run-4819...`
-   - `human:pablo`  
+   - `human:<username>`  
    The item in `doing` serves as the Single Source of Truth for the active lease.
 3. **Autonomous Peer Handshake & Cross-Harness Protocol:**  
    - **Intra-Harness (same runtime, e.g., `antigravity:` to `antigravity:`):** Issues a direct message (`send_message` with `Recipient: claimed_by`) announcing its presence and scope to coordinate or sequence work autonomously without human intermediation.
@@ -111,7 +111,7 @@ To prevent agents from colliding blindly or requiring human intervention as an i
 [ 2. Research & Design ] (Market Researcher + Product Designer)
           │
           ▼
-[ 3. Dev Execution ] (Principal Engineer) ─────────► status: (pool) ➔ doing ➔ review
+[ 3. Dev Execution ] (Principal Engineer) ─────────► status: draft ➔ doing ➔ review
           │
           ▼
 [ 4. QA Gate & Certification ] (QA Auditor) ──► status: review ➔ ready (Formal Handover)
@@ -132,7 +132,7 @@ Transitions, actors, and guards are specified in [STATE_MACHINE.md](STATE_MACHIN
 - **Output:** Populates design spec, interactive states, and edge-case handling.
 
 ### Phase 3: Dev Execution (`doing` ➔ `review`) (Principal Engineer)
-- **Action:** Implements modular, strictly typed code adhering to domain invariants. **Architecture-First:** establishes module boundaries and public contracts before coding if undefined. **Strict Modularity:** enforces hard ceiling of < 1000 LOC per file (target 150 - 500 LOC) and separates presentation, business logic, and infrastructure (zero God-Files). Claims the item by moving it `(pool)` ➔ `doing` - only after the refinement gate passed.
+- **Action:** Implements modular, strictly typed code adhering to domain invariants. **Architecture-First:** establishes module boundaries and public contracts before coding if undefined. **Strict Modularity:** enforces hard ceiling of < 1000 LOC per file (target 150 - 500 LOC) and separates presentation, business logic, and infrastructure (zero God-Files). Claims the item by moving it `draft` ➔ `doing` - only after the refinement gate passed.
 - **Ticking ACs:** Checks off acceptance criteria in real-time (`- [x]`).
 - **Output:** Passes the item to `status: review` upon completing implementation and local testing. **Cannot self-certify:** moving to `ready` is exclusive to the QA Auditor.
 

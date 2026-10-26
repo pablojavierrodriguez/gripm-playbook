@@ -151,7 +151,10 @@ describe('runPlaybookSync with local source', () => {
     assert.equal(fs.readFileSync(path.join(targetDir, '.agents/STATE_MACHINE.md'), 'utf8'), '# State Machine Local');
     assert.equal(fs.readFileSync(path.join(targetDir, '.agents/TEAM_PLAYBOOK.md'), 'utf8'), '# Team Playbook Local');
 
-    const lock = JSON.parse(fs.readFileSync(path.join(targetDir, '.playbook-lock.json'), 'utf8'));
+    const lockFile = fs.existsSync(path.join(targetDir, '.gripm', 'playbook-lock.json'))
+      ? path.join(targetDir, '.gripm', 'playbook-lock.json')
+      : path.join(targetDir, '.playbook-lock.json');
+    const lock = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
     assert.equal(lock.ref, 'local');
     assert.equal(lock.version, '2.2.2');
     assert.ok(lock.files['.agents/STATE_MACHINE.md']);

@@ -40,8 +40,8 @@ If your change would make the core depend on a framework, it belongs in a stack 
 | Add or change a UX signature | `scripts/ux-rules.json` **and** `.agents/skills/code-level-ux-auditor/SKILL.md` |
 | Certify an item (`review` → `ready`) | `npm run gate:qa <PLAY-NNN>` must exit 0 |
 | Add a canonical file | `.playbook-manifest.json` |
-| Change a status or transition | `.agents/STATE_MACHINE.md` only — never redefine statuses elsewhere |
-| Change git governance | `.agents/rules/git-workflow.md` only — `AGENTS.md` links to it |
+| Change a status or transition | `.agents/STATE_MACHINE.md` only - never redefine statuses elsewhere |
+| Change git governance | `.agents/rules/git-workflow.md` only - `AGENTS.md` links to it |
 | Add a core skill | `.agents/skills/<name>/SKILL.md` |
 | Add a vertical skill | `.agents/stacks/<tech>/skills/<name>/SKILL.md` |
 
@@ -61,7 +61,7 @@ Separately, `npm run gate:qa <PLAY-NNN>` is the executable gate for the `review`
 
 `npm test` proves the suite is green. It does **not** prove that those cases would fail if the thing they claim to protect broke. Both are different claims, and only one of them gets tested by default.
 
-> This rule exists because the defect reached production **twice**. `UX-010` shipped with a single labelled fixture — `<button><span>Guardar</span></button>`. It had no icon, so `needsContent Icon` filtered it out before `unlessVisibleText` ever evaluated. The test asserted the capability without ever exercising it. The conclusion "it works" was defensible for the case measured and false for the case that mattered.
+> This rule exists because the defect reached production **twice**. `UX-010` shipped with a single labelled fixture - `<button><span>Guardar</span></button>`. It had no icon, so `needsContent Icon` filtered it out before `unlessVisibleText` ever evaluated. The test asserted the capability without ever exercising it. The conclusion "it works" was defensible for the case measured and false for the case that mattered.
 
 ### The rule
 
@@ -76,7 +76,7 @@ The check is concrete and takes two minutes:
 3. **Observe a failure.** No failure means the test does not cover the capability.
 4. Re-apply the fix. Confirm green.
 
-**Revert the whole fix, not half of it.** A partial revert can leave the behaviour intact and prove nothing. If reverting one protection does not drop a test, the test may be covering the other one — revert both and check that the case actually fails.
+**Revert the whole fix, not half of it.** A partial revert can leave the behaviour intact and prove nothing. If reverting one protection does not drop a test, the test may be covering the other one - revert both and check that the case actually fails.
 
 > A test whose assertion cannot fail under any input is decoration. `assert.equal(new Set(mapKeys).size, mapKeys.length)` can never fail: `Map` keys are unique by construction. Assert the detector directly against a purpose-built fixture instead.
 
@@ -102,7 +102,7 @@ Absence assertions are the mechanism behind this failure mode: they go green for
 2. Use `requires.deps` if the rule only makes sense when a library is present. Stack-agnostic rules omit it.
 3. Document it in `.agents/skills/code-level-ux-auditor/SKILL.md` as `### N. [UX-0NN] · SEVERITY · Title`, with the title copied verbatim from the catalog.
 4. Add a positive and a negative fixture under `tests/fixtures/`.
-5. Add the id to the "every catalogued rule fires" coverage — the test fails if a catalogued rule has no fixture.
+5. Add the id to the "every catalogued rule fires" coverage - the test fails if a catalogued rule has no fixture.
 6. **Revert the fix and watch the new test fail.** This is not optional and not covered by `npm test`. See [A test that passes for the wrong reason is a defect](#a-test-that-passes-for-the-wrong-reason-is-a-defect).
 
 ## Adding a status or a transition
@@ -133,7 +133,7 @@ Use Conventional Commits with a structured body when a change spans modules.
 
 ## Reporting a bug
 
-Include the install method, the target stack, the Node version, and the command that reproduces it. If the issue is an inconsistency inside the framework, run `npm run validate` first — it may already be reporting it.
+Include the install method, the target stack, the Node version, and the command that reproduces it. If the issue is an inconsistency inside the framework, run `npm run validate` first - it may already be reporting it.
 
 ## License
 

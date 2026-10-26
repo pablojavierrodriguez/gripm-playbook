@@ -150,69 +150,41 @@ const user = payload as TotalUserResponse
 > [!CAUTION]
 > **Lesson recorded in this repository's history:** a fixture passed for the wrong reason (not because the rule under test was satisfied, but because the module isolation swallowed the path it was supposed to verify). Operational rule: when a test passes, verify **why** it passes before declaring it coverage. A test that passes without exercising its objective is a defect with a green check.
 
-### 13. Anti-Slop Linter Recipe (Oxlint / AST)
+### 13. Systematic Debugging Protocol
 
-For TypeScript/JavaScript projects consuming the playbook, the recommended deterministic linter is **Oxlint** (ultra-fast Rust-based AST analysis, 50-100x faster than classic ESLint), integrable as a deterministic gate in Step 1 of the Verification Pyramid:
+When diagnosing or fixing a defect or test failure, guessing or trying fixes blindly is strictly prohibited. Modifying production code before isolating the exact root cause creates superficial patches that leave underlying defects intact and rot the codebase.
 
-#### 1. Recommended configuration (`.oxlintrc.json`)
+Follow this 4-phase investigation protocol:
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "unicorn",
-    "oxc"
-  ],
-  "categories": {
-    "correctness": "error",
-    "suspicious": "warn"
-  },
-  "rules": {
-    "typescript/no-explicit-any": "error",
-    "typescript/no-unsafe-argument": "error",
-    "typescript/no-unsafe-assignment": "error",
-    "typescript/no-unsafe-call": "error",
-    "typescript/no-unsafe-member-access": "error",
-    "typescript/no-unsafe-return": "error",
-    "eslint/no-constant-condition": "error",
-    "eslint/no-debugger": "error",
-    "eslint/no-duplicate-case": "error",
-    "eslint/no-empty": ["error", { "allowEmptyCatch": false }],
-    "unicorn/no-unnecessary-await": "error",
-    "unicorn/prefer-ternary": "warn"
-  },
-  "ignorePatterns": [
-    "dist/**",
-    "build/**",
-    "coverage/**",
-    "node_modules/**"
-  ]
-}
-```
+1. **Phase 1: Isolated Reproduction**
+   - Reproduce the failure with the minimal possible surface area. Do not touch production code.
+   - Run tests or CLI invocations directly to witness the exact failure signature and error output.
+2. **Phase 2: Backward Flow Tracing**
+   - Trace the execution path backwards from the point of failure (the throw, the broken assertion, or incorrect output) to the earliest moment state diverged from expectation.
+   - Inspect call stack, inputs, preconditions, and invariants across module boundaries.
+3. **Phase 3: Single Testable Hypothesis**
+   - Formulate exactly one falsifiable hypothesis explaining why the defect occurs.
+   - Verify whether the hypothesis explains all observed symptoms, edge cases, and logs.
+4. **Phase 4: Red Test Verification**
+   - **Never touch production code without an automated test that reproduces the defect and fails (RED).**
+   - Write or isolate the minimal test that fails precisely due to the identified defect.
+   - Apply the fix (GREEN), confirm the test passes, and verify that no regressions were introduced across the suite.
 
-#### 2. Integration recipe in `package.json`
+#### Circuit Breaker (Anti-Thrashing Directive)
 
-```json
-{
-  "scripts": {
-    "lint:anti-slop": "oxlint --deny-warnings --config .oxlintrc.json",
-    "lint": "oxlint"
-  },
-  "devDependencies": {
-    "oxlint": "^0.15.0"
-  }
-}
-```
+If a fix attempt fails to pass the red test or introduces secondary failures:
+- **Maximum 2 attempts:** After two consecutive failed fix attempts, **immediately STOP**.
+- **Revert and Reset:** Revert all speculative code modifications (`git restore` on touched files in the active worktree or branch).
+- **Re-evaluate:** Do not stack workarounds on top of a failed hypothesis. Re-examine baseline assumptions, retrace data flow from scratch, or consult the human PO for missing business domain clarification.
 
-#### 3. AST evasion detection rules (no-chained-assertions)
+---
 
-For projects with additional ESLint/AST plugin support (`@typescript-eslint/eslint-plugin` or `dmmulroy/anti-slop`), enable:
-- `@typescript-eslint/consistent-type-assertions`: `["error", { "assertionStyle": "as", "objectLiteralTypeAssertions": "never" }]`
-- `@typescript-eslint/no-unnecessary-type-assertion`: `"error"`
-- **`as unknown as` evasion detection:** block via AST analysis or static check any sequence matching `as\s+unknown\s+as|as\s+any\s+as`.
+### 14. Anti-Slop Linter Reference (Oxlint / AST)
 
-In CI, `npm run lint:anti-slop` must run with a blocking exit code 1 before headless tests.
+For deterministic static analysis rules, `.oxlintrc.json` configuration, and AST evasion detection recipes against AI code slop, see:
+[`references/oxlint-anti-slop.md`](references/oxlint-anti-slop.md)
+
+---
 
 ---
 

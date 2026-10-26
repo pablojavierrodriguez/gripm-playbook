@@ -28,7 +28,7 @@ export const HARNESS_CHOICES = [
 
 const NON_NEGOTIABLES = [
   '**No commit and no push without explicit verbal authorization.** "Looks good", "ok" and "proceed" mean implement code only.',
-  '**Every change maps to a task in `backlog/tasks/`.** Dev moves `draft` to `doing` to `review`; only a clean-context QA sub-agent moves `review` to `ready` via `node scripts/gate-qa.mjs <ID>` (exit code 0).',
+  '**Every change maps to a task in `backlog/tasks/`.** Dev moves `draft` to `doing` to `review`; only a clean-context QA sub-agent moves `review` to `ready` via `gate-qa <ID>` or `playbook gate <ID>` (or `node scripts/gate-qa.mjs <ID>`, exit code 0).',
   '**Never mark `done` during development.** `done` is reserved for a real release deploy.',
   '**Run the Verification Pyramid before any promotion:** repo consistency, headless tests, spec and backlog consistency, static UX audit, build.',
   '**No browser sub-agent for logic, state, API or persistence.** Those are audited headlessly in milliseconds.',
@@ -38,9 +38,11 @@ const NON_NEGOTIABLES = [
 
 const GIT_RULES = [
   'Never commit or push without explicit verbal authorization for **each** action.',
+  'Commits, branches, and PRs must be 100% in imperative English (Conventional Commits), translating from Spanish tickets if necessary.',
   'One task, one consolidated commit: the code and the task file.',
   'Never run `git checkout` or `git restore` in the primary working tree while another agent works here.',
   'A `doing` item carrying a foreign `claimed_by` owns the tree: never revert or clean it.',
+  'Foreign uncommitted changes in `git status --porcelain` (files `A ` or `M ` not created by the active session) mandate immediate worktree isolation: do not struggle with the dirty index or revert foreign work, isolate via worktree instead.',
   'Parallel work runs in isolated worktrees: `git worktree add -b <branch> ../<repo>-<task>`.',
 ]
   .map((item) => `- ${item}`)
