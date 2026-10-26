@@ -1,13 +1,14 @@
 ---
 id: PLAY-043
 title: "Purga de project bleed y acoplamiento residual en stack packs de react y mobile"
-status: draft
+status: done
 created_date: '2026-10-25'
-updated_date: '2026-10-25'
+updated_date: '2026-10-26'
 labels: ["stacks", "refactor", "portability"]
 dependencies: [PLAY-042]
 priority: high
 type: chore
+claimed_by: "antigravity:dev"
 ---
 
 ## Description
@@ -24,11 +25,11 @@ Es necesario sanitizar estos skills para que provean patrones canonicos autocont
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] Sanitizar `forms-rhf-zod/SKILL.md` removiendo la dependencia a la skill inexistente `i18next-namespaces` y encapsulando los helpers de entrada de miles/decimales o documentando su contrato generico.
-- [ ] Desacoplar `ui-radix-tailwind/SKILL.md` de rutas fijas inexistentes (`date-range-picker.tsx`) convirtiendo los ejemplos en snippets autocontenidos y neutrales.
-- [ ] Eliminar selectores CSS hiper-especificos y referencias de hooks privados de `mobile-ux-design/SKILL.md`.
-- [ ] Estandarizar el idioma de los skills de stacks al estandar ingles (alineado con los demas skills del playbook) o documentar formalmente su alcance.
-- [ ] `npm run validate` ejecuta y aprueba con 0 errores.
+- [x] Sanitizar `forms-rhf-zod/SKILL.md` removiendo la dependencia a la skill inexistente `i18next-namespaces` y encapsulando los helpers de entrada de miles/decimales o documentando su contrato generico.
+- [x] Desacoplar `ui-radix-tailwind/SKILL.md` de rutas fijas inexistentes (`date-range-picker.tsx`) convirtiendo los ejemplos en snippets autocontenidos y neutrales.
+- [x] Eliminar selectores CSS hiper-especificos y referencias de hooks privados de `mobile-ux-design/SKILL.md`.
+- [x] Estandarizar el idioma de los skills de stacks al estandar ingles (alineado con los demas skills del playbook) o documentar formalmente su alcance.
+- [x] `npm run validate` ejecuta y aprueba con 0 errores.
 <!-- AC:END -->
 
 ## Implementation Plan

@@ -22,12 +22,23 @@ Execute **in strict order**. Each step is cheaper than the next; skipping one is
 | 1 | Strict typecheck | ms | Yes |
 | 2 | Headless tests | s | Yes |
 | 3 | Spec - backlog consistency | s | Yes |
-| 4 | Production build | s - min | Yes |
+| 4 | File budget & modularity (< 1000 LOC) | ms | Advisory (blocking with `--strict`) |
 | 5 | Static UX audit | s | Yes |
-| 6 | Real browser | min | **Only if not statically deducible** |
+| 6 | Production build | s - min | Yes (optional if bundle-free) |
+| 7 | Real browser | min | **Only if not statically deducible** |
 
 > [!CAUTION]
 > **Prohibited: opening a browser for what resolves headlessly in milliseconds.** API contracts, state logic, computation, persistence, and formatting are verified with types, tests, and the static auditor. The browser is reserved for CSS/layout not statically deducible, or on explicit user request.
+
+### Step 4 - File Budget & Modularity
+
+```bash
+node scripts/check-loc.mjs
+# or in gate-qa with strict enforcement:
+node scripts/gate-qa.mjs TASK-ID --strict
+```
+
+Verifies the 1000 LOC ceiling per source file. By default it runs in advisory mode respecting PO sovereignty (technical debt notice, non-blocking exit 0). When invoked with `--strict`, any file >= 1000 LOC blocks certification (exit 1).
 
 ### Step 5 - Static UX Audit
 
@@ -63,12 +74,13 @@ The runner mechanically verifies:
 2. **All** ACs are marked `- [x]`. Names those that are missing.
 3. `status: review`. Nothing else can be certified.
 4. `blocked_reason` coherence: mandatory if `status: blocked`, invalid in any other status.
-5. **Every** task in `dependencies:` exists on disk and is in `done`.
-6. The blocking steps of the Pyramid actually ran and exited with code 0. **If no step was executed, the gate fails.**
+5. **Every** task in `dependencies:` exists on disk and is in `ready` or `done`.
+6. **Anti-slop check:** git diff is free of type evasions (`as unknown as`, `as any as`) in production code.
+7. The blocking steps of the Pyramid actually ran and exited with code 0. **If no step was executed, the gate fails.**
 
-A blocking step (`validate`/`typecheck`, `test`, `spec`, `audit:ux`) that has no defined script fails the gate. The `build` step is blocking whenever the project defines a `"build"` script in `package.json` (only reported as `SKIPPED` for bundle-free packages like a pure CLI). A pyramid where nothing ran leaves the item unverified, and an unverified item cannot be certified.
+A blocking step (`validate`/`typecheck`, `test`, `spec`, `audit:ux`) that has no defined script fails the gate. Modularity (`loc`) is advisory by default and blocking when `--strict` is passed. The `build` step is blocking whenever the project defines a `"build"` script in `package.json` (only reported as `SKIPPED` for bundle-free packages like a pure CLI). A pyramid where nothing ran leaves the item unverified, and an unverified item cannot be certified.
 
-Exit codes: `0` certified (the script mutates `status: ready` on disk) · `1` failure (file left intact) · `2` inspection only (`--no-run`), which never certifies.
+Exit codes: `0` certified (all checks pass, the script mutates `status: ready` on disk) · `1` failure (inspection or pyramid failed, file left intact) · `2` fatal usage or inspection-only mode (`--no-run`), which never certifies.
 
 > The runner mutates `status: ready` only after obtaining `exit 0`, and the QA sub-agent in a clean context window documents the verdict in the `[QA MATRIX]` after checking the `git diff` against the ACs.
 

@@ -12,7 +12,7 @@ Esta skill permite auditar y verificar que los recursos de la PWA estén correct
 Para verificar la consistencia del manifest y sus íconos:
 
 ```bash
-node .agents/skills/pwa-assets-audit/scripts/validate-manifest.mjs
+node .agents/stacks/pwa/skills/pwa-assets-audit/scripts/validate-manifest.mjs
 ```
 
 ## Checklist Manual

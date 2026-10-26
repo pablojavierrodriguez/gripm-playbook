@@ -1,13 +1,14 @@
 ---
 id: PLAY-045
 title: "Enforcement mecanico de presupuesto de archivo y reglas anti-slop en gate-qa"
-status: draft
+status: done
 created_date: '2026-10-25'
-updated_date: '2026-10-25'
+updated_date: '2026-10-26'
 labels: ["gate", "principal-engineer", "qa-gate"]
 dependencies: []
 priority: medium
 type: feature
+claimed_by: "antigravity:dev"
 ---
 
 ## Description
@@ -23,10 +24,10 @@ Integrar estas verificaciones mecanicas en el ciclo de promocion robustece la ga
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] Incorporar el paso de chequeo de modularidad (`check-loc.mjs`) o inspeccion de presupuesto dentro de `scripts/gate-qa.mjs` o la piramide de verificacion, con comportamiento configurable o claramente documentado.
-- [ ] Incorporar chequeo estatico o regex en `scripts/gate-qa.mjs` / `inspectTask` para advertir o bloquear la presencia de `as unknown as` y `as any as` en archivos modificados.
-- [ ] Actualizar la documentacion de `qa-auditor/SKILL.md` para reflejar con precision los pasos y exit codes reales del runner mecanico.
-- [ ] `npm test` y `npm run validate` pasan en verde.
+- [x] Incorporar el paso de chequeo de modularidad (`check-loc.mjs`) o inspeccion de presupuesto dentro de `scripts/gate-qa.mjs` o la piramide de verificacion, con comportamiento configurable o claramente documentado.
+- [x] Incorporar chequeo estatico o regex en `scripts/gate-qa.mjs` / `inspectTask` para advertir o bloquear la presencia de `as unknown as` y `as any as` en archivos modificados.
+- [x] Actualizar la documentacion de `qa-auditor/SKILL.md` para reflejar con precision los pasos y exit codes reales del runner mecanico.
+- [x] `npm test` y `npm run validate` pasan en verde.
 <!-- AC:END -->
 
 ## Implementation Plan

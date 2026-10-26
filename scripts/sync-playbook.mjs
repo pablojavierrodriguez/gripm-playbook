@@ -37,24 +37,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { routeCli } from './lib/cli-router.mjs';
 import { c, promptConfirm } from './lib/terminal.mjs';
+import { HISTORY_BUDGET, makeBudget, fetchRemoteFile, resolveRef, findCanonicalProvenance } from './lib/provenance.mjs';
 import {
-  HISTORY_BUDGET,
-  makeBudget,
-  fetchRemoteFile,
-  resolveRef,
-  findCanonicalProvenance,
-} from './lib/provenance.mjs';
-import {
-  CANONICAL_LOCK_PATH,
-  LEGACY_LOCK_PATH,
-  LOCK_PATH,
-  sha256,
-  classifyLocalFile,
-  findOrphanedFiles,
-  pruneOrphanedFiles,
-  pruneLegacyScripts,
-  readLock,
-  planFiles,
+  CANONICAL_LOCK_PATH, LEGACY_LOCK_PATH, LOCK_PATH, sha256, classifyLocalFile,
+  findOrphanedFiles, pruneOrphanedFiles, pruneLegacyScripts, readLock, planFiles,
 } from './lib/sync-classifier.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -83,6 +69,7 @@ export const FALLBACK_CORE_FILES = [
   'scripts/gate-qa.mjs',
   'scripts/gate-review-items.mjs',
   'scripts/check-loc.mjs',
+  'scripts/validate-commit-msg.mjs',
   'scripts/ux-rules.json',
   'scripts/sync-playbook.mjs',
   'scripts/init.mjs',
@@ -91,6 +78,7 @@ export const FALLBACK_CORE_FILES = [
   'scripts/lib/adapters.mjs',
   'scripts/lib/pyramid.mjs',
   'scripts/lib/task-inspection.mjs',
+  'scripts/lib/anti-slop.mjs',
   'scripts/lib/provenance.mjs',
   'scripts/lib/sync-classifier.mjs',
   'scripts/lib/cli-router.mjs',
@@ -112,6 +100,7 @@ export const FALLBACK_STACKS = {
   pwa: [
     '.agents/stacks/pwa/STACK.md',
     '.agents/stacks/pwa/skills/pwa-assets-audit/SKILL.md',
+    '.agents/stacks/pwa/skills/pwa-assets-audit/scripts/validate-manifest.mjs',
   ],
 };
 
@@ -120,8 +109,7 @@ async function loadManifest(remote, ref, sourceDir = null) {
   if (!content) return null;
   try {
     const manifest = JSON.parse(content);
-    if (!manifest.core || !Array.isArray(manifest.core)) return null;
-    return manifest;
+    return (manifest.core && Array.isArray(manifest.core)) ? manifest : null;
   } catch {
     return null;
   }

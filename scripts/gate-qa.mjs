@@ -23,6 +23,7 @@ import {
   inspectTask,
   resolveActor,
   isSameActor,
+  syncConsolidatedBacklog,
 } from './lib/task-inspection.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -108,26 +109,7 @@ export function getExplicitRoot(argv = []) {
 const ROOT = resolveProjectRoot();
 const TASKS_DIR = path.join(ROOT, 'backlog', 'tasks');
 
-export function syncConsolidatedBacklog(projectRoot) {
-  if (!fs.existsSync(path.join(projectRoot, 'BACKLOG.md'))) return;
-  const scripts = readScripts(projectRoot);
-  const scriptName = ['backlog:sync', 'sync:backlog', 'backlog:export', 'export:backlog'].find((name) => Boolean(scripts[name]));
-  if (scriptName) {
-    try {
-      spawnSync('npm', ['run', '--silent', scriptName], { cwd: projectRoot, encoding: 'utf8', shell: process.platform === 'win32', stdio: 'ignore' });
-    } catch {}
-  } else if (fs.existsSync(path.join(projectRoot, 'scripts', 'sync-backlog.js'))) {
-    try {
-      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'sync-backlog.js')], { cwd: projectRoot, encoding: 'utf8', stdio: 'ignore' });
-    } catch {}
-  } else if (fs.existsSync(path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'))) {
-    try {
-      spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'verify-backlog-sync.js'), '--export'], { cwd: projectRoot, encoding: 'utf8', stdio: 'ignore' });
-    } catch {}
-  }
-}
-
-export { readFrontmatter, readACs, mutateTaskFrontmatter, inspectTask, resolveActor, isSameActor };
+export { readFrontmatter, readACs, mutateTaskFrontmatter, inspectTask, resolveActor, isSameActor, syncConsolidatedBacklog };
 
 export function loadTasks(tasksDir) {
   const dir = tasksDir || path.join(resolveProjectRoot(), 'backlog', 'tasks');
@@ -147,6 +129,7 @@ const PYRAMID_STEPS = [
   { id: 'validate', label: 'Repo consistency / typecheck', script: 'validate', fallbackScripts: ['typecheck'], blocking: true },
   { id: 'test', label: 'Headless tests', script: 'test', blocking: true },
   { id: 'spec', label: 'Spec ↔ backlog consistency', script: 'gate:review', blocking: true },
+  { id: 'loc', label: 'File budget & modularity (< 1000 LOC)', script: 'check:loc', fallbackScripts: ['check-loc'], blocking: false, optional: true },
   { id: 'audit:ux', label: 'Static UX audit', script: 'audit:ux:strict', blocking: true },
   { id: 'build', label: 'Production build', script: 'build', blocking: false, optional: true },
 ];
@@ -156,19 +139,40 @@ export function resolvePyramid(root = resolveProjectRoot(), options = {}) {
   const scripts = readScripts(root);
   const delegatesToPlaybook = (scriptName) => {
     const cmd = scripts[scriptName];
-    return typeof cmd === 'string' && /\bplaybook\s+(audit|review)\b/.test(cmd);
+    return typeof cmd === 'string' && /\bplaybook\s+(audit|review|loc)\b/.test(cmd);
   };
+  const isStrict = Boolean(options.strict || (process.argv && process.argv.includes('--strict')));
 
   const isAutonomous =
     options.autonomous ||
     (process.argv && process.argv.includes('--autonomous')) ||
     isInNodeModules ||
     delegatesToPlaybook('audit:ux:strict') ||
-    delegatesToPlaybook('gate:review');
+    delegatesToPlaybook('gate:review') ||
+    delegatesToPlaybook('check:loc');
 
   const steps = resolvePyramidSteps(root, PYRAMID_STEPS);
-  if (isAutonomous) {
-    for (const step of steps) {
+  for (const step of steps) {
+    if (step.id === 'loc' && isStrict) {
+      step.blocking = true;
+      if (scripts['check:loc:strict']) step.script = 'check:loc:strict';
+    }
+    if (isAutonomous) {
+      if ((!step.available || delegatesToPlaybook('check:loc')) && step.id === 'loc') {
+        const locScript = path.resolve(SCRIPT_DIR, 'check-loc.mjs');
+        if (fs.existsSync(locScript)) {
+          step.available = true;
+          step.runner = (r) => {
+            const args = isStrict ? [locScript, '--strict'] : [locScript];
+            const res = spawnSync(process.execPath, args, { cwd: r, encoding: 'utf8' });
+            if (res.status === 0) {
+              return { state: 'passed', detail: isStrict ? 'strict modularity passed (< 1000 LOC)' : 'file budget checked' };
+            }
+            const tail = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-4).join('\n      ');
+            return { state: 'failed', detail: `file budget failed (exit code ${res.status})${tail ? `\n      ${tail}` : ''}` };
+          };
+        }
+      }
       if ((!step.available || delegatesToPlaybook('audit:ux:strict')) && step.id === 'audit:ux') {
         step.available = true;
         step.runner = (r) => {
@@ -324,8 +328,8 @@ export function startMain(argv) {
   for (const dep of frontmatter?.dependencies || []) {
     const resolved = tasks.get(dep);
     if (!resolved) failures.push(`dependency "${dep}" does not exist in backlog/tasks/`);
-    else if (resolved.frontmatter.status !== 'done') {
-      failures.push(`dependency "${dep}" is "${resolved.frontmatter.status ?? '(missing)'}" (${resolved.file}) but must be "done"`);
+    else if (resolved.frontmatter.status !== 'done' && resolved.frontmatter.status !== 'ready') {
+      failures.push(`dependency "${dep}" is "${resolved.frontmatter.status ?? '(missing)'}" (${resolved.file}) but must be "ready" or "done"`);
     }
   }
   collisions.forEach((col) => {
@@ -366,7 +370,7 @@ export function submitMain(argv) {
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
   const { tasks, collisions } = loadTasks(tasksDir);
-  const failures = inspectTask({ content, frontmatter: { ...frontmatter, status: 'review' } }, tasks);
+  const failures = inspectTask({ content, frontmatter: { ...frontmatter, status: 'review' } }, tasks, { projectRoot });
   if (frontmatter?.status !== 'doing') {
     failures.unshift(`status is "${frontmatter?.status ?? '(missing)'}" but T1 only submits items in "doing"`);
   }
@@ -418,7 +422,7 @@ export function main(argv) {
   console.log(`    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
 
   const { tasks, collisions } = loadTasks(tasksDir);
-  const failures = inspectTask({ content, frontmatter }, tasks, { certifier });
+  const failures = inspectTask({ content, frontmatter }, tasks, { certifier, projectRoot });
 
   for (const collision of collisions) {
     failures.push(`task id "${collision.id}" is declared by two files: ${collision.files.join(' and ')}. Task identity must be unique`);
@@ -436,9 +440,11 @@ export function main(argv) {
   let pyramidRan = 0;
 
   if (runPyramid) {
-    const isAutonomous = argv.includes('--autonomous');
     const workRoot = projectRoot;
-    const steps = resolvePyramid(workRoot, { autonomous: isAutonomous });
+    const steps = resolvePyramid(workRoot, {
+      autonomous: argv.includes('--autonomous'),
+      strict: argv.includes('--strict'),
+    });
     console.log(`  ${c.bold('Verification pyramid:')}`);
     const execResult = executePyramid(steps, workRoot);
     pyramidFailed = execResult.pyramidFailed;

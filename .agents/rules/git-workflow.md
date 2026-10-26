@@ -17,10 +17,13 @@ Strict rules governing Git operations to prevent unintentional code loss or vagu
 
 ## Descriptive and Structured Commit Messages
 
+- **Mandatory English Rule:** All commit messages, branch names (`feat/...`, `fix/...`, `refactor/...`, `chore/...`), git tags (`vX.Y.Z`), and Pull Request titles/descriptions **must be 100% in imperative English** following Conventional Commits.
+- **Agent Translation Duty:** Even if the backlog task, ticket title, or conversation with the user is in Spanish (e.g. `[PLAY-047] Regla de git commits en ingles`), the agent has the methodological obligation to translate the commit header and body to English when committing (e.g. `feat(git-workflow): enforce english commits and commit-msg hook`). Never write commit messages in Spanish (e.g. `feat: agrega regla...` or `fix: corrige error...`).
 - **No Generic Messages:** Vague commits (e.g., *"fix bugs"*, *"update files"*, *"wip"*) are strictly forbidden.
 - **Structured Commit Anatomy:**
-  - **Header:** Meaningful title following Conventional Commits (`feat(...)`, `fix(...)`, `refactor(...)`, `docs(...)`).
+  - **Header:** Meaningful title following Conventional Commits (`feat(...)`, `fix(...)`, `refactor(...)`, `docs(...)`, `test(...)`, `chore(...)`).
   - **Body:** When a commit touches multiple areas, include a structured bulleted summary detailing the exact scope of changes so anyone outside the team understands what was changed and why.
+- **Mechanical Hook Enforcement:** Playbook provides `scripts/validate-commit-msg.mjs` (invocable via `playbook commit-msg <file>`) to mechanically reject non-conventional formats or Spanish terms in the header before git completes the commit.
 
 ---
 
@@ -75,9 +78,45 @@ git worktree prune                # clean references to manually deleted worktre
 ### Coexistence Rules
 
 - **One branch per worktree.** Git does not permit two worktrees to share the same branch: this is a core design constraint, not a preference.
-- **The primary worktree stays on `dev`.** It serves as the integration trunk. Agents do not check out branches there.
+- **The primary worktree stays on `dev` during development.** It serves as the active integration trunk. Feature branches and parallel interventions isolate in worktrees. The single controlled exception to this rule is the formal Release Deployment Protocol below.
 - **`git worktree remove` does not delete uncommitted changes.** If an agent terminates without consolidating, manually remove the worktree only after verifying no uncommitted work is lost.
 - **Parallel sub-agents:** if multiple sub-agents touch overlapping files, each operates in its own worktree. Working tree isolation **does not** isolate conflicting lines: two agents editing the same file will still conflict upon merge. See `.agents/TEAM_PLAYBOOK.md`.
+
+---
+
+## Release Deployment Protocol & Anti-Dev-Production Invariant
+
+> [!CAUTION]
+> **Anti-Dev-Production-Deploy Invariant:** Prohibited to execute production deployment commands (`vercel --prod`, cloud release CLIs, or production publish commands) from the `dev` branch. Production releases must originate physically and mechanically from the canonical trunk `main`. Marking `ready` ➔ `done` on items deployed from `dev` constitutes an infrastructure state lie.
+
+### Canonical Release Deployment Flow
+
+When all items for a release are verified and certified in `ready`:
+1. **Verification on `dev`:** Ensure `npm test` and `npm run validate` pass with 0 errors on `dev`.
+2. **Promote certified items to `done`:** Update task files from `ready` to `done` on disk and regenerate `BACKLOG.md`.
+3. **Commit release on `dev`:** Create the release commit (`chore(release): vX.Y.Z`).
+4. **Fast-forward merge into `main`:**
+   ```bash
+   git checkout main
+   git merge dev --ff-only
+   ```
+5. **Execute production deploy from `main`:**
+   Trigger the production deployment tool (or push to `main` if deployment is driven by CI):
+   ```bash
+   # If deploying via CLI:
+   vercel --prod
+   # If deploying via CI:
+   git push origin main
+   ```
+6. **Tag release on `main`:**
+   ```bash
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+7. **Return primary worktree to `dev`:**
+   ```bash
+   git checkout dev
+   ```
 
 ---
 

@@ -1,9 +1,9 @@
 ---
 id: PLAY-035
 title: "Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash"
-status: ready
+status: done
 created_date: '2026-10-21'
-updated_date: '2026-10-24'
+updated_date: '2026-10-26'
 labels:
   - "docs"
   - "changelog"

@@ -1,13 +1,14 @@
 ---
 id: PLAY-044
 title: "Unificacion de formato de tareas y reduccion de duplicacion DRY en documentacion troncal"
-status: draft
+status: done
 created_date: '2026-10-25'
-updated_date: '2026-10-25'
+updated_date: '2026-10-26'
 labels: ["documentation", "dry", "state-machine"]
 dependencies: []
 priority: medium
 type: refactor
+claimed_by: "antigravity:dev"
 ---
 
 ## Description
@@ -21,10 +22,10 @@ Existen dos problemas de coherencia y sobrecarga de contexto en la documentacion
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] Actualizar los ejemplos de definicion de tareas en `pm-orchestrator/SKILL.md` y `STATE_MACHINE.md` para reflejar fielmente la estructura real de archivo `backlog/tasks/*.md` con YAML frontmatter y bloques de criterios de aceptacion.
-- [ ] Aplicar DRY en `AGENTS.md`, `TEAM_PLAYBOOK.md` y `pm-orchestrator/SKILL.md`, consolidando `STATE_MACHINE.md` y `git-workflow.md` como unicas fuentes de verdad referenciadas por vinculos.
-- [ ] Reducir la sobrecarga de tokens de contexto sin debilitar las directivas no negociables del framework.
-- [ ] `npm run validate` valida con exito enlaces y vocabulario de estados.
+- [x] Actualizar los ejemplos de definicion de tareas en `pm-orchestrator/SKILL.md` y `STATE_MACHINE.md` para reflejar fielmente la estructura real de archivo `backlog/tasks/*.md` con YAML frontmatter y bloques de criterios de aceptacion.
+- [x] Aplicar DRY en `AGENTS.md`, `TEAM_PLAYBOOK.md` y `pm-orchestrator/SKILL.md`, consolidando `STATE_MACHINE.md` y `git-workflow.md` como unicas fuentes de verdad referenciadas por vinculos.
+- [x] Reducir la sobrecarga de tokens de contexto sin debilitar las directivas no negociables del framework.
+- [x] `npm run validate` valida con exito enlaces y vocabulario de estados.
 <!-- AC:END -->
 
 ## Implementation Plan

@@ -1,23 +1,23 @@
 # Stack Pack: Mobile
 
-Skills opcionales para equipos que entregan una **experiencia móvil**: responsive web, web app instalable o app nativa vía wrapper.
+Optional skills for teams delivering a **mobile experience**: responsive web, installable web apps (PWA), or hybrid apps via native wrappers.
 
-## Qué incluye
+## Included Skills
 
-| Skill | Aplica cuando |
+| Skill | Applies When |
 | :--- | :--- |
-| `mobile-ux-design` | Se diseñan o auditan interfaces móviles, sheets, teclado virtual, safe areas o integración nativa. |
+| `mobile-ux-design` | Designing or auditing mobile responsive interfaces, sheets, virtual keyboard resiliency, safe areas, or native Capacitor integration. |
 
-## Instalación
+## Installation
 
 ```bash
 node scripts/sync-playbook.mjs --stack mobile
 ```
 
-## Alcance
+## Scope
 
-Cubre **mobile web responsive** y, si tu proyecto lo usa, **Capacitor** para empaquetado nativo. Si tu app es puramente nativa (iOS/Android sin web), este pack no aplica: escribí tus propias reglas.
+Covers **mobile responsive web** and **Capacitor** native wrapping. For purely native Swift/Kotlin applications without a web runtime, define native invariants in your own project rules.
 
-## Dependencias
+## Dependencies
 
-Ninguna obligatoria. Secciones específicas asumen Capacitor y sus plugins (`@capacitor/haptics`, etc.) cuando el proyecto los usa.
+No required runtime dependencies. Specific sections assume Capacitor plugins (`@capacitor/haptics`, etc.) when enabled by the project.

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { inspectTask, loadTasks, mutateTaskFrontmatter, readFrontmatter, resolvePyramid, syncConsolidatedBacklog } from '../scripts/gate-qa.mjs';
+import { inspectDiffText, isTestOrFixturePath } from '../scripts/lib/anti-slop.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GATE = path.join(ROOT, 'scripts', 'gate-qa.mjs');
@@ -134,6 +135,15 @@ describe('dependency gate (PLAY-016 AC #3)', () => {
     const { file } = makeTask({ dependencies: ['PLAY-001', 'PLAY-002'] });
     const siblings = [
       ['PLAY-001', { file: 'a.md', content: '', frontmatter: { status: 'done' } }],
+      ['PLAY-002', { file: 'b.md', content: '', frontmatter: { status: 'done' } }],
+    ];
+    assert.deepEqual(inspectFile(file, siblings), []);
+  });
+
+  test('accepts dependencies that are in ready (same release candidate)', () => {
+    const { file } = makeTask({ dependencies: ['PLAY-001', 'PLAY-002'] });
+    const siblings = [
+      ['PLAY-001', { file: 'a.md', content: '', frontmatter: { status: 'ready' } }],
       ['PLAY-002', { file: 'b.md', content: '', frontmatter: { status: 'done' } }],
     ];
     assert.deepEqual(inspectFile(file, siblings), []);
@@ -481,7 +491,7 @@ describe('unblock command (PLAY-016 AC #4)', () => {
     const failures = inspectFile(file, siblings);
     const blockers = failures.filter((f) => f.startsWith('unblock refused'));
     assert.equal(blockers.length, 1, 'the guard must be the thing that reports the blocker');
-    assert.match(blockers[0], /must be "done" or unlinked/);
+    assert.match(blockers[0], /must be "ready" or "done" or unlinked/);
   });
 
   test('allows the unblock once the dependency is done', () => {
@@ -938,6 +948,93 @@ describe('mechanical state transitions (T0, T1, T2, T_unblock)', () => {
       }
       assert.equal(failed, true, 'gate must fail on unchecked AC');
       assert.equal(fs.readFileSync(backlogPath, 'utf8'), 'UNTOUCHED', 'failed gate must never touch BACKLOG.md');
+    });
+  });
+
+  describe('anti-slop diff inspection', () => {
+    test('isTestOrFixturePath identifies test and fixture files', () => {
+      assert.equal(isTestOrFixturePath('src/utils.ts'), false);
+      assert.equal(isTestOrFixturePath('src/components/Modal.tsx'), false);
+      assert.equal(isTestOrFixturePath('tests/unit.test.mjs'), true);
+      assert.equal(isTestOrFixturePath('src/__tests__/app.spec.ts'), true);
+      assert.equal(isTestOrFixturePath('fixtures/data.json'), true);
+    });
+
+    test('detects as unknown as and as any as in production files', () => {
+      const mockDiff = [
+        'diff --git a/src/service.ts b/src/service.ts',
+        '--- a/src/service.ts',
+        '+++ b/src/service.ts',
+        '@@ -10,3 +10,4 @@',
+        '+const data = response as unknown as UserData;',
+        '+const payload = raw as any as Target;',
+      ].join('\n');
+
+      const failures = inspectDiffText(mockDiff);
+      assert.equal(failures.length, 2);
+      assert.match(failures[0], /as unknown as/);
+      assert.match(failures[1], /as any as/);
+    });
+
+    test('ignores type evasions in test and fixture files', () => {
+      const testDiff = [
+        'diff --git a/tests/service.test.ts b/tests/service.test.ts',
+        '--- a/tests/service.test.ts',
+        '+++ b/tests/service.test.ts',
+        '@@ -5,3 +5,4 @@',
+        '+const fake = {} as unknown as User;',
+        '+const mock = {} as any as Config;',
+      ].join('\n');
+
+      const failures = inspectDiffText(testDiff);
+      assert.deepEqual(failures, []);
+    });
+
+    test('inspectTask integrates anti-slop failures when diffText is provided', () => {
+      const { file } = makeTask();
+      const content = fs.readFileSync(file, 'utf8');
+      const badDiff = [
+        'diff --git a/src/client.ts b/src/client.ts',
+        '--- a/src/client.ts',
+        '+++ b/src/client.ts',
+        '@@ -1,2 +1,3 @@',
+        '+const evasive = val as unknown as Type;',
+      ].join('\n');
+
+      const failures = inspectTask({ content, frontmatter: readFrontmatter(content) }, new Map(), {
+        diffText: badDiff,
+      });
+      assert.equal(failures.length, 1);
+      assert.match(failures[0], /anti-slop: type evasion "as unknown as" detected in src\/client\.ts/);
+    });
+  });
+
+  describe('file budget and modularity in pyramid', () => {
+    test('resolvePyramid includes loc step', () => {
+      const steps = resolvePyramid(ROOT);
+      const locStep = steps.find((s) => s.id === 'loc');
+      assert.ok(locStep, 'loc step must be present in pyramid');
+      assert.equal(locStep.blocking, false, 'loc step must be advisory (non-blocking) by default');
+      assert.equal(locStep.optional, true);
+    });
+
+    test('resolvePyramid configures loc step as blocking when strict is specified', () => {
+      const steps = resolvePyramid(ROOT, { strict: true });
+      const locStep = steps.find((s) => s.id === 'loc');
+      assert.ok(locStep);
+      assert.equal(locStep.blocking, true, 'loc step must be blocking when strict is enabled');
+      assert.equal(locStep.script, 'check:loc:strict');
+    });
+
+    test('autonomous runner executes check-loc and passes for clean repo', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-loc-'));
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'consumer' }));
+      const steps = resolvePyramid(dir, { autonomous: true });
+      const locStep = steps.find((s) => s.id === 'loc');
+      assert.ok(locStep);
+      assert.equal(typeof locStep.runner, 'function');
+      const outcome = locStep.runner(ROOT);
+      assert.equal(outcome.state, 'passed');
     });
   });
 });

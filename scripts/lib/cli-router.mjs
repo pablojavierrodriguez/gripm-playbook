@@ -26,6 +26,7 @@ export function printCliHelp() {
     ${c.cyan('gate')} <TASK-ID>     Execute QA verification pyramid and certify review → ready
     ${c.cyan('audit')}              Static code-level UX & accessibility audit
     ${c.cyan('check-loc')}          Mechanical file line budget (< 1000 LOC) checker
+    ${c.cyan('commit-msg')}         Validate Conventional Commits format and 100% English requirement
     ${c.cyan('review')}             Audit all backlog tasks currently in review
     ${c.cyan('help')}               Show this help message
 
@@ -81,6 +82,13 @@ export function routeCli(subcommand, rest, fallbackSync) {
     const result = spawnSync(process.execPath, [reviewScript, ...rest], {
       stdio: 'inherit',
       env: { ...process.env, GRIPM_ROOT: process.cwd() },
+    });
+    process.exit(result.status ?? 0);
+  } else if (subcommand === 'commit-msg' || subcommand === 'validate-commit' || subcommand === 'commit') {
+    const commitScript = path.join(SCRIPT_DIR, 'validate-commit-msg.mjs');
+    const result = spawnSync(process.execPath, [commitScript, ...rest], {
+      stdio: 'inherit',
+      env: process.env,
     });
     process.exit(result.status ?? 0);
   } else if (subcommand === 'help' || (subcommand && (subcommand === '--help' || subcommand === '-h') && rest.length === 0)) {

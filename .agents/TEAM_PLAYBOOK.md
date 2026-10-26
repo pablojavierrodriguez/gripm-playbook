@@ -111,7 +111,7 @@ To prevent agents from colliding blindly or requiring human intervention as an i
 [ 2. Research & Design ] (Market Researcher + Product Designer)
           │
           ▼
-[ 3. Dev Execution ] (Principal Engineer) ─────────► status: (pool) ➔ doing ➔ review
+[ 3. Dev Execution ] (Principal Engineer) ─────────► status: draft ➔ doing ➔ review
           │
           ▼
 [ 4. QA Gate & Certification ] (QA Auditor) ──► status: review ➔ ready (Formal Handover)
@@ -132,7 +132,7 @@ Transitions, actors, and guards are specified in [STATE_MACHINE.md](STATE_MACHIN
 - **Output:** Populates design spec, interactive states, and edge-case handling.
 
 ### Phase 3: Dev Execution (`doing` ➔ `review`) (Principal Engineer)
-- **Action:** Implements modular, strictly typed code adhering to domain invariants. **Architecture-First:** establishes module boundaries and public contracts before coding if undefined. **Strict Modularity:** enforces hard ceiling of < 1000 LOC per file (target 150 - 500 LOC) and separates presentation, business logic, and infrastructure (zero God-Files). Claims the item by moving it `(pool)` ➔ `doing` - only after the refinement gate passed.
+- **Action:** Implements modular, strictly typed code adhering to domain invariants. **Architecture-First:** establishes module boundaries and public contracts before coding if undefined. **Strict Modularity:** enforces hard ceiling of < 1000 LOC per file (target 150 - 500 LOC) and separates presentation, business logic, and infrastructure (zero God-Files). Claims the item by moving it `draft` ➔ `doing` - only after the refinement gate passed.
 - **Ticking ACs:** Checks off acceptance criteria in real-time (`- [x]`).
 - **Output:** Passes the item to `status: review` upon completing implementation and local testing. **Cannot self-certify:** moving to `ready` is exclusive to the QA Auditor.
 

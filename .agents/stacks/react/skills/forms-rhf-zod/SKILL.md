@@ -1,17 +1,17 @@
 ---
 name: forms-rhf-zod
-description: Usar esta skill siempre que se cree o modifique un formulario - esquemas de validación con Zod, configuración de React Hook Form, manejo de errores, o integración con componentes Radix UI. También cuando el usuario mencione formularios, validación, "form", inputs, o mensajes de error de campos.
+description: Best practices and patterns for forms using React Hook Form + Zod: schema validation, controlled inputs, error handling, Radix UI integration, and localized numeric formatting.
 ---
 
-# Formularios: React Hook Form + Zod
+# Forms: React Hook Form + Zod
 
-Patrón estándar para todos los formularios del proyecto.
+Standard patterns for robust, type-safe forms across the project.
 
-## Patrón base
+## Base Pattern
 
-1. Definir el schema de Zod (fuente de verdad de la validación).
-2. Inferir el tipo TS del schema (`z.infer<typeof schema>`) - nunca declarar el tipo del formulario a mano por separado, para que no se desincronice del schema.
-3. Conectar con `useForm` + `zodResolver`.
+1. Define the Zod validation schema (single source of truth for validation).
+2. Infer the TypeScript type from the schema (`z.infer<typeof schema>`) - never declare form types manually to avoid drift.
+3. Wire with `useForm` + `zodResolver`.
 
 ```ts
 import { z } from 'zod';
@@ -28,17 +28,17 @@ type FormValues = z.infer<typeof schema>;
 const { register, control, handleSubmit, formState: { errors } } =
   useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: '', name: '' },  // ← siempre inicializar con ""
+    defaultValues: { email: '', name: '' },  // always initialize with empty string
   });
 ```
 
 ---
 
-## Inputs siempre controlados - nunca `undefined`
+## Always Controlled Inputs - Never `undefined`
 
-**Regla crítica**: inicializar siempre todos los campos con `defaultValues` en `useForm`. Usar `""` (string vacío) para strings, nunca `undefined`.
+**Critical Rule:** Always initialize all fields in `defaultValues` within `useForm`. Use `""` (empty string) for strings, never `undefined`.
 
-Si un campo puede ser nulo desde la base de datos, usar `?? ''` al asignar:
+If a field can be null from a remote API or database, use `?? ''`:
 
 ```ts
 defaultValues: {
@@ -48,13 +48,13 @@ defaultValues: {
 }
 ```
 
-**Por qué**: React lanza el warning "A component is changing an uncontrolled input to be controlled" cuando el valor pasa de `undefined` a un string tras la carga inicial de datos. Inicializar siempre con string vacío previene re-renders innecesarios y warnings en consola.
+**Why:** React triggers the warning *"A component is changing an uncontrolled input to be controlled"* when value transitions from `undefined` to a string after initial fetch. Initializing with empty strings avoids unnecessary re-renders and console noise.
 
 ---
 
-## Integración con Radix UI
+## Radix UI Integration
 
-Los primitivos de Radix (`Select`, `Checkbox`, `RadioGroup`, etc.) no son `<input>` planos y no funcionan bien con `register()` directo. Para esos casos usar `Controller`:
+Radix primitives (`Select`, `Checkbox`, `RadioGroup`) are composite components, not raw `<input>` elements. Use `Controller` from `react-hook-form`:
 
 ```tsx
 <Controller
@@ -68,32 +68,31 @@ Los primitivos de Radix (`Select`, `Checkbox`, `RadioGroup`, etc.) no son `<inpu
 />
 ```
 
-Para `<input>`, `<textarea>` nativos, `register()` alcanza y es más simple.
+For native `<input>` and `<textarea>`, direct `register()` is simpler and fully sufficient.
 
 ---
 
-## Mensajes de error e i18n
+## Error Messages and Internationalization (i18n)
 
-Los mensajes en el schema de Zod deben ser **claves de traducción**, no texto plano. Usar el namespace `errors` del `es.json`:
+In internationalized projects, Zod error messages should be translation keys rather than hardcoded text:
 
 ```tsx
-// En el schema:
+// In the schema:
 z.string().email({ message: 'errors.emailInvalid' })
 
-// Al mostrar el error:
+// When rendering the error:
 {errors.email && <span>{t(errors.email.message)}</span>}
 ```
 
-Coordinar con la skill `i18next-namespaces` para verificar que la clave exista en `src/locales/es.json` bajo el namespace `errors`.
+If the project uses an i18n library (e.g., `react-i18next`), ensure translation keys exist under the appropriate namespace (e.g., `errors` or `validation`). In non-internationalized projects, clear literal strings can be passed directly.
 
 ---
 
-## Errores de servidor y APIs
+## Server and API Errors
 
-Si el backend devuelve un error de validación que no captura Zod (ej. "email ya registrado" o conflicto de unicidad), mapear al campo específico con `setError`:
+When the backend returns a domain validation error not caught client-side (e.g., unique email conflict), map to the specific field via `setError`:
 
 ```ts
-// En el catch del submit:
 if (error.status === 409 || error.code === 'CONFLICT') {
   setError('email', { type: 'server', message: 'api_errors.emailTaken' });
 } else {
@@ -101,16 +100,15 @@ if (error.status === 409 || error.code === 'CONFLICT') {
 }
 ```
 
-No usar errores genéricos de formulario cuando se puede mapear a un campo específico - mejora sustancialmente la UX.
+Mapping errors to specific fields dramatically improves UX over generic top-level error banners.
 
 ---
 
-## Objetos anidados y estructuras compuestas
+## Nested Objects and Composite Structures
 
-Para campos de objetos anidados (como metadatos o configuraciones estructuradas), guardar los campos con acceso por punto y proteger contra `undefined`:
+For nested object fields (such as metadata or structured settings), map dot-notation keys and protect against `undefined`:
 
 ```ts
-// ✅ Correcto - guardar contra undefined en defaultValues
 defaultValues: {
   metadata: {
     website: entity?.metadata?.website ?? '',
@@ -119,43 +117,46 @@ defaultValues: {
 }
 ```
 
-Garantizar siempre que las propiedades anidadas inicialicen con fallback para evitar warnings de reactividad cuando los datos provienen de fuentes asíncronas.
-
 ---
 
-## Inputs numéricos y valores decimales localizados
+## Localized Numeric Inputs and Decimal Values
 
-En aplicaciones con formato regional hispanohablante o europeo, los valores numéricos y métricas suelen presentarse con separador de miles por punto (`.`) y decimales por coma (`,`).
+In regional applications (e.g., European or Latin American numbering), numbers often format with `.` as thousands separator and `,` as decimal separator.
 
-**Regla de Oro:** Nunca usar `<input type="number">` para valores con decimales o importes si se pretende admitir decimales en español o separador de miles, ya que el navegador móvil/desktop fuerza la notación anglosajona (`.`) y rechaza comas.
+**Golden Rule:** Avoid `<input type="number">` for localized currency or decimal amounts. Browsers force Anglo-Saxon decimal dots (`.`) and reject localized comma notation. Use `<input type="text" inputMode="decimal">` with explicit format/parse helpers.
 
-### Patrón canónico con `formatThousandsInput` / `parseThousandsInput`
-
-1. Mantener en el estado/RHF el string formateado visible para el usuario (`1.500,00`).
-2. Sanitizar al parsear en Zod usando `z.preprocess` o convertir con `parseThousandsInput` al enviar al backend:
+### Canonical Pattern with Self-Contained Helpers
 
 ```ts
 import { z } from 'zod';
-import { formatThousandsInput, parseThousandsInput } from '@/lib/utils';
 
-// Schema Zod para valores numéricos localizados
+// Standalone formatting and parsing utilities
+export function parseThousandsInput(value: string): number {
+  if (typeof value === 'number') return value;
+  const normalized = value.replace(/\./g, '').replace(',', '.').trim();
+  return parseFloat(normalized);
+}
+
+export function formatThousandsInput(value: number, locale = 'es-ES'): string {
+  if (isNaN(value)) return '';
+  return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+}
+
+// Zod schema with preprocess
 export const amountSchema = z.preprocess(
   (val) => (typeof val === 'string' ? parseThousandsInput(val) : val),
-  z.number().positive({ message: 'El valor debe ser mayor a 0' })
+  z.number().positive({ message: 'Value must be greater than 0' })
 );
 ```
 
 ```tsx
-// Input controlado para valores numéricos con auto-formateo en blur o cambio
+// Controlled input with onBlur auto-formatting
 <input
   type="text"
   inputMode="decimal"
   placeholder="0,00"
   value={displayAmount}
-  onChange={(e) => {
-    // Permitir dígitos y coma/punto
-    setDisplayAmount(e.target.value);
-  }}
+  onChange={(e) => setDisplayAmount(e.target.value)}
   onBlur={() => {
     const numeric = parseThousandsInput(displayAmount);
     if (!isNaN(numeric)) {

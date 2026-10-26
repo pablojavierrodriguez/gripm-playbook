@@ -1,9 +1,9 @@
 ---
 id: PLAY-007
 title: "onlyFile debería enganchar el componente renderizado y no el nombre del archivo"
-status: ready
+status: done
 created_date: '2026-10-06'
-updated_date: '2026-10-24'
+updated_date: '2026-10-26'
 labels:
   - "engine"
   - "correctness"

@@ -1,13 +1,14 @@
 ---
 id: PLAY-042
 title: "Resolver contradicciones y bugs criticos en skills de stacks y auditoria"
-status: draft
+status: done
 created_date: '2026-10-25'
-updated_date: '2026-10-25'
+updated_date: '2026-10-26'
 labels: ["stacks", "ux-audit", "integrity"]
 dependencies: []
 priority: high
 type: bug
+claimed_by: "antigravity:dev"
 ---
 
 ## Description
@@ -22,11 +23,11 @@ Existen contradicciones directas entre los skills de stacks y las reglas determi
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] Corregir `mobile-ux-design/SKILL.md` para prescribir `pb-32` + `env(safe-area-inset-bottom)` alineado con `UX-006`.
-- [ ] Corregir `ui-radix-tailwind/SKILL.md` eliminando `text-[9px]` / `text-[10px]` y sustituyendo colores hardcodeados por tokens semanticos del design system.
-- [ ] Proveer la implementacion real de `validate-manifest.mjs` (o registrarla e instalarla via manifest) o corregir la invocacion documental en `pwa-assets-audit/SKILL.md`.
-- [ ] Extender `scripts/validate-repo.mjs` en `checkDocsReferenceInstalledFiles()` para que inspeccione tambien los archivos de documentacion dentro de `.agents/stacks/`.
-- [ ] `npm run validate` y `npm test` pasan en verde con 0 errores.
+- [x] Corregir `mobile-ux-design/SKILL.md` para prescribir `pb-32` + `env(safe-area-inset-bottom)` alineado con `UX-006`.
+- [x] Corregir `ui-radix-tailwind/SKILL.md` eliminando `text-[9px]` / `text-[10px]` y sustituyendo colores hardcodeados por tokens semanticos del design system.
+- [x] Proveer la implementacion real de `validate-manifest.mjs` (o registrarla e instalarla via manifest) o corregir la invocacion documental en `pwa-assets-audit/SKILL.md`.
+- [x] Extender `scripts/validate-repo.mjs` en `checkDocsReferenceInstalledFiles()` para que inspeccione tambien los archivos de documentacion dentro de `.agents/stacks/`.
+- [x] `npm run validate` y `npm test` pasan en verde con 0 errores.
 <!-- AC:END -->
 
 ## Implementation Plan

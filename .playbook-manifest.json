@@ -16,6 +16,7 @@
     "scripts/gate-qa.mjs",
     "scripts/gate-review-items.mjs",
     "scripts/check-loc.mjs",
+    "scripts/validate-commit-msg.mjs",
     "scripts/ux-rules.json",
     "scripts/sync-playbook.mjs",
     "scripts/init.mjs",
@@ -24,6 +25,7 @@
     "scripts/lib/adapters.mjs",
     "scripts/lib/pyramid.mjs",
     "scripts/lib/task-inspection.mjs",
+    "scripts/lib/anti-slop.mjs",
     "scripts/lib/provenance.mjs",
     "scripts/lib/sync-classifier.mjs",
     "scripts/lib/cli-router.mjs",
@@ -59,7 +61,8 @@
       "description": "Progressive Web App: manifest, icons, service worker and install configuration consistency.",
       "files": [
         ".agents/stacks/pwa/STACK.md",
-        ".agents/stacks/pwa/skills/pwa-assets-audit/SKILL.md"
+        ".agents/stacks/pwa/skills/pwa-assets-audit/SKILL.md",
+        ".agents/stacks/pwa/skills/pwa-assets-audit/scripts/validate-manifest.mjs"
       ]
     }
   },

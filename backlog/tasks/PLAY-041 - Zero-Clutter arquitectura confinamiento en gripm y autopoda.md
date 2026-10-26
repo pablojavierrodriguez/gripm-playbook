@@ -1,9 +1,9 @@
 ---
 id: PLAY-041
 title: "Zero-Clutter architecture: confinamiento de metadata en .gripm/, erradicacion de scripts/ en consumidor y auto-poda de huérfanos"
-status: ready
+status: done
 created_date: '2026-10-25'
-updated_date: '2026-10-25'
+updated_date: '2026-10-26'
 labels:
   - "architecture"
   - "sync"

@@ -28,21 +28,42 @@ Refinement is a **gate**, not a status. Every backlog task is created with `stat
 5. **Ambiguities Explicitly Resolved** (see the Structured Refinement Interview below). An item based on unverified assumptions fails Gate R1, regardless of how well-drafted its ACs are.
 6. **Prior Architecture and Modularity.** If the item introduces new domains or flows and the project lacks an established architecture, designing boundaries, layers, and contracts is a prerequisite in the technical plan before writing code, ensuring no file exceeds 1000 lines.
 
-Record the result in the project backlog:
+Record the task as an individual markdown file in `backlog/tasks/<ID> - <slug>.md` with canonical YAML frontmatter and acceptance criteria delimiters:
 
 ```markdown
-### [BACKLOG-001] Imperative task title
-- **Refined:** yes (2026-10-04)   # or: no - missing: <details>
-- **Status:** draft
+---
+id: BACKLOG-001
+title: "Imperative task title"
+status: draft
+created_date: '2026-10-25'
+updated_date: '2026-10-25'
+labels: ["domain", "feature"]
+dependencies: []
+priority: high # high | medium | low
+type: feature  # feature | bug | chore | refactor | enhancement
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Problem statement from the user perspective and bounded scope.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+
+<!-- AC:BEGIN -->
+- [ ] Criterion 1
+- [ ] Criterion 2
+<!-- AC:END -->
 ```
 
-> **Do not invent statuses.** The status vocabulary is defined in `.agents/STATE_MACHINE.md`. The backlog is not a status: every task on disk holds a canonical status (`draft` upon creation).
+> **Do not invent statuses.** The status vocabulary is defined in [`.agents/STATE_MACHINE.md`](../../STATE_MACHINE.md). The backlog is not a status: every task on disk holds a canonical status (`draft` upon creation).
 
 #### Structured Refinement Interview - Mandatory Before Closing Scope
 
 > **An item is never refined through passive assumption or unverified deduction.** The most costly failure mode in agentic development is not writing defective code: it is writing *correct code for an unintended product*. Initial misalignment cannot be caught by QA, because QA validates against acceptance criteria born from the wrong premise.
 
-Before marking `Refined: yes`, interrogate the proposal directly:
+Before considering Gate R1 passed and moving to `doing` (`node scripts/gate-qa.mjs start <ID>`), interrogate the proposal directly:
 
 | Dimension | Question to Ask |
 | :--- | :--- |
@@ -120,12 +141,19 @@ Do not request methodological confirmation from the user to select the operating
 
 ### 7. Branching & Safe Concurrency
 
-> Configure branch conventions in the project's `.agents/rules/git-workflow.md`. Recommended structure:
+> **The canonical git policy lives in [`.agents/rules/git-workflow.md`](../../rules/git-workflow.md).**
 
 - **`dev`** - development trunk. All daily tasks and sprints integrate here.
 - **`main`** - production only. Merged exclusively upon release deployment.
-- Feature or refactoring branches: `feat/<slug>` / `refactor/<slug>`, merged into `dev` only after complete verification.
-- **Multi-Agent Concurrency:** when multiple threads touch overlapping files, create isolated branches (`work/<task>`, `agent/<task>`) and integrate into `dev` running the complete Verification Pyramid before any release.
+- **Feature / refactoring branches:** `feat/<slug>` / `refactor/<slug>`, merged into `dev` only after complete verification.
+- **Multi-Agent Concurrency:** Always isolate concurrent agents in dedicated worktrees (`git worktree add -b <branch> ../<repo>-<task>`). Prohibited to switch branches in the shared working tree. Detailed recipe and rules in [`.agents/rules/git-workflow.md`](../../rules/git-workflow.md) § Multi-Agent Parallelism.
+
+### 8. Release Delivery & Anti-Dev-Production Guardrail
+
+- **Assembly by Delivered Value:** Group certified `ready` items (historical or current) into a release candidate.
+- **Anti-Dev-Production Invariant:** Verify that production deployment originates physically and mechanically from trunk `main` (via CI or fast-forward merge `dev` ➔ `main`). Never execute production deploy commands from `dev`.
+- **State Lie Prevention:** Mutate items from `ready` to `done` on disk only upon verified physical deployment from `main`.
+- **Release Ceremony Sequence:** Complete regression verification on `dev` ➔ promote `ready` to `done` and regenerate backlog ➔ commit release on `dev` ➔ fast-forward merge into `main` (`git merge dev --ff-only`) ➔ execute deploy from `main` ➔ tag `vX.Y.Z` ➔ return worktree to `dev`.
 
 > [!CAUTION]
 > Any cited regression command must exist in the project's `package.json`. Do not invent script names: verify `npm run` first.

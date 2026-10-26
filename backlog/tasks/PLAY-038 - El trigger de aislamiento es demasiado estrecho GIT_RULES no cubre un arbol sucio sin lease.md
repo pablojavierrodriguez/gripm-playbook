@@ -1,9 +1,9 @@
 ---
 id: PLAY-038
 title: "El trigger de aislamiento es demasiado estrecho: GIT_RULES no cubre un arbol sucio sin lease"
-status: ready
+status: done
 created_date: '2026-10-22'
-updated_date: '2026-10-24'
+updated_date: '2026-10-26'
 labels:
   - "git"
   - "multi-agent"

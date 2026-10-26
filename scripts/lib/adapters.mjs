@@ -38,6 +38,7 @@ const NON_NEGOTIABLES = [
 
 const GIT_RULES = [
   'Never commit or push without explicit verbal authorization for **each** action.',
+  'Commits, branches, and PRs must be 100% in imperative English (Conventional Commits), translating from Spanish tickets if necessary.',
   'One task, one consolidated commit: the code and the task file.',
   'Never run `git checkout` or `git restore` in the primary working tree while another agent works here.',
   'A `doing` item carrying a foreign `claimed_by` owns the tree: never revert or clean it.',

@@ -1,9 +1,9 @@
 ---
 id: PLAY-040
 title: "El gate escribe la transicion de estado sin regenerar el consolidado y el commit siguiente se rechaza"
-status: ready
+status: done
 created_date: '2026-10-22'
-updated_date: '2026-10-24'
+updated_date: '2026-10-26'
 labels:
   - "gate"
   - "backlog"

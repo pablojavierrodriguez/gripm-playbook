@@ -1,9 +1,9 @@
 ---
 id: PLAY-046
 title: "Protocolo de systematic debugging y root cause tracing en principal-engineer"
-status: ready
+status: done
 created_date: '2026-10-25'
-updated_date: '2026-10-25'
+updated_date: '2026-10-26'
 labels: ["engineering", "methodology", "debugging"]
 dependencies: []
 priority: medium

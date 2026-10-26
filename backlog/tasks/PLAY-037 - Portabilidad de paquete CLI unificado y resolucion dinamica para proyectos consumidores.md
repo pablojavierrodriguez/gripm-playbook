@@ -1,9 +1,9 @@
 ---
 id: PLAY-037
 title: "Portabilidad de paquete: CLI unificado, resolucion dinamica de raiz y desacople de piramide para proyectos consumidores"
-status: ready
+status: done
 created_date: '2026-10-22'
-updated_date: '2026-10-24'
+updated_date: '2026-10-26'
 labels:
   - "packaging"
   - "cli"

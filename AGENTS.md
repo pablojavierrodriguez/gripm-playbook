@@ -6,6 +6,7 @@
 
 - Code, variables, functions, and technical comments: **in English**.
 - Conversations, product documentation, and architecture decisions: **English** (or project-configured language).
+- Git commits, branch names, tags, and PRs: **100% in imperative English** following Conventional Commits (`feat:`, `fix:`, etc.). Even if the backlog task or user prompt is in Spanish, the agent must translate the commit title and description into English when committing.
 - **Standard Hyphen Rule (Anti-Em-Dash / Anti-AI):** Never use em-dash (`—`) or en-dash (`–`) in browser titles, UI text, select options, release titles, release notes, `CHANGELOG.md`, `releases.json`, or documentation. Always use the standard hyphen `-` with spaces (` - `). The em-dash is an artificial AI cliché that degrades product craftsmanship.
 
 ---
@@ -81,26 +82,7 @@
 > [!CAUTION]
 > **The canonical git policy lives in [.agents/rules/git-workflow.md](.agents/rules/git-workflow.md).** It is not duplicated here on purpose: two copies of a rule drift apart. Read it before any `git commit` or `git push`.
 
-Headline rule, for immediate effect:
+Headline rules, for immediate effect:
 
 - **NEVER** execute a git commit or push without explicit verbal authorization from the user for **each** action. Words like *"looks good"*, *"ok"*, *"proceed"* mean **implement code only**.
-
-### Multi-Agent Parallelism & Dynamic Peer Discovery
-
-> [!CAUTION]
-> **Prohibited to run `git checkout` or `git restore` in the primary working tree while another agent is working in the same repository.** The working tree and `.git/HEAD` represent shared filesystem state: checking out a branch silently switches the other agent's branch while it is writing, landing its subsequent commit on the wrong branch.
-
-- **Pre-Flight Concurrency Probe:** Before modifying files or running Git commands, check the backlog (`status: doing`) and `git status --porcelain`. If an item is in `doing` with a foreign `claimed_by` (format `<provider>:<id>`, e.g., `antigravity:<id>`, `cursor:<id>`, `human:<id>`) or `git status --porcelain` reveals uncommitted changes (`A `, `M `) not created by the active session, **never revert or clean the shared working tree**, and immediately self-isolate in a worktree.
-- **Autonomous Handshake & Cross-Harness Protocol:** If agents share a runtime (e.g., `antigravity:`), contact the peer directly via `send_message(Recipient: claimed_by)`. If from heterogeneous providers, respect the lease, avoid failing RPC calls, and immediately self-isolate in a worktree, notifying the user in chat.
-- **Auto-Worktree:** Each agent or parallel task operates in its own isolated worktree on its own branch. Recipe and coexistence rules in [`.agents/rules/git-workflow.md`](.agents/rules/git-workflow.md) § Multi-Agent Parallelism.
-
-```bash
-git worktree add -b <branch> ../<repo>-<task>
-# ... isolated task work ...
-git fetch . <branch>:dev          # consolidate without branch switching
-git worktree remove ../<repo>-<task>
-```
-
-> The `-b` flag is mandatory: without it Git fails with `invalid reference` if the branch does not exist, and creating it would require the checkout forbidden by this rule.
-
-> Working tree isolation does not isolate conflicting lines: two agents editing the same file will still conflict upon merge. For tasks touching the same files, sequence execution or split the scope.
+- **Multi-Agent Parallelism & Dynamic Peer Discovery:** Prohibited to run `git checkout` or `git restore` in the primary working tree while another agent is working in the same repository. When detecting active peers (`claimed_by`) or in-flight foreign uncommitted changes, never revert or clean the shared tree: self-isolate immediately in a worktree (`git worktree add -b <branch> ../<repo>-<task>`). Complete recipe, discovery probe, and consolidation flow in [`.agents/rules/git-workflow.md`](.agents/rules/git-workflow.md) § Multi-Agent Parallelism.
