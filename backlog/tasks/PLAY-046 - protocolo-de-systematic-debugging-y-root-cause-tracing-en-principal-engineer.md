@@ -1,13 +1,14 @@
 ---
 id: PLAY-046
 title: "Protocolo de systematic debugging y root cause tracing en principal-engineer"
-status: draft
+status: ready
 created_date: '2026-10-25'
 updated_date: '2026-10-25'
 labels: ["engineering", "methodology", "debugging"]
 dependencies: []
 priority: medium
 type: enhancement
+claimed_by: "antigravity:host"
 ---
 
 ## Description
@@ -25,10 +26,10 @@ Inspirado en los estandares de la industria (como los protocolos de `obra/superp
 ## Acceptance Criteria
 
 <!-- AC:BEGIN -->
-- [ ] Incorporar la seccion "Systematic Debugging Protocol" en `principal-engineer/SKILL.md` con las fases de investigacion, reproduccion previa e hipotesis comprobable.
-- [ ] Agregar la directiva de disyuntor ("circuit breaker" tras 2 intentos fallidos de fix) para evitar "thrashing" y parches de sintomas.
-- [ ] Mover el bloque de configuracion `.oxlintrc.json` (lineas 153-216 de `principal-engineer/SKILL.md`) a una referencia complementaria o archivo dedicado bajo `references/oxlint-anti-slop.md` para reducir consumo de contexto.
-- [ ] `npm run validate` valida enlaces y sintaxis con 0 errores.
+- [x] Incorporar la seccion "Systematic Debugging Protocol" en `principal-engineer/SKILL.md` con las fases de investigacion, reproduccion previa e hipotesis comprobable.
+- [x] Agregar la directiva de disyuntor ("circuit breaker" tras 2 intentos fallidos de fix) para evitar "thrashing" y parches de sintomas.
+- [x] Mover el bloque de configuracion `.oxlintrc.json` (lineas 153-216 de `principal-engineer/SKILL.md`) a una referencia complementaria o archivo dedicado bajo `references/oxlint-anti-slop.md` para reducir consumo de contexto.
+- [x] `npm run validate` valida enlaces y sintaxis con 0 errores.
 <!-- AC:END -->
 
 ## Implementation Plan

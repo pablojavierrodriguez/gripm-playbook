@@ -1,9 +1,9 @@
 # Backlog: gripm-playbook
-> Consolidado generado el 2026-10-25 por gripm
+> Consolidado generado el 2026-10-26 por gripm
 
 ## Resumen de Estados
 
-### 🚀 Ready for Deploy (6)
+### 🚀 Ready for Deploy (7)
 
 #### [PLAY-007] onlyFile debería enganchar el componente renderizado y no el nombre del archivo
 - **Prioridad**: `p2` | **Tipo**: `improvement`
@@ -162,7 +162,26 @@ Hoy `@gripm/playbook` invade la raíz del repositorio consumidor y el directorio
 
 ---
 
-### 📋 Backlog / Draft (5)
+#### [PLAY-046] Protocolo de systematic debugging y root cause tracing en principal-engineer
+- **Prioridad**: `p2` | **Tipo**: `enhancement`
+
+Actualmente, `principal-engineer/SKILL.md` define excelentes lineamientos de arquitectura, tipado e invariantes, pero carece de un protocolo sistematico de diagnostico y resolucion de defectos ("Systematic Debugging"). 
+Los modelos de lenguaje ante un bug complejo tienden a "adivinar", alterando componentes o envolviendo codigo en condicionales defensivos sin haber aislado la causa raiz, lo que degrada la base de codigo con parches de sintomas.
+
+Inspirado en los estandares de la industria (como los protocolos de `obra/superpowers`), este skill debe incorporar:
+1. Protocolo de 4 fases para investigacion de defectos: Reproduccion aislada -> Rastreo del flujo hacia atras -> Hipotesis unica -> Test rojo.
+2. Prohibicion explicita de tocar codigo de produccion antes de que exista un test que reproduzca y falle con el bug.
+3. Mecanismo de disyuntor ("circuit breaker"): si tras 2 intentos de fix la prueba sigue fallando, el agente debe detenerse, revertir los parches experimentales y reevaluar supuestos o consultar al usuario.
+
+**Criterios de Aceptación:**
+- [x] #1 Incorporar la seccion "Systematic Debugging Protocol" en `principal-engineer/SKILL.md` con las fases de investigacion, reproduccion previa e hipotesis comprobable.
+- [x] #2 Agregar la directiva de disyuntor ("circuit breaker" tras 2 intentos fallidos de fix) para evitar "thrashing" y parches de sintomas.
+- [x] #3 Mover el bloque de configuracion `.oxlintrc.json` (lineas 153-216 de `principal-engineer/SKILL.md`) a una referencia complementaria o archivo dedicado bajo `references/oxlint-anti-slop.md` para reducir consumo de contexto.
+- [x] #4 `npm run validate` valida enlaces y sintaxis con 0 errores.
+
+---
+
+### 📋 Backlog / Draft (4)
 
 #### [PLAY-042] Resolver contradicciones y bugs criticos en skills de stacks y auditoria
 - **Prioridad**: `p1` | **Tipo**: `bug`
@@ -229,25 +248,6 @@ Integrar estas verificaciones mecanicas en el ciclo de promocion robustece la ga
 - [ ] #2 Incorporar chequeo estatico o regex en `scripts/gate-qa.mjs` / `inspectTask` para advertir o bloquear la presencia de `as unknown as` y `as any as` en archivos modificados.
 - [ ] #3 Actualizar la documentacion de `qa-auditor/SKILL.md` para reflejar con precision los pasos y exit codes reales del runner mecanico.
 - [ ] #4 `npm test` y `npm run validate` pasan en verde.
-
----
-
-#### [PLAY-046] Protocolo de systematic debugging y root cause tracing en principal-engineer
-- **Prioridad**: `p2` | **Tipo**: `enhancement`
-
-Actualmente, `principal-engineer/SKILL.md` define excelentes lineamientos de arquitectura, tipado e invariantes, pero carece de un protocolo sistematico de diagnostico y resolucion de defectos ("Systematic Debugging"). 
-Los modelos de lenguaje ante un bug complejo tienden a "adivinar", alterando componentes o envolviendo codigo en condicionales defensivos sin haber aislado la causa raiz, lo que degrada la base de codigo con parches de sintomas.
-
-Inspirado en los estandares de la industria (como los protocolos de `obra/superpowers`), este skill debe incorporar:
-1. Protocolo de 4 fases para investigacion de defectos: Reproduccion aislada -> Rastreo del flujo hacia atras -> Hipotesis unica -> Test rojo.
-2. Prohibicion explicita de tocar codigo de produccion antes de que exista un test que reproduzca y falle con el bug.
-3. Mecanismo de disyuntor ("circuit breaker"): si tras 2 intentos de fix la prueba sigue fallando, el agente debe detenerse, revertir los parches experimentales y reevaluar supuestos o consultar al usuario.
-
-**Criterios de Aceptación:**
-- [ ] #1 Incorporar la seccion "Systematic Debugging Protocol" en `principal-engineer/SKILL.md` con las fases de investigacion, reproduccion previa e hipotesis comprobable.
-- [ ] #2 Agregar la directiva de disyuntor ("circuit breaker" tras 2 intentos fallidos de fix) para evitar "thrashing" y parches de sintomas.
-- [ ] #3 Mover el bloque de configuracion `.oxlintrc.json` (lineas 153-216 de `principal-engineer/SKILL.md`) a una referencia complementaria o archivo dedicado bajo `references/oxlint-anti-slop.md` para reducir consumo de contexto.
-- [ ] #4 `npm run validate` valida enlaces y sintaxis con 0 errores.
 
 ---
 

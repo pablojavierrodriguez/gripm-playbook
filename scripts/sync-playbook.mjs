@@ -76,6 +76,7 @@ export const FALLBACK_CORE_FILES = [
   '.agents/skills/market-researcher/SKILL.md',
   '.agents/skills/product-designer/SKILL.md',
   '.agents/skills/principal-engineer/SKILL.md',
+  '.agents/skills/principal-engineer/references/oxlint-anti-slop.md',
   '.agents/skills/qa-auditor/SKILL.md',
   '.agents/skills/code-level-ux-auditor/SKILL.md',
   'scripts/audit-ux-code.cjs',
