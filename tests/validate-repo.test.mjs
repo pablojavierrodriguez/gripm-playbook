@@ -289,3 +289,17 @@ describe('Anti-Dev-Production-Deploy and Release Protocol (PLAY-048)', () => {
     assert.match(pm, /Never execute production deploy commands from `dev`/);
   });
 });
+
+describe('Release Pipeline Consolidation and Anti-Premature-Tagging (PLAY-049)', () => {
+  test('redundant publish.yml workflow is removed in favor of unified ci.yml', () => {
+    assert.ok(!fs.existsSync(path.join(ROOT, '.github', 'workflows', 'publish.yml')), 'publish.yml must be removed to prevent duplicate workflows');
+    assert.ok(fs.existsSync(path.join(ROOT, '.github', 'workflows', 'ci.yml')), 'ci.yml must exist as the canonical release workflow');
+  });
+
+  test('git-workflow.md mandates Anti-Premature-Tagging Rule for automated CI releases', () => {
+    const gw = fs.readFileSync(path.join(ROOT, '.agents', 'rules', 'git-workflow.md'), 'utf8');
+    assert.match(gw, /Anti-Premature-Tagging Rule/);
+    assert.match(gw, /For Automated CI\/CD Pipelines/);
+  });
+});
+

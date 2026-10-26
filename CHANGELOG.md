@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.1] - 2026-10-26
+
+`PLAY-049`
+
+### Fixed
+
+- **Release Pipeline Consolidation & Anti-Premature-Tagging Guardrail** (`PLAY-049`). Eradicated duplicate deployment pipeline by retiring legacy `.github/workflows/publish.yml`, establishing `.github/workflows/ci.yml` as the single canonical release engine. Updated `git-workflow.md` and `pm-orchestrator/SKILL.md` to establish the Anti-Premature-Tagging Rule: in automated CI release pipelines, manual tag creation (`git tag vX.Y.Z`) is strictly prohibited. Pushing to `main` atomically delegates test verification, npm provenance publishing, annotated tag generation, and GitHub Release drafting to CI, eliminating race conditions and unverified GitHub releases.
+
+---
+
 ## [2.7.0] - 2026-10-26
 
 `PLAY-007` · `PLAY-033` · `PLAY-035` · `PLAY-036` · `PLAY-037` · `PLAY-038` · `PLAY-039` · `PLAY-040` · `PLAY-041` · `PLAY-042` · `PLAY-043` · `PLAY-044` · `PLAY-045` · `PLAY-046` · `PLAY-047` · `PLAY-048`

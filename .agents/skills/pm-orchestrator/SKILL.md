@@ -153,7 +153,7 @@ Do not request methodological confirmation from the user to select the operating
 - **Assembly by Delivered Value:** Group certified `ready` items (historical or current) into a release candidate.
 - **Anti-Dev-Production Invariant:** Verify that production deployment originates physically and mechanically from trunk `main` (via CI or fast-forward merge `dev` ➔ `main`). Never execute production deploy commands from `dev`.
 - **State Lie Prevention:** Mutate items from `ready` to `done` on disk only upon verified physical deployment from `main`.
-- **Release Ceremony Sequence:** Complete regression verification on `dev` ➔ promote `ready` to `done` and regenerate backlog ➔ commit release on `dev` ➔ fast-forward merge into `main` (`git merge dev --ff-only`) ➔ execute deploy from `main` ➔ tag `vX.Y.Z` ➔ return worktree to `dev`.
+- **Release Ceremony Sequence:** Complete regression verification on `dev` ➔ promote `ready` to `done` and regenerate backlog ➔ commit release on `dev` ➔ fast-forward merge into `main` (`git merge dev --ff-only`) ➔ push to `main` (delegating automated publish, tagging and GitHub Release to CI) or execute manual deploy from `main` ➔ return worktree to `dev`.
 
 > [!CAUTION]
 > Any cited regression command must exist in the project's `package.json`. Do not invent script names: verify `npm run` first.

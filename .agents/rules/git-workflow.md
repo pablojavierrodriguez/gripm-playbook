@@ -101,19 +101,21 @@ When all items for a release are verified and certified in `ready`:
    git merge dev --ff-only
    ```
 5. **Execute production deploy from `main`:**
-   Trigger the production deployment tool (or push to `main` if deployment is driven by CI):
-   ```bash
-   # If deploying via CLI:
-   vercel --prod
-   # If deploying via CI:
-   git push origin main
-   ```
-6. **Tag release on `main`:**
-   ```bash
-   git tag vX.Y.Z
-   git push origin vX.Y.Z
-   ```
-7. **Return primary worktree to `dev`:**
+   - **For Automated CI/CD Pipelines (e.g. GitHub Actions `ci.yml`):**
+     Push directly to trunk `main`. Automated CI takes over: runs test matrix, publishes to registry with provenance, and atomically generates the annotated tag and GitHub Release upon success.
+     ```bash
+     git push origin main
+     ```
+     > [!CAUTION]
+     > **Anti-Premature-Tagging Rule:** In automated CI release pipelines, manual tag creation (`git tag vX.Y.Z`) or manual GitHub Release creation is strictly prohibited. Tagging before CI completes induces race conditions, triggers redundant workflows, and exposes unverified releases on GitHub when tests fail.
+   - **For Manual / CLI-Driven Pipelines (e.g. `vercel --prod` without publish bot):**
+     Execute deploy from `main`, then tag and push:
+     ```bash
+     vercel --prod
+     git tag -a vX.Y.Z -m "Release vX.Y.Z"
+     git push origin vX.Y.Z
+     ```
+6. **Return primary worktree to `dev`:**
    ```bash
    git checkout dev
    ```
