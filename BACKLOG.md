@@ -3,255 +3,61 @@
 
 ## Resumen de Estados
 
-### 🚀 Ready for Deploy (7)
+### 🚀 Ready for Deploy (2)
 
-#### [PLAY-007] onlyFile debería enganchar el componente renderizado y no el nombre del archivo
-- **Prioridad**: `p2` | **Tipo**: `improvement`
-
-`onlyFile` (PLAY-005) resuelve por **nombre de archivo**. Es lo que el consumidor necesitaba para expresar "`truncate` dentro de un diálogo", y funciona, pero la forma en que funciona es frágil:
-
-```json
-"check": { "line": ["truncate"], "onlyFile": ["Modal", "Dialog"] }
-```
-
-Un diálogo definido en `Overlays.tsx` no se ve. Uno en `ConfirmModal.tsx`, sí. El comportamiento depende de cómo el proyecto nombró sus archivos, no de qué renderiza el componente.
-
-La misma debilidad ya existía en el invariante `ENV-002` del consumidor, y fue parte de lo que abrió la pregunta de si debía promoverse al catálogo: el problema no es solo si una regla debe ser canónica, sino si la regla es correcta.
-
-La solución refinada y aprobada por el PO agrega la semántica declarativa `withinComponent` en `check`: el árbol de parseo de unidades de JSX conoce la jerarquía de ancestros (`frame.parent`), permitiendo verificar si un elemento está contenido dentro de un componente padre (ej. `<Dialog>`, `<Modal>`, `<Dialog.Content>`) sin importar el nombre del archivo en disco.
-
-**Criterios de Aceptación:**
-- [x] #1 El motor de auditoría (`scripts/audit-ux-code.cjs`) soporta `check.withinComponent` como array de nombres de componente (soporta matching de nombre exacto y componentes con notación de punto como `<Dialog.Content>`).
-- [x] #2 Un elemento o texto dentro de un componente objetivo (ej. `<Dialog>`) declarado en un archivo con cualquier nombre (ej. `src/Overlays.tsx`) es detectado y reportado si viola la condición.
-- [x] #3 `onlyFile` se mantiene 100% funcional y retrocompatible para filtrado por ruta de archivo.
-- [x] #4 La documentación de authoring en `.agents/skills/code-level-ux-auditor/SKILL.md` y `README.md` documenta la sintaxis y distingue `withinComponent` de `onlyFile`.
-- [x] #5 Tests automatizados en `tests/audit-ux.test.mjs` validando `withinComponent` con anidamientos profundos, nombres de archivo no obvios (`Overlays.tsx`), componentes con punto y coexistencia con `onlyFile`.
-- [x] #6 `npm run check:all` (`validate`, `check:loc`, `test`) en verde con 0 fallos.
-
----
-
-#### [PLAY-035] Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash
-- **Prioridad**: `p3` | **Tipo**: `improvement`
-
-La revision de `dev` tras el commit `2b56029` ("eradicate em-dash from live files, english 2.6.0 entries") dejo dos residuos verificables en `CHANGELOG.md`, ambos fuera del alcance de ese commit pero inconsistentes con el estandar que el propio repo declara:
-
-1. **Dos entradas en espanol sin traducir** en la seccion `2.0.1`:
-   - L186: "- **Saneamiento P0 de skills de stacks**: Eliminadas todas las referencias residuales..."
-   - L187: "- **Formato regional estandar**: Reemplazado el valor invalido `'regional-locale'`..."
-   El commit tradujo las entradas espanolas de `2.6.0` pero no hizo un barrido completo del archivo.
-
-2. **Una referencia literal a em-dash/en-dash** en L58 (entrada `PLAY-022`): "`Replaced artificial AI em-dashes (—) and en-dashes (–) with standard hyphens`". Es una meta-referencia entre backticks a los caracteres que la regla combate, no prosa con guion prohibido. Es defendible, pero cualquier escaneo automatico futuro la cazaria.
-
-El file es la fuente de la que salen las notas de release publicadas (ver PLAY-036), asi que lo que quede aqui termina en GitHub/npm.
-
-**Criterios de Aceptación:**
-- [x] #1 Las lineas L186 y L187 de `CHANGELOG.md` quedan en ingles tecnico, fiel al sentido original (saneamiento P0 de skills de stacks; formato regional BCP-47 `es-ES`), sin tocar el resto de la seccion 2.0.1.
-- [x] #2 Decision del PO registrada sobre L58: adoptada la Opcion A (se reescribe para erradicar caracteres literales U+2014/U+2013, usando texto descriptivo 'em-dash and en-dash characters' y separador estandar '-' con espacios).
-- [x] #3 Decidida la politica sobre L58: erradicacion total de caracteres literales en live docs sin necesidad de exenciones; la norma se mantiene rigurosa para toda documentacion y releases futuros.
-- [x] #4 `npm run validate` y `npm test` en verde tras el cambio.
-
----
-
-#### [PLAY-037] Portabilidad de paquete: CLI unificado, resolucion dinamica de raiz y desacople de piramide para proyectos consumidores
-- **Prioridad**: `p1` | **Tipo**: `improvement`
-
-`@gripm/playbook` no puede utilizarse como paquete en proyectos consumidores por acoplamientos internos a rutas relativas fijas y llamadas de red forzadas:
-
-1. **Rutas fijadas a `__dirname/..`:** `scripts/gate-qa.mjs`, `scripts/audit-ux-code.cjs` y `scripts/gate-review-items.mjs` calculan su raíz como `path.resolve(__dirname, '..')`. Cuando corren instalados dentro de `node_modules/@gripm/playbook/`, intentan inspeccionar tareas y correr validaciones dentro de la carpeta del propio paquete instalado y no en la del proyecto consumidor (`process.cwd()`).
-2. **Descarga obligatoria de GitHub en `init` y `sync`:** `scripts/sync-playbook.mjs` y `scripts/init.mjs` descargan archivos desde `raw.githubusercontent.com` por defecto, ignorando que el paquete instalado ya contiene todos los archivos canónicos. Esto rompe entornos offline, CI/CD cerrados, proxies y versiones fijas.
-3. **Bloqueo de la Pirámide de Verificación:** `gate-qa.mjs` exige que el `package.json` del consumidor declare `gate:review` y `audit:ux:strict` como pasos bloqueantes. Un proyecto consumidor no tiene estos scripts internos, por lo que `gate-qa` falla siempre con código 1.
-4. **Falta de CLI router y binarios expuestos:** `package.json` solo tiene `playbook` atado a `sync-playbook.mjs` que solo acepta `init`. No hay binarios expuestos para `gate-qa`, `audit-ux`, `check-loc` ni subcomandos en el CLI.
-5. **Instrucciones hardcodeadas a `node scripts/...`:** Skills, adaptadores y documentación instruyen ejecutar `node scripts/gate-qa.mjs <ID>`, obligando a copiar los scripts al proyecto consumidor en vez de permitir consumirlos como paquete npm.
-6. **Residuo `human:pablo`:** `.agents/TEAM_PLAYBOOK.md` incluye el usuario `pablo` en los ejemplos de lease.
-
-Este item implementa el Modelo Hibrido: el consumidor puede optar por usar `@gripm/playbook` como dependencia de npm pura mediante su CLI (`npx playbook <cmd>` o `npx gate-qa`) o sincronizar archivos a su repositorio, funcionando de manera transparente y desacoplada en ambos casos.
-
-**Criterios de Aceptación:**
-- [x] #1 **Resolucion dinamica de raiz en herramientas centrales:** `scripts/gate-qa.mjs`, `scripts/audit-ux-code.cjs` y `scripts/gate-review-items.mjs` resuelven la raiz del proyecto de trabajo dinamicamente (`--root`/`--cwd`, `process.env.GRIPM_ROOT`/`process.env.AUDIT_UX_ROOT`, o `process.cwd()`), permitiendo su ejecucion correcta desde `node_modules/@gripm/playbook/` contra el proyecto consumidor.
-- [x] #2 **Zero-network local fallback en `init` y `sync`:** Si no se pasa `--remote` ni `--source`, `scripts/sync-playbook.mjs` e `init.mjs` detectan automaticamente los archivos del paquete local instalado (mediante `.playbook-manifest.json` en la raiz del paquete) y sincronizan localmente sin llamadas a GitHub ni requerir conexion a internet.
-- [x] #3 **Desacople autonomo de la Piramide de Verificación en `gate-qa`:** Si el `package.json` del proyecto consumidor carece de scripts `audit:ux:strict` o `gate:review`, `gate-qa` ejecuta el motor empaquetado directamente (auditoria UX en modo estricto y validacion del backlog local) sin fallar falsamente por ausencia de scripts en `package.json`.
-- [x] #4 **CLI Router unificado y binarios de paquete:** `package.json` expone los binarios `playbook`, `gripm-playbook`, `gate-qa`, `audit-ux` y `check-loc`. `scripts/sync-playbook.mjs` funciona como despachador para los subcomandos `init`, `sync`, `gate`, `audit`, `check-loc` y `review`.
-- [x] #5 **Limpieza de residuos y adaptacion documental:** Se erradica la referencia `human:pablo` de `.agents/TEAM_PLAYBOOK.md` (sustituida por `human:<username>`). La documentacion y adaptadores (`CLAUDE.md`, `.cursor/rules/*.mdc`) instruyen la ejecucion canonica mediante el CLI `playbook gate <ID>` (y alias `gate-qa <ID>`), manteniendo retrocompatibilidad con la invocacion directa `node scripts/gate-qa.mjs <ID>`.
-- [x] #6 **Suite de pruebas de portabilidad:** Se agrega `tests/package-portability.test.mjs` verificando la ejecucion de `gate-qa` y `audit-ux` simulando una instalacion en `node_modules`, la sincronizacion local zero-network, los subcomandos del router CLI y el paso de la piramide en un proyecto consumidor limpio.
-- [x] #7 **Validacion integral del repositorio:** `npm run check:all` pasa con 0 errores (332+ tests, validacion de manifiesto y paridad de reglas).
-
----
-
-#### [PLAY-038] El trigger de aislamiento es demasiado estrecho: GIT_RULES no cubre un arbol sucio sin lease
-- **Prioridad**: `p1` | **Tipo**: `bug`
-
-`scripts/lib/adapters.mjs:39-47` define `GIT_RULES`, el set de cinco reglas de git que el init inyecta en todo consumidor. Dos de ellas forman un par incompleto:
-
-- Regla 4: *"A `doing` item carrying a foreign `claimed_by` owns the tree: never revert or clean it."* Es **prohibicion negativa**: no hagas nada destructivo.
-- Regla 5: *"Parallel work runs in isolated worktrees: `git worktree add -b <branch> ../<repo>-<task>`."* Es **mecanismo**: aislate y trabaja igual.
-
-Ninguna de las dos dice **cuando se pasa de modo normal a modo aislado**. El unico disparador explicito es la regla 4, y su condicion es estrecha: un item en `doing` con `claimed_by` ajeno.
-
-Incidente medido (2026-10-22, repo gripm): otro agente dejo **seis** archivos stageados (`A `) en `backlog/tasks/` con `status: ideas` y **sin `claimed_by`**. Ninguna condicion existente disparo, asi que el agente en curso se quedo en el arbol principal y lucho contra el indice compartido durante toda la certificacion de DEV-326.
-
-El costo no fue cosmético. `BACKLOG.md` es un agregado que referencia **todas** las tareas del arbol, y el Backlog Guard exige que no referencie tareas fantasma. Con seis tareas ajenas sin commitear, **todo** commit que incluyera el consolidado quedaba bloqueado. El agente tuvo que decidir entre incluir trabajo ajeno en su commit o romper la coherencia del consolidado, y pregunto al PO porque no habia regla que lo resolviera.
-
-Un worktree lo habria resuelto limpiamente: la rama sale de HEAD, no ve las tareas sin trackear del otro agente, y su `BACKLOG.md` no las referencia. **La cura ya esta escrita en la regla 5; lo que falta es el disparador que active la regla 5.**
-
-La condicion actual tampoco detecta la situacion real de colision. `claimed_by` es un lease declarado; los archivos stageados en el indice de git son **estado observable**. El segundo es una evidencia mas fuerte que el primero: no requiere que el otro agente haya sido disciplinoso, solo que exista.
-
-**Criterios de Aceptación:**
-- [x] #1 `GIT_RULES` declara un disparador adicional: archivos `A ` o `M ` en `git status --porcelain` que el agente en curso no creo.
-- [x] #2 Ese disparador **obliga al aislamiento en worktree** (regla 5), no solo a no revertir (regla 4). La prohibicion negativa no basta: deja al agente paralizado en el arbol principal, que es exactamente lo que ocurrio.
-- [x] #3 La regla distingue explicitamente entre cambios propios del agente en curso y suciedad ajena. El disparador no puede exigir aislamiento ante los propios cambios.
-- [x] #4 `AGENTS.md` y `.agents/TEAM_PLAYBOOK.md` reflejan el mismo disparador **solo si** reproducen esta seccion. Verificar antes de tocar: si la norma vive unicamente en `GIT_RULES`, no duplicarla.
-- [x] #5 `npm run check:all` sale con 0 tras el cambio (validate + check:loc + test).
-
----
-
-#### [PLAY-040] El gate escribe la transicion de estado sin regenerar el consolidado y el commit siguiente se rechaza
-- **Prioridad**: `p1` | **Tipo**: `bug`
-
-`scripts/gate-qa.mjs` escribe `status` en disco en dos transiciones: T1 (`submit`, doing a review) y T2 (review a ready), ambas via `mutateTaskFrontmatter`. **Ninguna de las dos regenera `BACKLOG.md`.**
-
-El Backlog Guard del consumidor (`verify-backlog-sync.js`, hook `--hook`) rechaza cualquier commit cuyo `BACKLOG.md` este desfasado respecto a las tareas. Asi que el flujo mecanico completo queda roto en un punto que nadie documenta:
-
-```
-node scripts/gate-qa.mjs submit DEV-326    -> escribe doing a review. EXIT 0.
-npm run backlog:check                      -> EXIT 1: BACKLOG.md desactualizado.
-npm run backlog:sync                        -> EXIT 0.
-node scripts/gate-qa.mjs DEV-326           -> GATE PASSED, escribe ready. EXIT 0.
-npm run backlog:check                       -> EXIT 1: BACKLOG.md desactualizado otra vez.
-npm run backlog:sync                        -> EXIT 0.
-git commit                                  -> recien aqui pasa el guard.
-```
-
-Medido en gripm el 2026-10-22 durante la certificacion de DEV-326: **dos** syncs de mas, ambos provocados por el propio gate. El gate es la herramienta que certifica que el repo esta listo para commitear, y cada corrida lo deja en un estado que el hook de pre-commit rechaza.
-
-El punto ciego es estructural. El gate escribe un archivo y no conoce el consolidado que lo refleja. No es un bug de implementacion puntual: es que la transicion y el consolidado estan en capas que no se hablan.
-
-**Nota de alcance:** `scripts/gate-qa.mjs` tiene 147 lineas de diff sin commitear en este repo por PLAY-037 (portabilidad de rutas para consumidores). Ese trabajo es ortogonal a este hallazgo, pero comparte archivo: verificar el estado antes de tocar, y re-sincronizar el alcance si PLAY-037 lo reubica.
-
-**Criterios de Aceptación:**
-- [x] #1 Despues de que el gate escribe una transicion (`submit` o T2), `npm run backlog:check` sale con codigo 0 sin que el usuario corra `backlog:sync` a mano.
-- [x] #2 La regeneracion del consolidado ocurre solo si la verificacion previa paso, respetando el contrato ya documentado en `verify-backlog-sync.js:363-365`: un commit rechazado nunca deja el consolidado reescrito como efecto secundario.
-- [x] #3 El gate no stagea nada. La regla "un hook verifica, no muta" aplica tambien a la CLI: regenerar el consolidado no equivale a `git add BACKLOG.md`.
-- [x] #4 Un consumidor sin `BACKLOG.md` en disco (proyecto que aun no lo genero) no recibe error: la regeneracion se omite en silencio.
-- [x] #5 `npm run check:all` sale con 0 tras el cambio.
-
----
-
-#### [PLAY-041] Zero-Clutter architecture: confinamiento de metadata en .gripm/, erradicacion de scripts/ en consumidor y auto-poda de huérfanos
-- **Prioridad**: `p1` | **Tipo**: `feature`
-
-Hoy `@gripm/playbook` invade la raíz del repositorio consumidor y el directorio `scripts/`:
-1. **Contaminación de raíz:** Planta archivos sueltos como `.playbook-lock.json`, `.uxaudit.json`, `audit-ux-baseline.json`, `.locignore` y `.playbook-backups/`.
-2. **Contaminación de `scripts/`:** Copia 16 archivos ejecutables de infraestructura a `scripts/` del consumidor, pese a que PLAY-037 ya implementó la ejecución vía binarios de npm en `node_modules`.
-3. **Duplicación por renombre de skills:** Cuando el framework renombra un skill (como en PLAY-029: `worldclass-product-designer` a `product-designer`), el sincronizador deja ambos directorios vivos en `.agents/skills/`, forzando al desarrollador a borrar archivos obsoletos a mano.
-
-### Principio Arquitectónico Zero-Clutter
-
-1. **La raíz le pertenece al proyecto:** Solo conviven `package.json` y `AGENTS.md`.
-2. **Metadata confinada en `.gripm/`:** Lockfiles, backups, baselines y configs del framework viven en `.gripm/`. Si el proyecto usa `gripm-board`, comparte naturalmente esa misma carpeta. Si no usa el board, la carpeta sigue siendo el namespace limpio de la suite.
-3. **Ejecución desde `node_modules`:** Cero scripts copiados a `scripts/` del consumidor.
-4. **Auto-poda segura de huérfanos:** Archivos y directorios de skills obsoletos que fueron instalados por el playbook y no presentan modificaciones del usuario se eliminan automáticamente durante el sync sin dejar carpetas duplicadas.
-
-**Criterios de Aceptación:**
-- [x] #1 **Metadata confinada en `.gripm/`:** `scripts/sync-playbook.mjs` lee y escribe el lockfile en `.gripm/playbook-lock.json` y los backups en `.gripm/backups/`. Mantiene retrocompatibilidad leyendo `.playbook-lock.json` en la raíz si existe y migrándolo a `.gripm/`.
-- [x] #2 **Auditor UX y Check-LOC confinados:** `scripts/audit-ux-code.cjs` y `scripts/check-loc.mjs` buscan `.uxaudit.json`, `audit-ux-baseline.json` y `.locignore` preferentemente dentro de `.gripm/`, manteniendo fallback a la raíz del proyecto.
-- [x] #3 **Erradicación de `scripts/` en consumidor:** `sync-playbook.mjs` e `init.mjs` no copian archivos ejecutables a la carpeta `scripts/` de proyectos consumidores. La pirámide y los scripts de `package.json` invocan exclusivamente los binarios CLI (`playbook gate`, `playbook audit`, etc.).
-- [x] #4 **Auto-poda de huérfanos y renombres obsoletos:** `sync-playbook.mjs` elimina automáticamente archivos de `.agents/` presentes en el lockfile anterior que ya no formen parte del plan instalado, siempre que no registren modificaciones locales (`customizations`). Si el directorio contenedor queda vacío, es removido de disco.
-- [x] #5 **Limpieza de scripts legados en actualización:** Durante `sync`, si existen scripts en `scripts/` del consumidor que coincidan con los hashes canónicos del framework, se eliminan limpiamente para retirar la deuda técnica previa.
-- [x] #6 **Suite de pruebas de migración e2e:** `tests/` incluye tests que validan una actualización desde un repositorio con estructura legada (scripts en raíz y skills con nombre antiguo), verificando que la raíz quede limpia, `.gripm/` contenga el lockfile y los skills viejos sean podados sin duplicaciones.
-- [x] #7 **Validación total:** `npm run check:all` pasa con 0 errores y 100% de coherencia.
-
----
-
-#### [PLAY-046] Protocolo de systematic debugging y root cause tracing en principal-engineer
-- **Prioridad**: `p2` | **Tipo**: `enhancement`
-
-Actualmente, `principal-engineer/SKILL.md` define excelentes lineamientos de arquitectura, tipado e invariantes, pero carece de un protocolo sistematico de diagnostico y resolucion de defectos ("Systematic Debugging"). 
-Los modelos de lenguaje ante un bug complejo tienden a "adivinar", alterando componentes o envolviendo codigo en condicionales defensivos sin haber aislado la causa raiz, lo que degrada la base de codigo con parches de sintomas.
-
-Inspirado en los estandares de la industria (como los protocolos de `obra/superpowers`), este skill debe incorporar:
-1. Protocolo de 4 fases para investigacion de defectos: Reproduccion aislada -> Rastreo del flujo hacia atras -> Hipotesis unica -> Test rojo.
-2. Prohibicion explicita de tocar codigo de produccion antes de que exista un test que reproduzca y falle con el bug.
-3. Mecanismo de disyuntor ("circuit breaker"): si tras 2 intentos de fix la prueba sigue fallando, el agente debe detenerse, revertir los parches experimentales y reevaluar supuestos o consultar al usuario.
-
-**Criterios de Aceptación:**
-- [x] #1 Incorporar la seccion "Systematic Debugging Protocol" en `principal-engineer/SKILL.md` con las fases de investigacion, reproduccion previa e hipotesis comprobable.
-- [x] #2 Agregar la directiva de disyuntor ("circuit breaker" tras 2 intentos fallidos de fix) para evitar "thrashing" y parches de sintomas.
-- [x] #3 Mover el bloque de configuracion `.oxlintrc.json` (lineas 153-216 de `principal-engineer/SKILL.md`) a una referencia complementaria o archivo dedicado bajo `references/oxlint-anti-slop.md` para reducir consumo de contexto.
-- [x] #4 `npm run validate` valida enlaces y sintaxis con 0 errores.
-
----
-
-### 📋 Backlog / Draft (4)
-
-#### [PLAY-042] Resolver contradicciones y bugs criticos en skills de stacks y auditoria
-- **Prioridad**: `p1` | **Tipo**: `bug`
-
-Existen contradicciones directas entre los skills de stacks y las reglas deterministas del core, ademas de un script fantasma que causa fallos inmediatos:
-1. `mobile-ux-design/SKILL.md` prescribe `pb-20` / `pb-24` para contenedores desplazables con barras inferiores fijas, cuando la regla `UX-006` en `scripts/ux-rules.json` penaliza explicitamente `pb-20` y `pb-24` como WARNING y exige `pb-32` + `safe-area-inset-bottom`.
-2. `ui-radix-tailwind/SKILL.md` utiliza `text-[9px]` y `text-[10px]` en su seccion de modales oficiales, lo que dispara la regla `UX-011` (`Arbitrary font size outside the canonical type scale`) en `audit-ux-code.cjs`, y hardcodea clases de color (`text-slate-800 dark:text-slate-200`) violando su propia regla de tokens semanticos.
-3. `pwa-assets-audit/SKILL.md` instruye ejecutar `node .agents/skills/pwa-assets-audit/scripts/validate-manifest.mjs`, pero dicho script no existe en el repositorio ni en `.playbook-manifest.json`. Ademas, `scripts/validate-repo.mjs` no audita los scripts referenciados dentro de `.agents/stacks/`.
-
-**Criterios de Aceptación:**
-- [ ] #1 Corregir `mobile-ux-design/SKILL.md` para prescribir `pb-32` + `env(safe-area-inset-bottom)` alineado con `UX-006`.
-- [ ] #2 Corregir `ui-radix-tailwind/SKILL.md` eliminando `text-[9px]` / `text-[10px]` y sustituyendo colores hardcodeados por tokens semanticos del design system.
-- [ ] #3 Proveer la implementacion real de `validate-manifest.mjs` (o registrarla e instalarla via manifest) o corregir la invocacion documental en `pwa-assets-audit/SKILL.md`.
-- [ ] #4 Extender `scripts/validate-repo.mjs` en `checkDocsReferenceInstalledFiles()` para que inspeccione tambien los archivos de documentacion dentro de `.agents/stacks/`.
-- [ ] #5 `npm run validate` y `npm test` pasan en verde con 0 errores.
-
----
-
-#### [PLAY-043] Purga de project bleed y acoplamiento residual en stack packs de react y mobile
+#### [PLAY-050] Reestructuracion del README bajo piramide invertida y progressive disclosure
 - **Prioridad**: `p1` | **Tipo**: `chore`
 
-Los stack packs (`.agents/stacks/react`, `.agents/stacks/mobile`) presentan fuga de contexto y acoplamiento ("project bleed") procedente de una aplicacion SaaS anterior sin sanitizar:
-- `forms-rhf-zod/SKILL.md` hace referencia a una skill inexistente `i18next-namespaces`, asume rutas fijas `src/locales/es.json` e importa helpers (`formatThousandsInput`, `parseThousandsInput`) desde `@/lib/utils` sin proveer su definicion.
-- `ui-radix-tailwind/SKILL.md` impone que existe un componente preexistente `src/components/ui/date-range-picker.tsx`, muestra queries acopladas a columnas como `"starts_at"`, y prescribe modales rigidos propios de un producto especifico.
-- `mobile-ux-design/SKILL.md` prescribe hooks internos como `usePWAInstall` y estilos CSS ultra-acoplados (`.peer[data-state="expanded"] ~ div .btn-action-label`) pertenecientes al layout de una aplicacion externa.
+El README.md actual supera las 500 lineas y acumula cinco responsabilidades incompatibles en un unico archivo: pagina de aterrizaje, tutorial de inicio, especificacion profunda de arquitectura, catalogo de referencia de CLI/APIs y guia de contribucion interna del repositorio.
 
-Es necesario sanitizar estos skills para que provean patrones canonicos autocontenidos y portables para cualquier proyecto React / Mobile.
+Esta sobrecarga oculta el comando principal de inicio (`npx @gripm/playbook init`) hasta la linea 213, triplica la explicacion de los estados y roles del loop de entrega, e incluye detalles de bajo nivel (como selectores AST JSX del auditor UX o garantias de hash del sync) en el flujo de lectura inicial.
+
+Alcance:
+1. Reestructurar README.md bajo la regla de la piramide invertida y progressive disclosure, reduciendo su longitud total a menos de 250 lineas (~180-220 lineas).
+2. Ubicar el pitch y el Quickstart ("One Golden Path" con `npx @gripm/playbook init`) en el primer fold (primeras ~35 lineas).
+3. Consolidar la explicacion del Hub Orchestrator, la disciplina de subagentes limpios de QA y los 3 modos operativos en un unico bloque visual coherente, eliminando repeticiones y el bloque redundante "Framework Summary".
+4. Encapsular la configuracion avanzada del CLI/auditor UX y el puente poliglota para otros ecosistemas en bloques `<details>` colapsables o enlaces directos a su documentacion canonica.
+5. Preservar enlaces markdown relativos validos, badges, e invariante de guion simple anti-em-dash (` - `).
 
 **Criterios de Aceptación:**
-- [ ] #1 Sanitizar `forms-rhf-zod/SKILL.md` removiendo la dependencia a la skill inexistente `i18next-namespaces` y encapsulando los helpers de entrada de miles/decimales o documentando su contrato generico.
-- [ ] #2 Desacoplar `ui-radix-tailwind/SKILL.md` de rutas fijas inexistentes (`date-range-picker.tsx`) convirtiendo los ejemplos en snippets autocontenidos y neutrales.
-- [ ] #3 Eliminar selectores CSS hiper-especificos y referencias de hooks privados de `mobile-ux-design/SKILL.md`.
-- [ ] #4 Estandarizar el idioma de los skills de stacks al estandar ingles (alineado con los demas skills del playbook) o documentar formalmente su alcance.
-- [ ] #5 `npm run validate` ejecuta y aprueba con 0 errores.
+- [x] #1 README.md reestructurado con Quickstart (`npx @gripm/playbook init`) visible en las primeras 40 lineas.
+- [x] #2 Extension total de README.md reducida a menos de 250 lineas (~180-220 lineas), eliminando duplicaciones de estados y el bloque final "Framework Summary".
+- [x] #3 Configuraciones avanzadas del auditor UX (JSON AST, programmatic API) y puente poliglota agrupadas en bloques colapsables `<details>` o enlaces a especificacion.
+- [x] #4 Enlaces relativos a documentacion interna (.agents/STATE_MACHINE.md, .agents/TEAM_PLAYBOOK.md, CONTRIBUTING.md) completamente funcionales y validados.
+- [x] #5 Invariante anti-em-dash respetada al 100% (cero em-dash ni en-dash, solo guion simple ` - `).
+- [x] #6 `npm run check:all` (`npm run validate`, `npm run check:loc`, `npm test`) pasa con 0 errores.
 
 ---
 
-#### [PLAY-044] Unificacion de formato de tareas y reduccion de duplicacion DRY en documentacion troncal
-- **Prioridad**: `p2` | **Tipo**: `refactor`
+#### [PLAY-051] Modularizacion de playbook init y sync: seleccion granular de roles, scripts y plantillas con presets rapidos
+- **Prioridad**: `p1` | **Tipo**: `feature`
 
-Existen dos problemas de coherencia y sobrecarga de contexto en la documentacion troncal del framework:
-1. En `pm-orchestrator/SKILL.md` (lineas 33-37) y `STATE_MACHINE.md` (lineas 46-50), los ejemplos de refinamiento muestran un formato plano markdown (`### [BACKLOG-001] ... - **Status:** draft`), mientras que `gate-qa.mjs` y `BACKLOG.md` operan obligatoriamente con archivos individuales en `backlog/tasks/*.md` que llevan YAML frontmatter (`id`, `status`, `dependencies`, etc.) y bloques `<!-- AC:BEGIN -->`. Esto confunde a los modelos cuando generan nuevas tareas.
-2. La maquina de estados, el protocolo `claimed_by` con `git worktree`, y las politicas de `< 1000 LOC` estan duplicadas palabra por palabra a lo largo de `AGENTS.md`, `TEAM_PLAYBOOK.md`, `STATE_MACHINE.md` y las skills principales. Esto consume miles de tokens innecesarios por sesion de agente.
+Actualmente `playbook init` (`scripts/init.mjs`) y `playbook sync` (`scripts/sync-playbook.mjs`) operan bajo un modelo 'todo o nada':
+1. Inyectan silenciosamente 5 scripts en `package.json` del proyecto consumidor sin preguntar al usuario si los desea ni cuales prefiere.
+2. Instalan invariablemente los 6 roles de agentes (`pm-orchestrator`, `principal-engineer`, `qa-auditor`, `product-designer`, `market-researcher`, `code-level-ux-auditor`) en `.agents/skills/`.
+3. Copian plantillas opcionales a `docs/` (`DOMAIN_TEMPLATE.md` y `SPRINT_SPEC_TEMPLATE.md`) sin consultar si el proyecto utilizara sprints o glosario de dominio.
+4. Al configurar Gripm Board, clavan una configuracion rigida (`BOARD_DEFAULTS`) sin ofrecer modulos ni opciones del Cockpit.
+
+Bajo la vision de Gripm Suite y el principio de '100% ofrecido, 0% impuesto', esta tarea modulariza el init y sync de Gripm Playbook:
+- Soporte para **Modo Rapido** (defaults de confianza) vs **Componente por Componente** (control total mediante multi-select).
+- Seleccion granular de **Roles de Agentes** a instalar en `.agents/skills/`.
+- Seleccion granular y opt-in de **Scripts en package.json** (`gate:qa`, `gate:review`, `audit:ux`, `check:loc`, `validate:commit`).
+- Seleccion granular de **Plantillas en docs/** (`DOMAIN_TEMPLATE.md`, `SPRINT_SPEC_TEMPLATE.md`).
+- Persistencia de los componentes seleccionados en `.gripm/playbook-lock.json` (`selectedSkills`, `selectedScripts`, `selectedTemplates`) para que subsecuentes `playbook sync` respeten lo que el usuario eligio no instalar y no lo vuelvan a forzar.
 
 **Criterios de Aceptación:**
-- [ ] #1 Actualizar los ejemplos de definicion de tareas en `pm-orchestrator/SKILL.md` y `STATE_MACHINE.md` para reflejar fielmente la estructura real de archivo `backlog/tasks/*.md` con YAML frontmatter y bloques de criterios de aceptacion.
-- [ ] #2 Aplicar DRY en `AGENTS.md`, `TEAM_PLAYBOOK.md` y `pm-orchestrator/SKILL.md`, consolidando `STATE_MACHINE.md` y `git-workflow.md` como unicas fuentes de verdad referenciadas por vinculos.
-- [ ] #3 Reducir la sobrecarga de tokens de contexto sin debilitar las directivas no negociables del framework.
-- [ ] #4 `npm run validate` valida con exito enlaces y vocabulario de estados.
+- [x] #1 scripts/init.mjs ofrece selector de modo: 'Rapido (Baterias incluidas)' y 'Componente por componente (Control total)'.
+- [x] #2 En modo Componente por componente, se presenta un multi-select con los roles de agentes (coreSkills), permitiendo elegir que roles instalar en .agents/skills/.
+- [x] #3 La adicion de scripts a package.json es opt-in y permite seleccionar individualmente cuales incorporar (gate:qa, gate:review, audit:ux, check:loc, validate:commit).
+- [x] #4 La copia de plantillas a docs/ (DOMAIN_TEMPLATE.md, SPRINT_SPEC_TEMPLATE.md) es opt-in y seleccionable.
+- [x] #5 .gripm/playbook-lock.json registra los componentes seleccionados por el usuario, y scripts/sync-playbook.mjs sincroniza unicamente los componentes activos.
+- [x] #6 Soporte para flags no interactivas en init y sync (--skills <lista>, --no-scripts, --no-docs, --yes).
+- [x] #7 Tests en tests/ validando que la instalacion respete la seleccion granular sin inyecciones no autorizadas.
+- [x] #8 npm run check:all (validate, check:loc, test) pasa con codigo 0.
 
 ---
 
-#### [PLAY-045] Enforcement mecanico de presupuesto de archivo y reglas anti-slop en gate-qa
-- **Prioridad**: `p2` | **Tipo**: `feature`
-
-Las skills `principal-engineer` y `qa-auditor` declaran reglas estrictas que hoy descansan unicamente en la inspeccion humana o semantica del subagente, sin respaldo mecanico en `scripts/gate-qa.mjs`:
-1. `PYRAMID_STEPS` en `gate-qa.mjs` no incluye la ejecucion de `check-loc.mjs` ni define formalmente si el exceso de lineas (>= 1000 LOC) bloquea la certificacion o emite un aviso segun la soberania del PO.
-2. No existe un chequeo mecanico rapido en el runner para detectar evasiones de tipado en el diff (`as unknown as`, `as any as`) o mocks globales de modulo (`vi.mock(` / `jest.mock(`) que simulan cobertura sin ejercitar la integracion.
-
-Integrar estas verificaciones mecanicas en el ciclo de promocion robustece la garantia de calidad eliminando atajos inadvertidos.
-
-**Criterios de Aceptación:**
-- [ ] #1 Incorporar el paso de chequeo de modularidad (`check-loc.mjs`) o inspeccion de presupuesto dentro de `scripts/gate-qa.mjs` o la piramide de verificacion, con comportamiento configurable o claramente documentado.
-- [ ] #2 Incorporar chequeo estatico o regex en `scripts/gate-qa.mjs` / `inspectTask` para advertir o bloquear la presencia de `as unknown as` y `as any as` en archivos modificados.
-- [ ] #3 Actualizar la documentacion de `qa-auditor/SKILL.md` para reflejar con precision los pasos y exit codes reales del runner mecanico.
-- [ ] #4 `npm test` y `npm run validate` pasan en verde.
-
----
-
-### ✅ Done / Deployed (32)
+### ✅ Done / Deployed (46)
 
 #### [PLAY-001] Anatomía de unidad en el motor de reglas: text, ownContent y scopeText
 - **Prioridad**: `p1` | **Tipo**: `bug`
@@ -394,6 +200,31 @@ se reportaba como botón icon-only sin nombre. Un control que le muestra "Guarda
 - [x] #6 `IconOnly.tsx` cubre las cinco formas etiquetadas y las dos sin nombre
 - [x] #7 La aserción lista exactamente qué dos líneas pueden reportarse
 - [x] #8 `npm run check:all` en verde
+
+---
+
+#### [PLAY-007] onlyFile debería enganchar el componente renderizado y no el nombre del archivo
+- **Prioridad**: `p2` | **Tipo**: `improvement`
+
+`onlyFile` (PLAY-005) resuelve por **nombre de archivo**. Es lo que el consumidor necesitaba para expresar "`truncate` dentro de un diálogo", y funciona, pero la forma en que funciona es frágil:
+
+```json
+"check": { "line": ["truncate"], "onlyFile": ["Modal", "Dialog"] }
+```
+
+Un diálogo definido en `Overlays.tsx` no se ve. Uno en `ConfirmModal.tsx`, sí. El comportamiento depende de cómo el proyecto nombró sus archivos, no de qué renderiza el componente.
+
+La misma debilidad ya existía en el invariante `ENV-002` del consumidor, y fue parte de lo que abrió la pregunta de si debía promoverse al catálogo: el problema no es solo si una regla debe ser canónica, sino si la regla es correcta.
+
+La solución refinada y aprobada por el PO agrega la semántica declarativa `withinComponent` en `check`: el árbol de parseo de unidades de JSX conoce la jerarquía de ancestros (`frame.parent`), permitiendo verificar si un elemento está contenido dentro de un componente padre (ej. `<Dialog>`, `<Modal>`, `<Dialog.Content>`) sin importar el nombre del archivo en disco.
+
+**Criterios de Aceptación:**
+- [x] #1 El motor de auditoría (`scripts/audit-ux-code.cjs`) soporta `check.withinComponent` como array de nombres de componente (soporta matching de nombre exacto y componentes con notación de punto como `<Dialog.Content>`).
+- [x] #2 Un elemento o texto dentro de un componente objetivo (ej. `<Dialog>`) declarado en un archivo con cualquier nombre (ej. `src/Overlays.tsx`) es detectado y reportado si viola la condición.
+- [x] #3 `onlyFile` se mantiene 100% funcional y retrocompatible para filtrado por ruta de archivo.
+- [x] #4 La documentación de authoring en `.agents/skills/code-level-ux-auditor/SKILL.md` y `README.md` documenta la sintaxis y distingue `withinComponent` de `onlyFile`.
+- [x] #5 Tests automatizados en `tests/audit-ux.test.mjs` validando `withinComponent` con anidamientos profundos, nombres de archivo no obvios (`Overlays.tsx`), componentes con punto y coexistencia con `onlyFile`.
+- [x] #6 `npm run check:all` (`validate`, `check:loc`, `test`) en verde con 0 fallos.
 
 ---
 
@@ -954,6 +785,290 @@ Este defecto quedo fuera de PLAY-029 (alcance editorial) y de PLAY-030 (alcance 
 - [x] #8 `npm run check:all` pasa con 0 errores tras el cambio (332/332 tests, 72 suites).
 - [x] #9 **Fix post-QA (invariante T_ready-immutability).** La QA ciego (subagente limpio) hallo que el barrido inicial subescalo el alcance: el inventario solo cubrio los 5 archivos donde aparecia `npm run gate:qa`, no **todos** los archivos core. Se reabrio el item a `doing` (STATE_MACHINE L77: un fix post-QA invalida la certificacion y debe recorrer T1/T2 de nuevo) y se sustituyeron las 4 lineas restantes de **mismo defecto** en archivos que el consumidor **si** recibe y cuyo binario **si** esta en core: `.agents/skills/code-level-ux-auditor/SKILL.md` L26 (forma `node scripts/audit-ux-code.cjs --update-baseline`, ya usada en L21-25) y L32 (prosa), mas `scripts/audit-ux-code.cjs` L1009 y L1204 (la **propia salida del binario** instruia `npm run audit:ux` al consumidor).
 - [x] #10 **Hallazgos reportados, deliberadamente fuera de este fix** (mismo origen: `package.json` no viaja al consumidor, pero no admiten sustitucion porque su binario no esta en core o es ambiguo): (a) `npm run validate` en `TEAM_PLAYBOOK.md` L142; (b) `npm run lint:anti-slop` en `principal-engineer/SKILL.md` L215, que ademas no existe ni en este `package.json` (lectura ambigua: recomendacion de CI propia del consumidor vs script ausente); (c) en `README.md` (landing page, no instalado) `validate`, `gate:review` y `check:all`. Todos requieren decision propia del PO, no se resuelven por sustitucion.
+
+---
+
+#### [PLAY-035] Higiene residual del CHANGELOG: entradas en espanol y referencia literal de em-dash
+- **Prioridad**: `p3` | **Tipo**: `improvement`
+
+La revision de `dev` tras el commit `2b56029` ("eradicate em-dash from live files, english 2.6.0 entries") dejo dos residuos verificables en `CHANGELOG.md`, ambos fuera del alcance de ese commit pero inconsistentes con el estandar que el propio repo declara:
+
+1. **Dos entradas en espanol sin traducir** en la seccion `2.0.1`:
+   - L186: "- **Saneamiento P0 de skills de stacks**: Eliminadas todas las referencias residuales..."
+   - L187: "- **Formato regional estandar**: Reemplazado el valor invalido `'regional-locale'`..."
+   El commit tradujo las entradas espanolas de `2.6.0` pero no hizo un barrido completo del archivo.
+
+2. **Una referencia literal a em-dash/en-dash** en L58 (entrada `PLAY-022`): "`Replaced artificial AI em-dashes (—) and en-dashes (–) with standard hyphens`". Es una meta-referencia entre backticks a los caracteres que la regla combate, no prosa con guion prohibido. Es defendible, pero cualquier escaneo automatico futuro la cazaria.
+
+El file es la fuente de la que salen las notas de release publicadas (ver PLAY-036), asi que lo que quede aqui termina en GitHub/npm.
+
+**Criterios de Aceptación:**
+- [x] #1 Las lineas L186 y L187 de `CHANGELOG.md` quedan en ingles tecnico, fiel al sentido original (saneamiento P0 de skills de stacks; formato regional BCP-47 `es-ES`), sin tocar el resto de la seccion 2.0.1.
+- [x] #2 Decision del PO registrada sobre L58: adoptada la Opcion A (se reescribe para erradicar caracteres literales U+2014/U+2013, usando texto descriptivo 'em-dash and en-dash characters' y separador estandar '-' con espacios).
+- [x] #3 Decidida la politica sobre L58: erradicacion total de caracteres literales en live docs sin necesidad de exenciones; la norma se mantiene rigurosa para toda documentacion y releases futuros.
+- [x] #4 `npm run validate` y `npm test` en verde tras el cambio.
+
+---
+
+#### [PLAY-037] Portabilidad de paquete: CLI unificado, resolucion dinamica de raiz y desacople de piramide para proyectos consumidores
+- **Prioridad**: `p1` | **Tipo**: `improvement`
+
+`@gripm/playbook` no puede utilizarse como paquete en proyectos consumidores por acoplamientos internos a rutas relativas fijas y llamadas de red forzadas:
+
+1. **Rutas fijadas a `__dirname/..`:** `scripts/gate-qa.mjs`, `scripts/audit-ux-code.cjs` y `scripts/gate-review-items.mjs` calculan su raíz como `path.resolve(__dirname, '..')`. Cuando corren instalados dentro de `node_modules/@gripm/playbook/`, intentan inspeccionar tareas y correr validaciones dentro de la carpeta del propio paquete instalado y no en la del proyecto consumidor (`process.cwd()`).
+2. **Descarga obligatoria de GitHub en `init` y `sync`:** `scripts/sync-playbook.mjs` y `scripts/init.mjs` descargan archivos desde `raw.githubusercontent.com` por defecto, ignorando que el paquete instalado ya contiene todos los archivos canónicos. Esto rompe entornos offline, CI/CD cerrados, proxies y versiones fijas.
+3. **Bloqueo de la Pirámide de Verificación:** `gate-qa.mjs` exige que el `package.json` del consumidor declare `gate:review` y `audit:ux:strict` como pasos bloqueantes. Un proyecto consumidor no tiene estos scripts internos, por lo que `gate-qa` falla siempre con código 1.
+4. **Falta de CLI router y binarios expuestos:** `package.json` solo tiene `playbook` atado a `sync-playbook.mjs` que solo acepta `init`. No hay binarios expuestos para `gate-qa`, `audit-ux`, `check-loc` ni subcomandos en el CLI.
+5. **Instrucciones hardcodeadas a `node scripts/...`:** Skills, adaptadores y documentación instruyen ejecutar `node scripts/gate-qa.mjs <ID>`, obligando a copiar los scripts al proyecto consumidor en vez de permitir consumirlos como paquete npm.
+6. **Residuo `human:pablo`:** `.agents/TEAM_PLAYBOOK.md` incluye el usuario `pablo` en los ejemplos de lease.
+
+Este item implementa el Modelo Hibrido: el consumidor puede optar por usar `@gripm/playbook` como dependencia de npm pura mediante su CLI (`npx playbook <cmd>` o `npx gate-qa`) o sincronizar archivos a su repositorio, funcionando de manera transparente y desacoplada en ambos casos.
+
+**Criterios de Aceptación:**
+- [x] #1 **Resolucion dinamica de raiz en herramientas centrales:** `scripts/gate-qa.mjs`, `scripts/audit-ux-code.cjs` y `scripts/gate-review-items.mjs` resuelven la raiz del proyecto de trabajo dinamicamente (`--root`/`--cwd`, `process.env.GRIPM_ROOT`/`process.env.AUDIT_UX_ROOT`, o `process.cwd()`), permitiendo su ejecucion correcta desde `node_modules/@gripm/playbook/` contra el proyecto consumidor.
+- [x] #2 **Zero-network local fallback en `init` y `sync`:** Si no se pasa `--remote` ni `--source`, `scripts/sync-playbook.mjs` e `init.mjs` detectan automaticamente los archivos del paquete local instalado (mediante `.playbook-manifest.json` en la raiz del paquete) y sincronizan localmente sin llamadas a GitHub ni requerir conexion a internet.
+- [x] #3 **Desacople autonomo de la Piramide de Verificación en `gate-qa`:** Si el `package.json` del proyecto consumidor carece de scripts `audit:ux:strict` o `gate:review`, `gate-qa` ejecuta el motor empaquetado directamente (auditoria UX en modo estricto y validacion del backlog local) sin fallar falsamente por ausencia de scripts en `package.json`.
+- [x] #4 **CLI Router unificado y binarios de paquete:** `package.json` expone los binarios `playbook`, `gripm-playbook`, `gate-qa`, `audit-ux` y `check-loc`. `scripts/sync-playbook.mjs` funciona como despachador para los subcomandos `init`, `sync`, `gate`, `audit`, `check-loc` y `review`.
+- [x] #5 **Limpieza de residuos y adaptacion documental:** Se erradica la referencia `human:pablo` de `.agents/TEAM_PLAYBOOK.md` (sustituida por `human:<username>`). La documentacion y adaptadores (`CLAUDE.md`, `.cursor/rules/*.mdc`) instruyen la ejecucion canonica mediante el CLI `playbook gate <ID>` (y alias `gate-qa <ID>`), manteniendo retrocompatibilidad con la invocacion directa `node scripts/gate-qa.mjs <ID>`.
+- [x] #6 **Suite de pruebas de portabilidad:** Se agrega `tests/package-portability.test.mjs` verificando la ejecucion de `gate-qa` y `audit-ux` simulando una instalacion en `node_modules`, la sincronizacion local zero-network, los subcomandos del router CLI y el paso de la piramide en un proyecto consumidor limpio.
+- [x] #7 **Validacion integral del repositorio:** `npm run check:all` pasa con 0 errores (332+ tests, validacion de manifiesto y paridad de reglas).
+
+---
+
+#### [PLAY-038] El trigger de aislamiento es demasiado estrecho: GIT_RULES no cubre un arbol sucio sin lease
+- **Prioridad**: `p1` | **Tipo**: `bug`
+
+`scripts/lib/adapters.mjs:39-47` define `GIT_RULES`, el set de cinco reglas de git que el init inyecta en todo consumidor. Dos de ellas forman un par incompleto:
+
+- Regla 4: *"A `doing` item carrying a foreign `claimed_by` owns the tree: never revert or clean it."* Es **prohibicion negativa**: no hagas nada destructivo.
+- Regla 5: *"Parallel work runs in isolated worktrees: `git worktree add -b <branch> ../<repo>-<task>`."* Es **mecanismo**: aislate y trabaja igual.
+
+Ninguna de las dos dice **cuando se pasa de modo normal a modo aislado**. El unico disparador explicito es la regla 4, y su condicion es estrecha: un item en `doing` con `claimed_by` ajeno.
+
+Incidente medido (2026-10-22, repo gripm): otro agente dejo **seis** archivos stageados (`A `) en `backlog/tasks/` con `status: ideas` y **sin `claimed_by`**. Ninguna condicion existente disparo, asi que el agente en curso se quedo en el arbol principal y lucho contra el indice compartido durante toda la certificacion de DEV-326.
+
+El costo no fue cosmético. `BACKLOG.md` es un agregado que referencia **todas** las tareas del arbol, y el Backlog Guard exige que no referencie tareas fantasma. Con seis tareas ajenas sin commitear, **todo** commit que incluyera el consolidado quedaba bloqueado. El agente tuvo que decidir entre incluir trabajo ajeno en su commit o romper la coherencia del consolidado, y pregunto al PO porque no habia regla que lo resolviera.
+
+Un worktree lo habria resuelto limpiamente: la rama sale de HEAD, no ve las tareas sin trackear del otro agente, y su `BACKLOG.md` no las referencia. **La cura ya esta escrita en la regla 5; lo que falta es el disparador que active la regla 5.**
+
+La condicion actual tampoco detecta la situacion real de colision. `claimed_by` es un lease declarado; los archivos stageados en el indice de git son **estado observable**. El segundo es una evidencia mas fuerte que el primero: no requiere que el otro agente haya sido disciplinoso, solo que exista.
+
+**Criterios de Aceptación:**
+- [x] #1 `GIT_RULES` declara un disparador adicional: archivos `A ` o `M ` en `git status --porcelain` que el agente en curso no creo.
+- [x] #2 Ese disparador **obliga al aislamiento en worktree** (regla 5), no solo a no revertir (regla 4). La prohibicion negativa no basta: deja al agente paralizado en el arbol principal, que es exactamente lo que ocurrio.
+- [x] #3 La regla distingue explicitamente entre cambios propios del agente en curso y suciedad ajena. El disparador no puede exigir aislamiento ante los propios cambios.
+- [x] #4 `AGENTS.md` y `.agents/TEAM_PLAYBOOK.md` reflejan el mismo disparador **solo si** reproducen esta seccion. Verificar antes de tocar: si la norma vive unicamente en `GIT_RULES`, no duplicarla.
+- [x] #5 `npm run check:all` sale con 0 tras el cambio (validate + check:loc + test).
+
+---
+
+#### [PLAY-040] El gate escribe la transicion de estado sin regenerar el consolidado y el commit siguiente se rechaza
+- **Prioridad**: `p1` | **Tipo**: `bug`
+
+`scripts/gate-qa.mjs` escribe `status` en disco en dos transiciones: T1 (`submit`, doing a review) y T2 (review a ready), ambas via `mutateTaskFrontmatter`. **Ninguna de las dos regenera `BACKLOG.md`.**
+
+El Backlog Guard del consumidor (`verify-backlog-sync.js`, hook `--hook`) rechaza cualquier commit cuyo `BACKLOG.md` este desfasado respecto a las tareas. Asi que el flujo mecanico completo queda roto en un punto que nadie documenta:
+
+```
+node scripts/gate-qa.mjs submit DEV-326    -> escribe doing a review. EXIT 0.
+npm run backlog:check                      -> EXIT 1: BACKLOG.md desactualizado.
+npm run backlog:sync                        -> EXIT 0.
+node scripts/gate-qa.mjs DEV-326           -> GATE PASSED, escribe ready. EXIT 0.
+npm run backlog:check                       -> EXIT 1: BACKLOG.md desactualizado otra vez.
+npm run backlog:sync                        -> EXIT 0.
+git commit                                  -> recien aqui pasa el guard.
+```
+
+Medido en gripm el 2026-10-22 durante la certificacion de DEV-326: **dos** syncs de mas, ambos provocados por el propio gate. El gate es la herramienta que certifica que el repo esta listo para commitear, y cada corrida lo deja en un estado que el hook de pre-commit rechaza.
+
+El punto ciego es estructural. El gate escribe un archivo y no conoce el consolidado que lo refleja. No es un bug de implementacion puntual: es que la transicion y el consolidado estan en capas que no se hablan.
+
+**Nota de alcance:** `scripts/gate-qa.mjs` tiene 147 lineas de diff sin commitear en este repo por PLAY-037 (portabilidad de rutas para consumidores). Ese trabajo es ortogonal a este hallazgo, pero comparte archivo: verificar el estado antes de tocar, y re-sincronizar el alcance si PLAY-037 lo reubica.
+
+**Criterios de Aceptación:**
+- [x] #1 Despues de que el gate escribe una transicion (`submit` o T2), `npm run backlog:check` sale con codigo 0 sin que el usuario corra `backlog:sync` a mano.
+- [x] #2 La regeneracion del consolidado ocurre solo si la verificacion previa paso, respetando el contrato ya documentado en `verify-backlog-sync.js:363-365`: un commit rechazado nunca deja el consolidado reescrito como efecto secundario.
+- [x] #3 El gate no stagea nada. La regla "un hook verifica, no muta" aplica tambien a la CLI: regenerar el consolidado no equivale a `git add BACKLOG.md`.
+- [x] #4 Un consumidor sin `BACKLOG.md` en disco (proyecto que aun no lo genero) no recibe error: la regeneracion se omite en silencio.
+- [x] #5 `npm run check:all` sale con 0 tras el cambio.
+
+---
+
+#### [PLAY-041] Zero-Clutter architecture: confinamiento de metadata en .gripm/, erradicacion de scripts/ en consumidor y auto-poda de huérfanos
+- **Prioridad**: `p1` | **Tipo**: `feature`
+
+Hoy `@gripm/playbook` invade la raíz del repositorio consumidor y el directorio `scripts/`:
+1. **Contaminación de raíz:** Planta archivos sueltos como `.playbook-lock.json`, `.uxaudit.json`, `audit-ux-baseline.json`, `.locignore` y `.playbook-backups/`.
+2. **Contaminación de `scripts/`:** Copia 16 archivos ejecutables de infraestructura a `scripts/` del consumidor, pese a que PLAY-037 ya implementó la ejecución vía binarios de npm en `node_modules`.
+3. **Duplicación por renombre de skills:** Cuando el framework renombra un skill (como en PLAY-029: `worldclass-product-designer` a `product-designer`), el sincronizador deja ambos directorios vivos en `.agents/skills/`, forzando al desarrollador a borrar archivos obsoletos a mano.
+
+### Principio Arquitectónico Zero-Clutter
+
+1. **La raíz le pertenece al proyecto:** Solo conviven `package.json` y `AGENTS.md`.
+2. **Metadata confinada en `.gripm/`:** Lockfiles, backups, baselines y configs del framework viven en `.gripm/`. Si el proyecto usa `gripm-board`, comparte naturalmente esa misma carpeta. Si no usa el board, la carpeta sigue siendo el namespace limpio de la suite.
+3. **Ejecución desde `node_modules`:** Cero scripts copiados a `scripts/` del consumidor.
+4. **Auto-poda segura de huérfanos:** Archivos y directorios de skills obsoletos que fueron instalados por el playbook y no presentan modificaciones del usuario se eliminan automáticamente durante el sync sin dejar carpetas duplicadas.
+
+**Criterios de Aceptación:**
+- [x] #1 **Metadata confinada en `.gripm/`:** `scripts/sync-playbook.mjs` lee y escribe el lockfile en `.gripm/playbook-lock.json` y los backups en `.gripm/backups/`. Mantiene retrocompatibilidad leyendo `.playbook-lock.json` en la raíz si existe y migrándolo a `.gripm/`.
+- [x] #2 **Auditor UX y Check-LOC confinados:** `scripts/audit-ux-code.cjs` y `scripts/check-loc.mjs` buscan `.uxaudit.json`, `audit-ux-baseline.json` y `.locignore` preferentemente dentro de `.gripm/`, manteniendo fallback a la raíz del proyecto.
+- [x] #3 **Erradicación de `scripts/` en consumidor:** `sync-playbook.mjs` e `init.mjs` no copian archivos ejecutables a la carpeta `scripts/` de proyectos consumidores. La pirámide y los scripts de `package.json` invocan exclusivamente los binarios CLI (`playbook gate`, `playbook audit`, etc.).
+- [x] #4 **Auto-poda de huérfanos y renombres obsoletos:** `sync-playbook.mjs` elimina automáticamente archivos de `.agents/` presentes en el lockfile anterior que ya no formen parte del plan instalado, siempre que no registren modificaciones locales (`customizations`). Si el directorio contenedor queda vacío, es removido de disco.
+- [x] #5 **Limpieza de scripts legados en actualización:** Durante `sync`, si existen scripts en `scripts/` del consumidor que coincidan con los hashes canónicos del framework, se eliminan limpiamente para retirar la deuda técnica previa.
+- [x] #6 **Suite de pruebas de migración e2e:** `tests/` incluye tests que validan una actualización desde un repositorio con estructura legada (scripts en raíz y skills con nombre antiguo), verificando que la raíz quede limpia, `.gripm/` contenga el lockfile y los skills viejos sean podados sin duplicaciones.
+- [x] #7 **Validación total:** `npm run check:all` pasa con 0 errores y 100% de coherencia.
+
+---
+
+#### [PLAY-042] Resolver contradicciones y bugs criticos en skills de stacks y auditoria
+- **Prioridad**: `p1` | **Tipo**: `bug`
+
+Existen contradicciones directas entre los skills de stacks y las reglas deterministas del core, ademas de un script fantasma que causa fallos inmediatos:
+1. `mobile-ux-design/SKILL.md` prescribe `pb-20` / `pb-24` para contenedores desplazables con barras inferiores fijas, cuando la regla `UX-006` en `scripts/ux-rules.json` penaliza explicitamente `pb-20` y `pb-24` como WARNING y exige `pb-32` + `safe-area-inset-bottom`.
+2. `ui-radix-tailwind/SKILL.md` utiliza `text-[9px]` y `text-[10px]` en su seccion de modales oficiales, lo que dispara la regla `UX-011` (`Arbitrary font size outside the canonical type scale`) en `audit-ux-code.cjs`, y hardcodea clases de color (`text-slate-800 dark:text-slate-200`) violando su propia regla de tokens semanticos.
+3. `pwa-assets-audit/SKILL.md` instruye ejecutar `node .agents/skills/pwa-assets-audit/scripts/validate-manifest.mjs`, pero dicho script no existe en el repositorio ni en `.playbook-manifest.json`. Ademas, `scripts/validate-repo.mjs` no audita los scripts referenciados dentro de `.agents/stacks/`.
+
+**Criterios de Aceptación:**
+- [x] #1 Corregir `mobile-ux-design/SKILL.md` para prescribir `pb-32` + `env(safe-area-inset-bottom)` alineado con `UX-006`.
+- [x] #2 Corregir `ui-radix-tailwind/SKILL.md` eliminando `text-[9px]` / `text-[10px]` y sustituyendo colores hardcodeados por tokens semanticos del design system.
+- [x] #3 Proveer la implementacion real de `validate-manifest.mjs` (o registrarla e instalarla via manifest) o corregir la invocacion documental en `pwa-assets-audit/SKILL.md`.
+- [x] #4 Extender `scripts/validate-repo.mjs` en `checkDocsReferenceInstalledFiles()` para que inspeccione tambien los archivos de documentacion dentro de `.agents/stacks/`.
+- [x] #5 `npm run validate` y `npm test` pasan en verde con 0 errores.
+
+---
+
+#### [PLAY-043] Purga de project bleed y acoplamiento residual en stack packs de react y mobile
+- **Prioridad**: `p1` | **Tipo**: `chore`
+
+Los stack packs (`.agents/stacks/react`, `.agents/stacks/mobile`) presentan fuga de contexto y acoplamiento ("project bleed") procedente de una aplicacion SaaS anterior sin sanitizar:
+- `forms-rhf-zod/SKILL.md` hace referencia a una skill inexistente `i18next-namespaces`, asume rutas fijas `src/locales/es.json` e importa helpers (`formatThousandsInput`, `parseThousandsInput`) desde `@/lib/utils` sin proveer su definicion.
+- `ui-radix-tailwind/SKILL.md` impone que existe un componente preexistente `src/components/ui/date-range-picker.tsx`, muestra queries acopladas a columnas como `"starts_at"`, y prescribe modales rigidos propios de un producto especifico.
+- `mobile-ux-design/SKILL.md` prescribe hooks internos como `usePWAInstall` y estilos CSS ultra-acoplados (`.peer[data-state="expanded"] ~ div .btn-action-label`) pertenecientes al layout de una aplicacion externa.
+
+Es necesario sanitizar estos skills para que provean patrones canonicos autocontenidos y portables para cualquier proyecto React / Mobile.
+
+**Criterios de Aceptación:**
+- [x] #1 Sanitizar `forms-rhf-zod/SKILL.md` removiendo la dependencia a la skill inexistente `i18next-namespaces` y encapsulando los helpers de entrada de miles/decimales o documentando su contrato generico.
+- [x] #2 Desacoplar `ui-radix-tailwind/SKILL.md` de rutas fijas inexistentes (`date-range-picker.tsx`) convirtiendo los ejemplos en snippets autocontenidos y neutrales.
+- [x] #3 Eliminar selectores CSS hiper-especificos y referencias de hooks privados de `mobile-ux-design/SKILL.md`.
+- [x] #4 Estandarizar el idioma de los skills de stacks al estandar ingles (alineado con los demas skills del playbook) o documentar formalmente su alcance.
+- [x] #5 `npm run validate` ejecuta y aprueba con 0 errores.
+
+---
+
+#### [PLAY-044] Unificacion de formato de tareas y reduccion de duplicacion DRY en documentacion troncal
+- **Prioridad**: `p2` | **Tipo**: `refactor`
+
+Existen dos problemas de coherencia y sobrecarga de contexto en la documentacion troncal del framework:
+1. En `pm-orchestrator/SKILL.md` (lineas 33-37) y `STATE_MACHINE.md` (lineas 46-50), los ejemplos de refinamiento muestran un formato plano markdown (`### [BACKLOG-001] ... - **Status:** draft`), mientras que `gate-qa.mjs` y `BACKLOG.md` operan obligatoriamente con archivos individuales en `backlog/tasks/*.md` que llevan YAML frontmatter (`id`, `status`, `dependencies`, etc.) y bloques `<!-- AC:BEGIN -->`. Esto confunde a los modelos cuando generan nuevas tareas.
+2. La maquina de estados, el protocolo `claimed_by` con `git worktree`, y las politicas de `< 1000 LOC` estan duplicadas palabra por palabra a lo largo de `AGENTS.md`, `TEAM_PLAYBOOK.md`, `STATE_MACHINE.md` y las skills principales. Esto consume miles de tokens innecesarios por sesion de agente.
+
+**Criterios de Aceptación:**
+- [x] #1 Actualizar los ejemplos de definicion de tareas en `pm-orchestrator/SKILL.md` y `STATE_MACHINE.md` para reflejar fielmente la estructura real de archivo `backlog/tasks/*.md` con YAML frontmatter y bloques de criterios de aceptacion.
+- [x] #2 Aplicar DRY en `AGENTS.md`, `TEAM_PLAYBOOK.md` y `pm-orchestrator/SKILL.md`, consolidando `STATE_MACHINE.md` y `git-workflow.md` como unicas fuentes de verdad referenciadas por vinculos.
+- [x] #3 Reducir la sobrecarga de tokens de contexto sin debilitar las directivas no negociables del framework.
+- [x] #4 `npm run validate` valida con exito enlaces y vocabulario de estados.
+
+---
+
+#### [PLAY-045] Enforcement mecanico de presupuesto de archivo y reglas anti-slop en gate-qa
+- **Prioridad**: `p2` | **Tipo**: `feature`
+
+Las skills `principal-engineer` y `qa-auditor` declaran reglas estrictas que hoy descansan unicamente en la inspeccion humana o semantica del subagente, sin respaldo mecanico en `scripts/gate-qa.mjs`:
+1. `PYRAMID_STEPS` en `gate-qa.mjs` no incluye la ejecucion de `check-loc.mjs` ni define formalmente si el exceso de lineas (>= 1000 LOC) bloquea la certificacion o emite un aviso segun la soberania del PO.
+2. No existe un chequeo mecanico rapido en el runner para detectar evasiones de tipado en el diff (`as unknown as`, `as any as`) o mocks globales de modulo (`vi.mock(` / `jest.mock(`) que simulan cobertura sin ejercitar la integracion.
+
+Integrar estas verificaciones mecanicas en el ciclo de promocion robustece la garantia de calidad eliminando atajos inadvertidos.
+
+**Criterios de Aceptación:**
+- [x] #1 Incorporar el paso de chequeo de modularidad (`check-loc.mjs`) o inspeccion de presupuesto dentro de `scripts/gate-qa.mjs` o la piramide de verificacion, con comportamiento configurable o claramente documentado.
+- [x] #2 Incorporar chequeo estatico o regex en `scripts/gate-qa.mjs` / `inspectTask` para advertir o bloquear la presencia de `as unknown as` y `as any as` en archivos modificados.
+- [x] #3 Actualizar la documentacion de `qa-auditor/SKILL.md` para reflejar con precision los pasos y exit codes reales del runner mecanico.
+- [x] #4 `npm test` y `npm run validate` pasan en verde.
+
+---
+
+#### [PLAY-046] Protocolo de systematic debugging y root cause tracing en principal-engineer
+- **Prioridad**: `p2` | **Tipo**: `enhancement`
+
+Actualmente, `principal-engineer/SKILL.md` define excelentes lineamientos de arquitectura, tipado e invariantes, pero carece de un protocolo sistematico de diagnostico y resolucion de defectos ("Systematic Debugging"). 
+Los modelos de lenguaje ante un bug complejo tienden a "adivinar", alterando componentes o envolviendo codigo en condicionales defensivos sin haber aislado la causa raiz, lo que degrada la base de codigo con parches de sintomas.
+
+Inspirado en los estandares de la industria (como los protocolos de `obra/superpowers`), este skill debe incorporar:
+1. Protocolo de 4 fases para investigacion de defectos: Reproduccion aislada -> Rastreo del flujo hacia atras -> Hipotesis unica -> Test rojo.
+2. Prohibicion explicita de tocar codigo de produccion antes de que exista un test que reproduzca y falle con el bug.
+3. Mecanismo de disyuntor ("circuit breaker"): si tras 2 intentos de fix la prueba sigue fallando, el agente debe detenerse, revertir los parches experimentales y reevaluar supuestos o consultar al usuario.
+
+**Criterios de Aceptación:**
+- [x] #1 Incorporar la seccion "Systematic Debugging Protocol" en `principal-engineer/SKILL.md` con las fases de investigacion, reproduccion previa e hipotesis comprobable.
+- [x] #2 Agregar la directiva de disyuntor ("circuit breaker" tras 2 intentos fallidos de fix) para evitar "thrashing" y parches de sintomas.
+- [x] #3 Mover el bloque de configuracion `.oxlintrc.json` (lineas 153-216 de `principal-engineer/SKILL.md`) a una referencia complementaria o archivo dedicado bajo `references/oxlint-anti-slop.md` para reducir consumo de contexto.
+- [x] #4 `npm run validate` valida enlaces y sintaxis con 0 errores.
+
+---
+
+#### [PLAY-047] Regla de git commits en ingles y guardrail mecanico commit-msg
+- **Prioridad**: `p2` | **Tipo**: `feature`
+
+Para garantizar un historial de control de versiones estándar y exportable a escala internacional:
+1. Las directivas de Git en `.agents/rules/git-workflow.md` y `AGENTS.md` deben establecer explícitamente que los mensajes de commit, nombres de ramas (`feat/...`, `fix/...`), tags y PRs deben ser 100% en inglés imperativo bajo Conventional Commits. Aunque el ticket en el backlog o la interacción con el usuario sea en español, el agente tiene la obligación de traducir el título y descripción al commitear.
+2. El framework `@gripm/playbook` debe proveer un script o guardrail mecánico de validación de `commit-msg` (`scripts/validate-commit-msg.mjs` o comando CLI) que verifique el formato Conventional Commits y alerte o rechace commits en español o mal formateados para el repo y sus proyectos consumidores.
+
+**Criterios de Aceptación:**
+- [x] #1 Incorporar en `.agents/rules/git-workflow.md` la directiva mandatoria de commits, ramas, tags y PRs 100% en inglés imperativo con Conventional Commits, estipulando la obligación del agente de traducir desde tickets en español.
+- [x] #2 Desarrollar `scripts/validate-commit-msg.mjs` (o subcomando en el router del playbook) con soporte para validar mensajes de commit (formato conventional commits, detección de patrones o palabras clave en español en el header como `agrega`, `corrige`, `arregla`, etc.).
+- [x] #3 Registrar el hook/script en `.playbook-manifest.json` y sincronizarlo a repositorios consumidores para su adopción vía hooks de Git.
+- [x] #4 Añadir suite de tests automatizados para el validador de `commit-msg` en `tests/validate-commit-msg.test.mjs`.
+- [x] #5 `npm test` y `npm run validate` pasan en verde con 0 errores.
+
+---
+
+#### [PLAY-048] Invariante Anti-Dev-Production-Deploy y protocolo de Release Deployment
+- **Prioridad**: `p1` | **Tipo**: `feature`
+
+Al auditar los deployments de Vercel en Gripm Board (dogfooding), se detectó que los despliegues históricos de Producción figuraban con `branch: dev`.
+La causa raíz es una contradicción metodológica no resuelta en el Playbook:
+1. `git-workflow.md` estipulaba que *"The primary worktree stays on dev"*.
+2. `STATE_MACHINE.md` exige despliegue real a producción para cerrar la transición T4 (`ready` ➔ `done`).
+3. Al no existir una regla ni excepción explícita para la ejecución del deploy, las herramientas de despliegue (`vercel --prod`, CLIs cloud, etc.) se ejecutaban situados en `dev`, estampando en la infraestructura que producción corre desde la rama de integración y abriendo riesgo de State Lies.
+
+Alcance:
+1. Declarar la invariante **Anti-Dev-Production-Deploy** en `.agents/STATE_MACHINE.md`.
+2. Documentar el protocolo canónico de Release Deployment en `.agents/rules/git-workflow.md` como la excepción controlada para la promoción a `main`.
+3. Actualizar `.agents/skills/pm-orchestrator/SKILL.md` para verificar el origen en `main` antes de transicionar `ready` ➔ `done`.
+4. Incorporar verificación en `tests/validate-repo.test.mjs` para garantizar la presencia y paridad de la regla en el framework.
+
+**Criterios de Aceptación:**
+- [x] #1 Declarar la invariante Anti-Dev-Production-Deploy en `.agents/STATE_MACHINE.md` estableciendo la prohibición de ejecutar herramientas de producción desde `dev`.
+- [x] #2 Documentar el protocolo canónico de Release Deployment en `.agents/rules/git-workflow.md` (integración `dev` ➔ `main` vía fast-forward y origen físico de despliegue en `main`).
+- [x] #3 Actualizar `.agents/skills/pm-orchestrator/SKILL.md` en el checklist de Release Delivery exigiendo la verificación de trunk `main` antes de mover a `done`.
+- [x] #4 Añadir prueba automatizada en `tests/validate-repo.test.mjs` que verifique la presencia y consistencia de la invariante Anti-Dev-Production-Deploy.
+- [x] #5 `npm test` y `npm run validate` pasan en verde con 0 errores.
+
+---
+
+#### [PLAY-049] Consolidación de pipeline de release y eliminación de workflow redundante
+- **Prioridad**: `p1` | **Tipo**: `bug`
+
+Durante el ciclo de release de v2.7.0, se evidenció una colisión entre dos modelos de despliegue coexistentes en el repositorio:
+1. `.github/workflows/ci.yml` automatiza el release completo desde `main` (pruebas, npm publish con provenance, creación de tag anotado y GitHub Release oficial).
+2. `.github/workflows/publish.yml` operaba como workflow legado redundante activado por `push: tags: ['v*']`.
+3. El protocolo de Release Deployment en `.agents/rules/git-workflow.md` y `.agents/skills/pm-orchestrator/SKILL.md` prescribía un paso manual prematuro (`git tag vX.Y.Z && git push origin vX.Y.Z`), induciendo al operador a exponer tags y releases antes de que el CI valide `main` y provocando ejecuciones duplicadas y carreras en CI.
+
+Alcance:
+1. Eliminar definitivamente el workflow legado redundante `.github/workflows/publish.yml`.
+2. Actualizar `.agents/rules/git-workflow.md` formalizando que en pipelines automatizados (CI-driven), el push a `main` delega de forma atómica a CI la verificación de calidad, el despliegue a npm y la creación del tag y GitHub Release, prohibiendo el tagging manual preventivo.
+3. Alinear `.agents/skills/pm-orchestrator/SKILL.md` en el checklist y ceremonia de Release Delivery.
+4. Actualizar `tests/validate-repo.test.mjs` para validar la integridad del protocolo consolidado.
+5. Preparar el patch 2.7.1 (`package.json`, `.playbook-manifest.json`, `CHANGELOG.md`).
+
+**Criterios de Aceptación:**
+- [x] #1 Eliminar `.github/workflows/publish.yml` consolidando el pipeline de publicación exclusivamente en `.github/workflows/ci.yml`.
+- [x] #2 Actualizar `.agents/rules/git-workflow.md` eliminando el paso manual de tag/push en flujos CI-driven y declarando la prohibición de tags manuales prematuros.
+- [x] #3 Actualizar `.agents/skills/pm-orchestrator/SKILL.md` en el paso de Release Ceremony Sequence.
+- [x] #4 Actualizar `tests/validate-repo.test.mjs` verificando la coherencia y guardrails del protocolo consolidado.
+- [x] #5 Incrementar versión a 2.7.1 en `package.json` y `.playbook-manifest.json`, y registrar sección 2.7.1 en `CHANGELOG.md`.
+- [x] #6 `npm test` y `npm run validate` pasan con 0 errores.
 
 ---
 

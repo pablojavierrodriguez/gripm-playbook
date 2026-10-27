@@ -29,6 +29,7 @@
     "scripts/lib/provenance.mjs",
     "scripts/lib/sync-classifier.mjs",
     "scripts/lib/cli-router.mjs",
+    "scripts/lib/selection.mjs",
     "docs/sprints/SPRINT_SPEC_TEMPLATE.md",
     "docs/DOMAIN_TEMPLATE.md"
   ],

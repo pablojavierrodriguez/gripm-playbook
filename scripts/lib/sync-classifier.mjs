@@ -41,12 +41,14 @@ export function findOrphanedFiles(targetRepo, plannedFiles, lockFiles = null) {
         walk(full);
         continue;
       }
-      if (!entry.name.endsWith('.md')) continue;
       const rel = path.relative(targetRepo, full).split(path.sep).join('/');
+      // Never treat @gripm/board's native skill as an orphaned Playbook file
+      if (rel.startsWith('.agents/skills/gripm/')) continue;
       if (lockFiles && typeof lockFiles === 'object' && Object.keys(lockFiles).length > 0) {
         if (lockFiles[rel] && !planned.has(rel)) orphans.push(rel);
-      } else if (!planned.has(rel)) {
-        orphans.push(rel);
+      } else {
+        if (!entry.name.endsWith('.md')) continue;
+        if (!planned.has(rel)) orphans.push(rel);
       }
     }
   };
@@ -121,23 +123,41 @@ export function pruneEmptyDirs(dir, stopAt) {
   } catch {}
 }
 
-export function pruneOrphanedFiles(targetRepo, orphans, customizations = new Set()) {
+export function pruneOrphanedFiles(targetRepo, orphans, customizations = new Set(), lockFiles = {}) {
   const pruned = [];
   const kept = [];
   const agentsRoot = path.join(targetRepo, '.agents');
+  const customSet = customizations instanceof Set ? customizations : new Set(customizations || []);
 
   for (const rel of orphans) {
-    if (customizations.has(rel)) {
+    const full = path.join(targetRepo, rel);
+    if (!fs.existsSync(full)) continue;
+
+    let isCustom = customSet.has(rel);
+    const knownHash = lockFiles && lockFiles[rel];
+    const isSha256 = typeof knownHash === 'string' && /^[a-f0-9]{64}$/i.test(knownHash);
+    if (!isCustom && isSha256) {
+      try {
+        const localContent = fs.readFileSync(full, 'utf8');
+        const localHash = sha256(localContent);
+        if (localHash !== knownHash) {
+          isCustom = true;
+          customSet.add(rel);
+        }
+      } catch {
+        isCustom = true;
+      }
+    }
+
+    if (isCustom) {
       kept.push(rel);
       continue;
     }
-    const full = path.join(targetRepo, rel);
+
     try {
-      if (fs.existsSync(full)) {
-        fs.unlinkSync(full);
-        pruned.push(rel);
-        pruneEmptyDirs(path.dirname(full), agentsRoot);
-      }
+      fs.unlinkSync(full);
+      pruned.push(rel);
+      pruneEmptyDirs(path.dirname(full), agentsRoot);
     } catch {
       kept.push(rel);
     }
@@ -156,7 +176,7 @@ export function resolveLockPath(targetRepo) {
 
 export function readLock(targetRepo) {
   const lockPath = resolveLockPath(targetRepo);
-  const empty = { playbook: null, ref: null, version: null, files: {}, customizations: [] };
+  const empty = { playbook: null, ref: null, version: null, files: {}, customizations: [], selection: null };
   if (!fs.existsSync(lockPath)) return empty;
   try {
     const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
@@ -166,6 +186,11 @@ export function readLock(targetRepo) {
       version: lock.version || null,
       files: lock.files || {},
       customizations: Array.isArray(lock.customizations) ? lock.customizations : [],
+      selection: lock.selection && typeof lock.selection === 'object' ? {
+        skills: Array.isArray(lock.selection.skills) ? lock.selection.skills : null,
+        scripts: Array.isArray(lock.selection.scripts) ? lock.selection.scripts : null,
+        docs: Array.isArray(lock.selection.docs) ? lock.selection.docs : null,
+      } : null,
       isLegacyPath: lockPath.endsWith(LEGACY_LOCK_PATH),
     };
   } catch {
@@ -177,7 +202,7 @@ export function planFiles(manifest, stacks, fallbackCore = [], fallbackStacks = 
   const core = manifest ? manifest.core : fallbackCore;
   const stackSource = manifest && manifest.stacks ? manifest.stacks : fallbackStacks;
 
-  const files = [...core];
+  let files = [...core];
   const unknown = [];
 
   for (const name of stacks) {
@@ -188,6 +213,34 @@ export function planFiles(manifest, stacks, fallbackCore = [], fallbackStacks = 
     }
     const packFiles = Array.isArray(pack) ? pack : pack?.files ?? [];
     files.push(...packFiles);
+  }
+
+  if (options.selection) {
+    const selSkills = options.selection.skills;
+    const selDocs = options.selection.docs;
+
+    files = files.filter((f) => {
+      const skillMatch = f.match(/^\.agents\/skills\/([^/]+)/);
+      if (skillMatch) {
+        const skillName = skillMatch[1];
+        if (Array.isArray(selSkills) && !selSkills.includes(skillName)) {
+          return false;
+        }
+      }
+
+      if (f === 'docs/DOMAIN_TEMPLATE.md') {
+        if (Array.isArray(selDocs) && !selDocs.includes('domain')) {
+          return false;
+        }
+      }
+      if (f === 'docs/sprints/SPRINT_SPEC_TEMPLATE.md') {
+        if (Array.isArray(selDocs) && !selDocs.includes('sprint-spec')) {
+          return false;
+        }
+      }
+
+      return true;
+    });
   }
 
   const filtered = options.packageMode

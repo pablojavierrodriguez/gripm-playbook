@@ -167,3 +167,62 @@ export function renderAdapters(projectName, harnesses) {
 
   return files;
 }
+
+export const STACK_LABELS = {
+  react: 'react     -  forms (RHF + Zod), Radix/Tailwind, Recharts',
+  mobile: 'mobile    -  mobile-first UX, sheets, safe areas, Capacitor',
+  pwa: 'pwa       -  manifest, icons, service worker consistency',
+};
+
+export const STACK_SIGNALS = {
+  react: ['react', 'react-dom', 'next'],
+  mobile: ['@capacitor/core', 'capacitor', 'react-native', 'expo'],
+  pwa: ['vite-plugin-pwa', 'workbox-window', 'workbox-webpack-plugin', 'next-pwa'],
+};
+
+export const TECH_STACK_RULES = [
+  {
+    category: 'Frontend',
+    signals: [['next', 'Next.js'], ['react', 'React'], ['vue', 'Vue'], ['svelte', 'Svelte'], ['@angular/core', 'Angular']],
+  },
+  {
+    category: 'Backend / DB',
+    signals: [
+      ['@nestjs/core', 'NestJS'], ['fastify', 'Fastify'], ['express', 'Express'], ['koa', 'Koa'],
+      ['postgres', 'PostgreSQL'], ['pg', 'PostgreSQL'], ['prisma', 'Prisma'], ['mongoose', 'MongoDB'], ['better-sqlite3', 'SQLite'],
+    ],
+  },
+  {
+    category: 'Styling',
+    signals: [['tailwindcss', 'Tailwind CSS'], ['styled-components', 'styled-components'], ['sass', 'Sass'], ['less', 'Less']],
+  },
+  {
+    category: 'Forms & Validation',
+    signals: [['react-hook-form', 'React Hook Form'], ['zod', 'Zod'], ['yup', 'Yup'], ['ajv', 'AJV']],
+  },
+  {
+    category: 'Testing',
+    signals: [['vitest', 'Vitest'], ['jest', 'Jest'], ['@playwright/test', 'Playwright'], ['mocha', 'Mocha']],
+  },
+];
+
+export const NOT_DETECTED = 'Not detected in package.json';
+
+export function detectStacks(deps) {
+  return Object.entries(STACK_SIGNALS)
+    .filter(([, signals]) => signals.some((signal) => deps[signal]))
+    .map(([pack]) => pack);
+}
+
+export function detectTechStack(deps) {
+  const detected = {};
+  for (const rule of TECH_STACK_RULES) {
+    const hits = [...new Set(rule.signals.flatMap(([dep, label]) => (deps[dep] ? [label] : [])))];
+    detected[rule.category] = hits.length ? hits.join(' + ') : NOT_DETECTED;
+  }
+  return detected;
+}
+
+export function getStackChoices(stacksObj) {
+  return Object.keys(stacksObj).map((value) => ({ value, label: STACK_LABELS[value] || value }));
+}

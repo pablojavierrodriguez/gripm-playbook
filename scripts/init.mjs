@@ -19,6 +19,13 @@
  *   --harness <name>   antigravity | cursor | claude, repeatable. Skips the harness question.
  *   --name <name>      Project name (default: package.json "name")
  *   --lang <code>      Project language: en | es (default: en)
+ *   --mode <name>      quick | custom (default: prompt, or quick with --yes)
+ *   --skills <list>    Agent roles to install: comma-separated, all, or none
+ *   --scripts <list>   package.json scripts to inject: comma-separated, all, or none
+ *   --no-scripts       Skip package.json scripts injection
+ *   --docs <list>      Documentation templates to install: comma-separated, all, or none
+ *   --no-docs          Skip documentation templates
+ *   --install-scripts  Copy internal framework scripts into target repo scripts/
  *   --board            Configure the Gripm Board (.gripm/config.json)
  *   --no-board         Skip the Gripm Board configuration
  *   --force            Overwrite generated adapter files (CLAUDE.md, .cursor/rules) that already exist.
@@ -33,8 +40,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { c, printHeader, promptText, promptConfirm, promptSelect, promptMultiSelect } from './lib/terminal.mjs';
-import { HARNESS_CHOICES, LANGUAGE_LABELS, isBaseTemplate, parametrizeAgentsMd, renderAdapters } from './lib/adapters.mjs';
+import {
+  HARNESS_CHOICES, LANGUAGE_LABELS, isBaseTemplate, parametrizeAgentsMd, renderAdapters,
+  detectStacks, detectTechStack, getStackChoices,
+} from './lib/adapters.mjs';
 import { FALLBACK_STACKS, runPlaybookSync } from './sync-playbook.mjs';
+import {
+  MODE_CHOICES, DEFAULT_CORE_SKILLS, VALID_SCRIPTS, VALID_DOCS,
+  SCRIPT_DEFINITIONS, parseSelectionList, loadCatalogFromManifest,
+  getSkillChoices, getScriptChoices, getDocChoices, resolveSelection,
+  applySelectionFlag,
+} from './lib/selection.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -45,49 +61,6 @@ const LANGUAGE_CHOICES = [
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Spanish' },
 ];
-
-/** Presentation only. The offered values come from FALLBACK_STACKS. */
-const STACK_LABELS = {
-  react: 'react     -  forms (RHF + Zod), Radix/Tailwind, Recharts',
-  mobile: 'mobile    -  mobile-first UX, sheets, safe areas, Capacitor',
-  pwa: 'pwa       -  manifest, icons, service worker consistency',
-};
-
-/** Dependency names that signal a stack pack in package.json. */
-const STACK_SIGNALS = {
-  react: ['react', 'react-dom', 'next'],
-  mobile: ['@capacitor/core', 'capacitor', 'react-native', 'expo'],
-  pwa: ['vite-plugin-pwa', 'workbox-window', 'workbox-webpack-plugin', 'next-pwa'],
-};
-
-/** Dependency to label map per AGENTS.md category. First match order is priority order. */
-const TECH_STACK_RULES = [
-  {
-    category: 'Frontend',
-    signals: [['next', 'Next.js'], ['react', 'React'], ['vue', 'Vue'], ['svelte', 'Svelte'], ['@angular/core', 'Angular']],
-  },
-  {
-    category: 'Backend / DB',
-    signals: [
-      ['@nestjs/core', 'NestJS'], ['fastify', 'Fastify'], ['express', 'Express'], ['koa', 'Koa'],
-      ['postgres', 'PostgreSQL'], ['pg', 'PostgreSQL'], ['prisma', 'Prisma'], ['mongoose', 'MongoDB'], ['better-sqlite3', 'SQLite'],
-    ],
-  },
-  {
-    category: 'Styling',
-    signals: [['tailwindcss', 'Tailwind CSS'], ['styled-components', 'styled-components'], ['sass', 'Sass'], ['less', 'Less']],
-  },
-  {
-    category: 'Forms & Validation',
-    signals: [['react-hook-form', 'React Hook Form'], ['zod', 'Zod'], ['yup', 'Yup'], ['ajv', 'AJV']],
-  },
-  {
-    category: 'Testing',
-    signals: [['vitest', 'Vitest'], ['jest', 'Jest'], ['@playwright/test', 'Playwright'], ['mocha', 'Mocha']],
-  },
-];
-
-const NOT_DETECTED = 'Not detected in package.json';
 
 /**
  * Fixed part of `.gripm/config.json`, mirroring the shape the Gripm Board writes
@@ -123,28 +96,10 @@ function dependenciesOf(pkg) {
   return { ...(pkg?.dependencies ?? {}), ...(pkg?.devDependencies ?? {}) };
 }
 
-function detectStacks(deps) {
-  return Object.entries(STACK_SIGNALS)
-    .filter(([, signals]) => signals.some((signal) => deps[signal]))
-    .map(([pack]) => pack);
-}
-
-function detectTechStack(deps) {
-  const detected = {};
-  for (const rule of TECH_STACK_RULES) {
-    const hits = [...new Set(rule.signals.flatMap(([dep, label]) => (deps[dep] ? [label] : [])))];
-    detected[rule.category] = hits.length ? hits.join(' + ') : NOT_DETECTED;
-  }
-  return detected;
-}
-
-function stackChoices() {
-  return Object.keys(FALLBACK_STACKS).map((value) => ({ value, label: STACK_LABELS[value] || value }));
-}
-
 async function collectAnswers(repo, opts) {
   const pkg = readPackageJson(repo);
   const deps = dependenciesOf(pkg);
+  const catalog = loadCatalogFromManifest();
 
   const answers = {
     projectName: opts.name || pkg?.name || path.basename(path.resolve(repo)),
@@ -153,23 +108,81 @@ async function collectAnswers(repo, opts) {
     stacks: opts.stacks.length ? [...opts.stacks] : detectStacks(deps),
     board: opts.board === null ? true : opts.board,
     techStack: detectTechStack(deps),
+    mode: opts.mode || (opts.yes || !process.stdin.isTTY ? 'quick' : null),
+    skills: opts.skills,
+    scripts: opts.noScripts ? [] : opts.scripts,
+    docs: opts.noDocs ? [] : opts.docs,
   };
 
-  if (opts.yes || !process.stdin.isTTY) return answers;
+  const isInteractive = !opts.yes && process.stdin.isTTY;
 
-  answers.projectName = await promptText('Project name', answers.projectName);
-  answers.language = await promptSelect('Language', LANGUAGE_CHOICES, answers.language);
-  answers.harnesses = await promptMultiSelect('AI harnesses', HARNESS_CHOICES, answers.harnesses);
+  if (isInteractive) {
+    if (!opts.name) answers.projectName = await promptText('Project name', answers.projectName);
+    if (!opts.lang) answers.language = await promptSelect('Language', LANGUAGE_CHOICES, answers.language);
+    if (!opts.harnesses.length) answers.harnesses = await promptMultiSelect('AI harnesses', HARNESS_CHOICES, answers.harnesses);
 
-  const detected = answers.stacks.length ? ` (auto-detected: ${answers.stacks.join(', ')})` : '';
-  answers.stacks = await promptMultiSelect(`Stack packs${detected}`, stackChoices(), answers.stacks);
+    if (!opts.stacks.length) {
+      const detected = answers.stacks.length ? ` (auto-detected: ${answers.stacks.join(', ')})` : '';
+      answers.stacks = await promptMultiSelect(`Stack packs${detected}`, getStackChoices(FALLBACK_STACKS), answers.stacks);
+    }
 
-  answers.board = await promptConfirm('Configure the Gripm Board (.gripm/config.json)', answers.board);
+    if (!answers.mode) {
+      answers.mode = await promptSelect('Installation mode', MODE_CHOICES, 'quick');
+    }
+
+    if (answers.mode === 'custom') {
+      if (answers.skills === null) {
+        answers.skills = await promptMultiSelect(
+          'Agent roles (.agents/skills/)',
+          getSkillChoices(catalog.skills),
+          catalog.skills
+        );
+        if (!answers.skills.includes('pm-orchestrator') || !answers.skills.includes('qa-auditor')) {
+          console.log(`  ${c.yellow('▲')} ${c.yellow('Warning:')} Deselecting pm-orchestrator or qa-auditor may affect playbook governance.`);
+        }
+      }
+
+      if (answers.scripts === null && !opts.noScripts) {
+        answers.scripts = await promptMultiSelect(
+          'Scripts to inject in package.json',
+          getScriptChoices(),
+          VALID_SCRIPTS
+        );
+      }
+
+      if (answers.docs === null && !opts.noDocs) {
+        answers.docs = await promptMultiSelect(
+          'Documentation templates (docs/)',
+          getDocChoices(),
+          VALID_DOCS
+        );
+      }
+    }
+
+    if (opts.board === null) {
+      answers.board = await promptConfirm('Configure the Gripm Board (.gripm/config.json)', answers.board);
+    }
+  }
+
+  const resolved = resolveSelection({
+    mode: answers.mode || 'quick',
+    skills: answers.skills,
+    scripts: answers.scripts,
+    docs: answers.docs,
+    availableSkills: catalog.skills,
+  });
+  answers.mode = answers.mode || 'quick';
+  answers.skills = resolved.skills;
+  answers.scripts = resolved.scripts;
+  answers.docs = resolved.docs;
 
   return answers;
 }
 
 function validateAnswers(answers) {
+  if (answers.mode !== 'quick' && answers.mode !== 'custom') {
+    return `Unknown mode "${answers.mode}". Available: quick, custom`;
+  }
   const unknownHarness = answers.harnesses.filter(
     (value) => !HARNESS_CHOICES.some((option) => option.value === value),
   );
@@ -278,22 +291,21 @@ function writeItemPool(repo) {
   }
 }
 
-function addPlaybookScripts(repo) {
+function addPlaybookScripts(repo, selectedScripts = null) {
   const pkgFile = path.join(repo, 'package.json');
   if (!fs.existsSync(pkgFile)) return;
   try {
     const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
     pkg.scripts = pkg.scripts || {};
     let added = 0;
-    const scriptsToAdd = {
-      'gate:qa': 'playbook gate',
-      'gate:review': 'playbook review',
-      'audit:ux': 'playbook audit',
-      'audit:ux:strict': 'playbook audit --strict',
-      'check:loc': 'playbook check-loc',
-    };
-    for (const [key, cmd] of Object.entries(scriptsToAdd)) {
-      if (!pkg.scripts[key]) {
+    const allowed = Array.isArray(selectedScripts) ? selectedScripts : VALID_SCRIPTS;
+    if (allowed.length === 0) {
+      console.log(`  ${c.dim('•')} ${c.dim('skipped'.padEnd(10))} package.json ${c.dim('(no scripts selected)')}`);
+      return;
+    }
+    for (const key of allowed) {
+      const cmd = SCRIPT_DEFINITIONS[key];
+      if (cmd && !pkg.scripts[key]) {
         pkg.scripts[key] = cmd;
         added += 1;
       }
@@ -359,6 +371,10 @@ export async function runInit(argv = []) {
   console.log(`  ${c.dim('➜')}  ${c.dim('Language:')}     ${languageLabel(answers.language)}`);
   console.log(`  ${c.dim('➜')}  ${c.dim('Harnesses:')}    ${answers.harnesses.join(', ')}`);
   console.log(`  ${c.dim('➜')}  ${c.dim('Stack packs:')}  ${answers.stacks.length ? answers.stacks.join(', ') : '(core only)'}`);
+  console.log(`  ${c.dim('➜')}  ${c.dim('Mode:')}         ${answers.mode}`);
+  console.log(`  ${c.dim('➜')}  ${c.dim('Skills:')}       ${answers.skills.length ? answers.skills.join(', ') : '(none)'}`);
+  console.log(`  ${c.dim('➜')}  ${c.dim('Scripts:')}      ${answers.scripts.length ? answers.scripts.join(', ') : '(none)'}`);
+  console.log(`  ${c.dim('➜')}  ${c.dim('Docs:')}         ${answers.docs.length ? answers.docs.join(', ') : '(none)'}`);
   console.log(`  ${c.dim('➜')}  ${c.dim('Gripm Board:')}  ${answers.board ? 'yes' : 'no'}\n`);
 
   await runPlaybookSync(repo, {
@@ -370,13 +386,18 @@ export async function runInit(argv = []) {
     yes: opts.yes,
     force: opts.force,
     installScripts: opts.installScripts,
+    selection: {
+      skills: answers.skills,
+      scripts: answers.scripts,
+      docs: answers.docs,
+    },
   });
 
   if (!parametrizeAgentsMdFile(repo, answers)) return;
 
   writeAdapters(repo, answers, opts);
   writeItemPool(repo);
-  addPlaybookScripts(repo);
+  addPlaybookScripts(repo, answers.scripts);
   if (answers.board) writeBoardConfig(repo, answers, opts);
 
   console.log(`
@@ -388,6 +409,7 @@ export async function runInit(argv = []) {
 }
 
 function parseArgs(argv) {
+  const catalog = loadCatalogFromManifest();
   const opts = {
     repo: process.cwd(),
     source: null,
@@ -403,6 +425,12 @@ function parseArgs(argv) {
     listHarnesses: false,
     help: false,
     installScripts: false,
+    mode: null,
+    skills: null,
+    scripts: null,
+    docs: null,
+    noScripts: false,
+    noDocs: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -420,6 +448,18 @@ function parseArgs(argv) {
       case '--lang': case '-l': opts.lang = next(); break;
       case '--board': opts.board = true; break;
       case '--no-board': opts.board = false; break;
+      case '--mode': {
+        const val = next();
+        if (val !== 'quick' && val !== 'custom') {
+          console.error(`Unknown mode "${val}". Available: quick, custom`);
+          process.exit(2);
+        }
+        opts.mode = val;
+        break;
+      }
+      case '--skills': case '--scripts': case '--no-scripts': case '--docs': case '--no-docs':
+        applySelectionFlag(arg, next, catalog, opts);
+        break;
       case '--install-scripts': opts.installScripts = true; break;
       case '--force': case '-f': opts.force = true; break;
       case '--yes': case '-y': opts.yes = true; break;
