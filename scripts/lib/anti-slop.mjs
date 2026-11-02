@@ -5,7 +5,9 @@
  * Scans git diff for chained casts (as unknown as / as any as) in production code files.
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const TYPE_EVASION_REGEX = /\bas\s+(?:unknown|any)\s+as\b/;
@@ -79,6 +81,69 @@ export function checkDiffAntiSlop(projectRoot) {
     failures.push(...inspectDiffText(gitRes.stdout || ''));
   } catch (err) {
     warnings.push(`anti-slop: git diff inspection skipped (${err.message})`);
+  }
+
+  return {
+    passed: failures.length === 0,
+    failures,
+    warnings,
+  };
+}
+
+export async function checkStructuralHealth(projectRoot, options = {}) {
+  const failures = [];
+  const warnings = [];
+
+  const root = path.resolve(projectRoot || process.cwd());
+  const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.join(root, 'scripts', 'audit-engine.mjs'),
+    path.resolve(scriptDir, '..', 'audit-engine.mjs'),
+  ];
+  const enginePath = candidates.find((p) => fs.existsSync(p));
+  if (!enginePath) {
+    return { passed: true, failures, warnings };
+  }
+
+  let scanCodebase;
+  try {
+    const mod = await import(pathToFileURL(enginePath).href);
+    scanCodebase = mod.scanCodebase;
+  } catch (err) {
+    warnings.push(`structural health: failed to load audit engine (${err.message})`);
+    return { passed: true, failures, warnings };
+  }
+
+  if (typeof scanCodebase !== 'function') {
+    return { passed: true, failures, warnings };
+  }
+
+  const maxLines = options.maxLines || 1000;
+  const report = await scanCodebase(root, { maxLines });
+
+  const criticalLocViolations = (report?.loc?.violations || []).filter(
+    (v) => v.status === 'error' || v.lines >= 1000,
+  );
+  const criticalSuppressions = (report?.quality?.suppressions || []).filter(
+    (s) => s.type !== 'console.log',
+  );
+
+  const locCount = criticalLocViolations.length;
+  const suppCount = criticalSuppressions.length;
+
+  if (locCount > 0 || suppCount > 0) {
+    if (options.force) {
+      warnings.push(
+        `Structural health bypassed (--force): ${locCount} LOC violation(s), ${suppCount} suppression(s) skipped by PO authority.`,
+      );
+    } else {
+      for (const v of criticalLocViolations) {
+        failures.push(`file budget: "${v.file}" has ${v.lines} LOC, exceeding the 1000-line hard ceiling`);
+      }
+      for (const s of criticalSuppressions) {
+        failures.push(`anti-slop: quality suppression "${s.type}" detected in ${s.file}:${s.line}`);
+      }
+    }
   }
 
   return {

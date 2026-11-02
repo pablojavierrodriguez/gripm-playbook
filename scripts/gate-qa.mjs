@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { readFrontmatter, readACs, mutateTaskFrontmatter } from './lib/frontmatter.mjs';
 import { c, printHeader } from './lib/terminal.mjs';
 import { resolvePyramidSteps, executePyramid, readScripts } from './lib/pyramid.mjs';
+import { checkStructuralHealth } from './lib/anti-slop.mjs';
 import {
   loadTasks as loadTasksFromDir,
   resolveTaskPath as resolveTaskPathFromDir,
@@ -59,18 +60,12 @@ export function resolveProjectRoot(explicitRoot = null, targetPath = null) {
 
   if (targetPath && !targetPath.includes('/') && !targetPath.includes('\\')) {
     const cwdTasks = path.join(cwd, 'backlog', 'tasks');
-    if (fs.existsSync(cwdTasks) && resolveTaskPathFromDir(targetPath, cwdTasks)) {
-      return cwd;
-    }
+    if (fs.existsSync(cwdTasks) && resolveTaskPathFromDir(targetPath, cwdTasks)) return cwd;
     const parentTasks = path.join(scriptParent, 'backlog', 'tasks');
-    if (fs.existsSync(parentTasks) && resolveTaskPathFromDir(targetPath, parentTasks)) {
-      return scriptParent;
-    }
+    if (fs.existsSync(parentTasks) && resolveTaskPathFromDir(targetPath, parentTasks)) return scriptParent;
   }
 
-  if (isInNodeModules) {
-    return cwd;
-  }
+  if (isInNodeModules) return cwd;
 
   let isPlaybookRepo = false;
   try {
@@ -83,23 +78,18 @@ export function resolveProjectRoot(explicitRoot = null, targetPath = null) {
   if (!isPlaybookRepo && (fs.existsSync(path.join(scriptParent, 'package.json')) || fs.existsSync(path.join(scriptParent, 'backlog', 'tasks')))) {
     return scriptParent;
   }
-
   if (isPlaybookRepo && cwd !== scriptParent && (fs.existsSync(path.join(cwd, 'package.json')) || fs.existsSync(path.join(cwd, 'backlog', 'tasks')))) {
     return cwd;
   }
-
   if (fs.existsSync(path.join(cwd, 'backlog', 'tasks')) || fs.existsSync(path.join(cwd, 'package.json'))) {
     return cwd;
   }
-
   return scriptParent;
 }
 
 export function getExplicitRoot(argv = []) {
   for (let i = 0; i < argv.length; i++) {
-    if ((argv[i] === '--root' || argv[i] === '--cwd') && argv[i + 1]) {
-      return argv[i + 1];
-    }
+    if ((argv[i] === '--root' || argv[i] === '--cwd') && argv[i + 1]) return argv[i + 1];
     if (argv[i].startsWith('--root=')) return argv[i].split('=')[1];
     if (argv[i].startsWith('--cwd=')) return argv[i].split('=')[1];
   }
@@ -112,13 +102,11 @@ const TASKS_DIR = path.join(ROOT, 'backlog', 'tasks');
 export { readFrontmatter, readACs, mutateTaskFrontmatter, inspectTask, resolveActor, isSameActor, syncConsolidatedBacklog };
 
 export function loadTasks(tasksDir) {
-  const dir = tasksDir || path.join(resolveProjectRoot(), 'backlog', 'tasks');
-  return loadTasksFromDir(dir);
+  return loadTasksFromDir(tasksDir || path.join(resolveProjectRoot(), 'backlog', 'tasks'));
 }
 
 export function resolveTaskPath(target, tasksDir) {
-  const dir = tasksDir || path.join(resolveProjectRoot(null, target), 'backlog', 'tasks');
-  return resolveTaskPathFromDir(target, dir);
+  return resolveTaskPathFromDir(target, tasksDir || path.join(resolveProjectRoot(null, target), 'backlog', 'tasks'));
 }
 
 /**
@@ -163,28 +151,19 @@ export function resolvePyramid(root = resolveProjectRoot(), options = {}) {
         if (fs.existsSync(locScript)) {
           step.available = true;
           step.runner = (r) => {
-            const args = isStrict ? [locScript, '--strict'] : [locScript];
-            const res = spawnSync(process.execPath, args, { cwd: r, encoding: 'utf8' });
-            if (res.status === 0) {
-              return { state: 'passed', detail: isStrict ? 'strict modularity passed (< 1000 LOC)' : 'file budget checked' };
-            }
+            const res = spawnSync(process.execPath, isStrict ? [locScript, '--strict'] : [locScript], { cwd: r, encoding: 'utf8' });
+            if (res.status === 0) return { state: 'passed', detail: isStrict ? 'strict modularity passed (< 1000 LOC)' : 'file budget checked' };
             const tail = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-4).join('\n      ');
             return { state: 'failed', detail: `file budget failed (exit code ${res.status})${tail ? `\n      ${tail}` : ''}` };
           };
         }
       }
       if ((!step.available || delegatesToPlaybook('audit:ux:strict')) && step.id === 'audit:ux') {
+        const auditScript = path.resolve(SCRIPT_DIR, 'audit-ux-code.cjs');
         step.available = true;
         step.runner = (r) => {
-          const auditScript = path.resolve(SCRIPT_DIR, 'audit-ux-code.cjs');
-          const res = spawnSync(process.execPath, [auditScript, '--strict', '--quiet'], {
-            cwd: r,
-            encoding: 'utf8',
-            env: { ...process.env, AUDIT_UX_ROOT: r },
-          });
-          if (res.status === 0) {
-            return { state: 'passed', detail: 'packaged audit-ux --strict passed' };
-          }
+          const res = spawnSync(process.execPath, [auditScript, '--strict', '--quiet'], { cwd: r, encoding: 'utf8', env: { ...process.env, AUDIT_UX_ROOT: r } });
+          if (res.status === 0) return { state: 'passed', detail: 'packaged audit-ux --strict passed' };
           const tail = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-4).join('\n      ');
           return { state: 'failed', detail: `audit-ux failed (exit code ${res.status})${tail ? `\n      ${tail}` : ''}` };
         };
@@ -192,19 +171,10 @@ export function resolvePyramid(root = resolveProjectRoot(), options = {}) {
       if ((!step.available || delegatesToPlaybook('gate:review')) && step.id === 'spec') {
         step.available = true;
         step.runner = (r) => {
-          const tasksDir = path.join(r, 'backlog', 'tasks');
-          if (!fs.existsSync(tasksDir)) {
-            return { state: 'passed', detail: 'no backlog/tasks directory' };
-          }
+          if (!fs.existsSync(path.join(r, 'backlog', 'tasks'))) return { state: 'passed', detail: 'no backlog/tasks directory' };
           const reviewScript = path.resolve(SCRIPT_DIR, 'gate-review-items.mjs');
-          const res = spawnSync(process.execPath, [reviewScript], {
-            cwd: r,
-            encoding: 'utf8',
-            env: { ...process.env, GRIPM_ROOT: r },
-          });
-          if (res.status === 0) {
-            return { state: 'passed', detail: 'packaged review check passed' };
-          }
+          const res = spawnSync(process.execPath, [reviewScript], { cwd: r, encoding: 'utf8', env: { ...process.env, GRIPM_ROOT: r } });
+          if (res.status === 0) return { state: 'passed', detail: 'packaged review check passed' };
           const tail = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-4).join('\n      ');
           return { state: 'failed', detail: `spec review check failed (exit code ${res.status})${tail ? `\n      ${tail}` : ''}` };
         };
@@ -227,16 +197,11 @@ function getPositionalTarget(argv) {
 }
 
 export function unblockMain(argv) {
-  let target = null;
-  let targetStatus = 'doing';
+  let target = null, targetStatus = 'doing';
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--to' && argv[i + 1]) {
-      targetStatus = argv[++i];
-    } else if (argv[i] === '--root' || argv[i] === '--cwd') {
-      i += 1;
-    } else if (!argv[i].startsWith('--') && !target) {
-      target = argv[i];
-    }
+    if (argv[i] === '--to' && argv[i + 1]) targetStatus = argv[++i];
+    else if (argv[i] === '--root' || argv[i] === '--cwd') i += 1;
+    else if (!argv[i].startsWith('--') && !target) target = argv[i];
   }
   if (!target || !['doing', 'draft'].includes(targetStatus)) {
     printHeader('QA Gate · unblock');
@@ -245,7 +210,6 @@ export function unblockMain(argv) {
   }
 
   printHeader('QA Gate · unblock (T_unblock)');
-
   const explicitRoot = getExplicitRoot(argv);
   const projectRoot = resolveProjectRoot(explicitRoot, target);
   const tasksDir = path.join(projectRoot, 'backlog', 'tasks');
@@ -257,9 +221,7 @@ export function unblockMain(argv) {
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  console.log(`  ${c.dim('➜')} Task:    ${path.relative(projectRoot, taskPath)}`);
-  console.log(`    ID:      ${c.bold(frontmatter?.id ?? '(unreadable)')}`);
-  console.log(`    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
+  console.log(`  ${c.dim('➜')} Task:    ${path.relative(projectRoot, taskPath)}\n    ID:      ${c.bold(frontmatter?.id ?? '(unreadable)')}\n    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
 
   if (frontmatter?.status !== 'blocked') {
     console.log(`  ${c.dim('ℹ')} this item is "${frontmatter?.status ?? '(missing)'}", not "blocked"; T_unblock does not apply.\n`);
@@ -268,11 +230,9 @@ export function unblockMain(argv) {
 
   const { tasks, collisions } = loadTasks(tasksDir);
   const blockers = inspectTask({ content, frontmatter }, tasks).filter((f) => f.startsWith('unblock refused'));
-
   for (const collision of collisions) {
     blockers.push(`task id "${collision.id}" is declared by two files: ${collision.files.join(' and ')}`);
   }
-
   if (blockers.length) {
     console.log(`  ${c.bold('T_unblock guard:')}`);
     for (const blocker of blockers) console.log(`    ${c.red('✖')} ${blocker}`);
@@ -283,10 +243,7 @@ export function unblockMain(argv) {
   const updated = mutateTaskFrontmatter(content, { status: targetStatus, remove: ['blocked_reason'] });
   fs.writeFileSync(taskPath, updated, 'utf8');
   syncConsolidatedBacklog(projectRoot);
-
-  console.log(`  ${c.bold('T_unblock guard:')}`);
-  console.log(`    ${c.green('✔')} every dependency is done or unlinked`);
-  console.log(`\n  ${c.green('✔')} UNBLOCK ALLOWED - ${frontmatter.id} moved blocked → ${targetStatus}.\n`);
+  console.log(`  ${c.bold('T_unblock guard:')}\n    ${c.green('✔')} every dependency is done or unlinked\n\n  ${c.green('✔')} UNBLOCK ALLOWED - ${frontmatter.id} moved blocked → ${targetStatus}.\n`);
   process.exit(0);
 }
 
@@ -390,7 +347,7 @@ export function submitMain(argv) {
   process.exit(0);
 }
 
-export function main(argv) {
+export async function main(argv) {
   const target = getPositionalTarget(argv);
   if (!target) {
     printHeader('QA Gate');
@@ -417,9 +374,7 @@ export function main(argv) {
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  console.log(`  ${c.dim('➜')} Task:    ${path.relative(projectRoot, taskPath)}`);
-  console.log(`    ID:      ${c.bold(frontmatter?.id ?? '(unreadable)')}`);
-  console.log(`    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
+  console.log(`  ${c.dim('➜')} Task:    ${path.relative(projectRoot, taskPath)}\n    ID:      ${c.bold(frontmatter?.id ?? '(unreadable)')}\n    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
 
   const { tasks, collisions } = loadTasks(tasksDir);
   const failures = inspectTask({ content, frontmatter }, tasks, { certifier, projectRoot });
@@ -428,7 +383,14 @@ export function main(argv) {
     failures.push(`task id "${collision.id}" is declared by two files: ${collision.files.join(' and ')}. Task identity must be unique`);
   }
 
+  const isForced = argv.includes('--force');
+  const health = await checkStructuralHealth(projectRoot, { force: isForced });
+  failures.push(...health.failures);
+
   console.log(`  ${c.bold('Task inspection:')}`);
+  for (const w of health.warnings) {
+    console.log(`    ${c.yellow('▲')} ${w}`);
+  }
   if (failures.length) {
     for (const failure of failures) console.log(`    ${c.red('✖')} ${failure}`);
   } else {
@@ -492,5 +454,5 @@ if (invokedDirectly) {
   if (args[0] === 'unblock') unblockMain(args.slice(1));
   else if (args[0] === 'start') startMain(args.slice(1));
   else if (args[0] === 'submit') submitMain(args.slice(1));
-  else main(args);
+  else await main(args);
 }

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { inspectTask, loadTasks, mutateTaskFrontmatter, readFrontmatter, resolvePyramid, syncConsolidatedBacklog } from '../scripts/gate-qa.mjs';
-import { inspectDiffText, isTestOrFixturePath } from '../scripts/lib/anti-slop.mjs';
+import { inspectDiffText, isTestOrFixturePath, checkStructuralHealth } from '../scripts/lib/anti-slop.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GATE = path.join(ROOT, 'scripts', 'gate-qa.mjs');
@@ -1035,6 +1035,172 @@ describe('mechanical state transitions (T0, T1, T2, T_unblock)', () => {
       assert.equal(typeof locStep.runner, 'function');
       const outcome = locStep.runner(ROOT);
       assert.equal(outcome.state, 'passed');
+    });
+  });
+
+  describe('structural health mechanical guardrail (PLAY-054)', () => {
+    function makeHealthSandbox({ files = {} } = {}) {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-health-'));
+      fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'backlog', 'tasks'), { recursive: true });
+      fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+      fs.cpSync(path.join(ROOT, 'scripts', 'lib'), path.join(dir, 'scripts', 'lib'), { recursive: true });
+      fs.copyFileSync(path.join(ROOT, 'scripts', 'audit-engine.mjs'), path.join(dir, 'scripts', 'audit-engine.mjs'));
+      fs.copyFileSync(path.join(ROOT, 'scripts', 'check-loc.mjs'), path.join(dir, 'scripts', 'check-loc.mjs'));
+      fs.writeFileSync(
+        path.join(dir, 'package.json'),
+        JSON.stringify({
+          name: 'health-test-sandbox',
+          scripts: {
+            validate: 'node -e "process.exit(0)"',
+            test: 'node -e "process.exit(0)"',
+            'gate:review': 'node -e "process.exit(0)"',
+            'audit:ux:strict': 'node -e "process.exit(0)"',
+          },
+        }),
+      );
+
+      const taskPath = path.join(dir, 'backlog', 'tasks', 'PLAY-100.md');
+      fs.writeFileSync(
+        taskPath,
+        [
+          '---',
+          'id: PLAY-100',
+          'title: "Health task"',
+          'status: review',
+          'dependencies: []',
+          'priority: high',
+          '---',
+          '<!-- AC:BEGIN -->',
+          '- [x] #1 Done',
+          '<!-- AC:END -->',
+          '',
+        ].join('\n'),
+      );
+
+      for (const [relPath, content] of Object.entries(files)) {
+        const fullPath = path.join(dir, relPath);
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        fs.writeFileSync(fullPath, content, 'utf8');
+      }
+
+      return { dir, taskPath };
+    }
+
+    test('checkStructuralHealth programmatic API passes on clean directory', async () => {
+      const { dir } = makeHealthSandbox();
+      const res = await checkStructuralHealth(dir);
+      assert.equal(res.passed, true);
+      assert.equal(res.failures.length, 0);
+      assert.equal(res.warnings.length, 0);
+    });
+
+    test('File >= 1000 LOC blocks promotion to ready with exit code 1', async () => {
+      const bigContent = '// line\n'.repeat(1005);
+      const { dir, taskPath } = makeHealthSandbox({
+        files: { 'src/monolith.js': bigContent },
+      });
+
+      // 1. Programmatic API asserts failure
+      const health = await checkStructuralHealth(dir);
+      assert.equal(health.passed, false);
+      assert.ok(health.failures.some((f) => f.includes('exceeding the 1000-line hard ceiling')));
+
+      // 2. Gate CLI execution exits 1 and blocks promotion
+      let exitCode = 0;
+      let output = '';
+      try {
+        output = execFileSync(process.execPath, [path.join(dir, 'scripts', 'gate-qa.mjs'), taskPath, '--by', 'qa:peer'], {
+          cwd: dir,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (err) {
+        exitCode = err.status ?? 1;
+        output = `${err.stdout || ''}${err.stderr || ''}`;
+      }
+
+      assert.equal(exitCode, 1, 'Gate must exit code 1 when LOC ceiling is violated');
+      assert.match(output, /GATE FAILED/);
+      assert.match(output, /exceeding the 1000-line hard ceiling/);
+
+      // Verify task was NOT promoted
+      const taskContent = fs.readFileSync(taskPath, 'utf8');
+      assert.match(taskContent, /status:\s*review/);
+    });
+
+    test('Critical quality suppression (@ts-ignore) blocks promotion to ready with exit code 1', async () => {
+      const slopContent = 'const a = 1;\n// @ts-ignore\nconst b = 2;\n';
+      const { dir, taskPath } = makeHealthSandbox({
+        files: { 'src/evasion.ts': slopContent },
+      });
+
+      // 1. Programmatic API asserts failure
+      const health = await checkStructuralHealth(dir);
+      assert.equal(health.passed, false);
+      assert.ok(health.failures.some((f) => f.includes('anti-slop: quality suppression "@ts-ignore" detected')));
+
+      // 2. Gate CLI execution exits 1 and blocks promotion
+      let exitCode = 0;
+      let output = '';
+      try {
+        output = execFileSync(process.execPath, [path.join(dir, 'scripts', 'gate-qa.mjs'), taskPath, '--by', 'qa:peer'], {
+          cwd: dir,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (err) {
+        exitCode = err.status ?? 1;
+        output = `${err.stdout || ''}${err.stderr || ''}`;
+      }
+
+      assert.equal(exitCode, 1, 'Gate must exit code 1 when quality suppressions are present');
+      assert.match(output, /GATE FAILED/);
+      assert.match(output, /anti-slop: quality suppression "@ts-ignore"/);
+
+      // Verify task was NOT promoted
+      const taskContent = fs.readFileSync(taskPath, 'utf8');
+      assert.match(taskContent, /status:\s*review/);
+    });
+
+    test('--force bypasses structural health violations and allows promotion to ready with exit code 0', async () => {
+      const bigContent = '// line\n'.repeat(1005);
+      const slopContent = 'const a = 1;\n// @ts-ignore\nconst b = 2;\n';
+      const { dir, taskPath } = makeHealthSandbox({
+        files: {
+          'src/big.js': bigContent,
+          'src/suppressed.ts': slopContent,
+        },
+      });
+
+      // 1. Programmatic API with force returns passed: true and records warning
+      const health = await checkStructuralHealth(dir, { force: true });
+      assert.equal(health.passed, true);
+      assert.equal(health.failures.length, 0);
+      assert.equal(health.warnings.length, 1);
+      assert.match(health.warnings[0], /Structural health bypassed \(--force\): 1 LOC violation\(s\), 1 suppression\(s\) skipped by PO authority\./);
+
+      // 2. Gate CLI with --force exits 0 and promotes task to ready
+      let exitCode = 0;
+      let output = '';
+      try {
+        output = execFileSync(process.execPath, [path.join(dir, 'scripts', 'gate-qa.mjs'), taskPath, '--force', '--by', 'qa:peer'], {
+          cwd: dir,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (err) {
+        exitCode = err.status ?? 1;
+        output = `${err.stdout || ''}${err.stderr || ''}`;
+      }
+
+      assert.equal(exitCode, 0, `Gate must exit 0 with --force. Output: ${output}`);
+      assert.match(output, /GATE PASSED/);
+      assert.match(output, /Structural health bypassed \(--force\)/);
+
+      // Verify task WAS promoted to ready
+      const taskContent = fs.readFileSync(taskPath, 'utf8');
+      assert.match(taskContent, /status:\s*ready/);
     });
   });
 });

@@ -49,14 +49,14 @@ export function routeCli(subcommand, rest, fallbackSync) {
       });
   } else if (subcommand === 'gate' || subcommand === 'gate-qa') {
     import('../gate-qa.mjs')
-      .then((module) => {
+      .then(async (module) => {
         const sub = rest[0];
         if (sub === 'unblock') module.unblockMain(rest.slice(1));
         else if (sub === 'start') module.startMain(rest.slice(1));
         else if (sub === 'submit') module.submitMain(rest.slice(1));
         else {
           const args = rest.includes('--autonomous') ? rest : ['--autonomous', ...rest];
-          module.main(args);
+          await module.main(args);
         }
       })
       .catch((err) => {
@@ -65,6 +65,13 @@ export function routeCli(subcommand, rest, fallbackSync) {
       });
   } else if (subcommand === 'audit' || subcommand === 'audit-ux') {
     const auditScript = path.join(SCRIPT_DIR, 'audit-ux-code.cjs');
+    const result = spawnSync(process.execPath, [auditScript, ...rest], {
+      stdio: 'inherit',
+      env: process.env,
+    });
+    process.exit(result.status ?? 0);
+  } else if (subcommand === 'audit-repo') {
+    const auditScript = path.join(SCRIPT_DIR, 'audit-engine.mjs');
     const result = spawnSync(process.execPath, [auditScript, ...rest], {
       stdio: 'inherit',
       env: process.env,

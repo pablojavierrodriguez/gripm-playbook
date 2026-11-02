@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * scripts/check-loc.mjs
  *
@@ -355,6 +353,7 @@ Options:
   process.exit(0);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+const isDirectEntry = process.argv[1] && path.resolve(process.argv[1]) === __filename && path.basename(process.argv[1]).includes('check-loc');
+if (isDirectEntry) {
   runCli();
 }
