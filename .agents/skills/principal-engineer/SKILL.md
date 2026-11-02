@@ -186,12 +186,27 @@ For deterministic static analysis rules, `.oxlintrc.json` configuration, and AST
 
 ---
 
+### 15. Static Repository Diagnostic & Health Assessment
+
+When entering an existing codebase or preparing non-trivial changes, the agent must perform an initial static code diagnostic before writing or refactoring code. Operating blindly without knowing the project baseline leads to compounding structural decay and accidental regressions.
+
+Follow this diagnostic protocol:
+
+1. **Detect Tooling & Audit Surface:**
+   - **When `@gripm/board` is active in the repository:** call MCP tool `gripm_get_repo_health` to retrieve the current repository health score (0 - 100), file budget violations (files >= 1000 LOC), anti-slop debt, and pending TODO / FIXME density.
+   - **When `@gripm/board` is not present:** run `npm run audit:repo` (or `npx @gripm/playbook audit`) in terminal to execute headless static checks and inspect file budgets.
+2. **Never Regress the Health Score:**
+   - An engineering intervention must preserve or improve the baseline health score.
+   - Respect modular limits (< 1000 LOC per file; healthy range: 150 - 500 lines). Never grow an already oversized file.
+   - Never introduce unsuppressed anti-slop patterns, type evasions (`as unknown as`, `as any as`), or silent debt into production code.
+
 ---
 
 ## Pre-Handoff Checklist
 
 - [ ] Typecheck and build are clean
 - [ ] Headless tests are green
+- [ ] Repository health score maintained or improved (no new LOC violations or anti-slop debt)
 - [ ] Project invariants respected (`.agents/rules/`)
 - [ ] No secrets or sensitive data in code
 - [ ] No performance regression on touched paths

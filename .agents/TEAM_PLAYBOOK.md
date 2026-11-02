@@ -124,7 +124,7 @@ Transitions, actors, and guards are specified in [STATE_MACHINE.md](STATE_MACHIN
 
 ### Phase 1: Briefing & Alignment (PM Orchestrator / PO)
 - **Input:** Backlog item or user requirement.
-- **Action:** Initializes task or sprint spec using `docs/sprints/SPRINT_SPEC_TEMPLATE.md`. Refines the item until it passes the **refinement gate (R1)**: problem statement, scoped in/out, measurable ACs, priority, and architecture readiness (boundaries and contracts established if none exist).
+- **Action:** Initializes task or sprint spec (when operating with sprint specifications). Refines the item until it passes the **refinement gate (R1)**: problem statement, scoped in/out, measurable ACs, priority, and architecture readiness (boundaries and contracts established if none exist).
 - **Output:** Clear problem statement, target personas, and measurable acceptance criteria (ACs).
 
 ### Phase 2: Benchmarking & Experience Design (Researcher + Designer)

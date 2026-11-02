@@ -27,6 +27,7 @@ Refinement is a **gate**, not a status. Every backlog task is created with `stat
 4. **Assigned Priority** defined by the Product Owner.
 5. **Ambiguities Explicitly Resolved** (see the Structured Refinement Interview below). An item based on unverified assumptions fails Gate R1, regardless of how well-drafted its ACs are.
 6. **Prior Architecture and Modularity.** If the item introduces new domains or flows and the project lacks an established architecture, designing boundaries, layers, and contracts is a prerequisite in the technical plan before writing code, ensuring no file exceeds 1000 lines.
+7. **Repository Health Assessment.** Before refining tasks, accepting complex initiatives, or opening sprints in legacy or existing codebases, inspect repository health. If `@gripm/board` is active in the repository, call MCP tool `gripm_get_repo_health` to evaluate the health score, file budgets, and code hygiene baseline. If `@gripm/board` is not present, run `npm run audit:repo` (or `npx @gripm/playbook audit`) in terminal. If the health score is below 80 or files exceed 1000 LOC, prioritize technical debt reduction or isolate changes strictly to prevent compounding structural instability.
 
 Record the task as an individual markdown file in `backlog/tasks/<ID> - <slug>.md` with canonical YAML frontmatter and acceptance criteria delimiters:
 
@@ -68,6 +69,7 @@ Before considering Gate R1 passed and moving to `doing` (`node scripts/gate-qa.m
 | Dimension | Question to Ask |
 | :--- | :--- |
 | **Architecture & Modularity** | Is there an established architecture for this flow? How is it partitioned into independent modules or components (< 1000 LOC) avoiding God-Files? |
+| **Repository Health** | What is the repository health score and file budget baseline? Are there God-Files (>= 1000 LOC) or technical debt that must be isolated or remediated before building? |
 | **Edge Cases** | How should the system handle empty, boundary, negative, or duplicated inputs? |
 | **Fallbacks** | What does the user see when this dependency fails? Do we present an error, hide the component, or degrade gracefully? |
 | **Empty States** | What is rendered when there is zero data? Is this a genuine product state or an unconsidered case? |
@@ -101,7 +103,7 @@ This serves two concrete purposes:
 
 The `pm-orchestrator` coordinates from the host thread and **dispatches clean-context sub-agents** with explicit input/output contracts:
 
-1. Initialize the sprint document from `docs/sprints/SPRINT_SPEC_TEMPLATE.md` (Mode 3) or outline the plan in chat (Mode 2).
+1. Initialize the sprint document (Mode 3, when operating with sprints) or outline the plan in chat (Mode 2), including a repository health diagnostic (`gripm_get_repo_health` via MCP or `npm run audit:repo`) to identify baseline risks.
 2. **Dispatch `market-researcher` Sub-Agent** (when applicable): `TypeName: "research"`, read-only + web search; receives problem statement and domain; reads `.agents/skills/market-researcher/SKILL.md` and returns `[RESEARCH]` brief with >= 3 benchmarks and domain edge-case table.
 3. **Dispatch `product-designer` Sub-Agent** (Modes 2 and 3): `TypeName: "research"` (or `"self"` if generating visual assets); receives brief + ACs + project design tokens; reads `.agents/skills/product-designer/SKILL.md` and returns `[DESIGN SPEC]` covering all 7 states, >= 44×44px touch targets, Purpose Test verdicts, and copy veracity.
 4. Present the plan to the user for formal approval before writing code.

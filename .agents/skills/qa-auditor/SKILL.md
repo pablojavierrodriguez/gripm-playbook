@@ -38,7 +38,10 @@ node scripts/check-loc.mjs
 node scripts/gate-qa.mjs TASK-ID --strict
 ```
 
-Verifies the 1000 LOC ceiling per source file. By default it runs in advisory mode respecting PO sovereignty (technical debt notice, non-blocking exit 0). When invoked with `--strict`, any file >= 1000 LOC blocks certification (exit 1).
+Verifies the 1000 LOC ceiling per source file, structural modularity, and repository code health:
+- **File Budget Check:** Verifies that no source file reaches or exceeds 1000 lines of code. By default it runs in advisory mode respecting PO sovereignty (technical debt notice, non-blocking exit 0). When invoked with `--strict`, any file >= 1000 LOC blocks certification (exit 1).
+- **Anti-Slop Debt Check:** Audits that changes do not introduce type evasions (`as unknown as`, `as any as`), unsuppressed linter silencers, or artificial AI slop into production code.
+- **Repository Health Verification:** When `@gripm/board` is active in the repository, inspect `gripm_get_repo_health` via MCP to confirm that the health score has not regressed. When `@gripm/board` is not present, run `npm run audit:repo` (or `npx @gripm/playbook audit`) in terminal.
 
 ### Step 5 - Static UX Audit
 
@@ -143,10 +146,11 @@ Execute invariants declared in `.agents/rules/`. Common generic ones (sign non-n
 - Navigate away and back N times without listener or memory growth.
 - Requests cancelled on unmount (no state-update warnings on unmounted components).
 
-### 7. Modularity and File Budget (< 1000 LOC)
+### 7. Modularity, File Budget (< 1000 LOC), and Code Health
 
 - **1000-line budget and Debt Visibility:** Verify whether any new or modified file reaches or exceeds **1000 lines of code**. If a file exceeds this threshold, QA documents it as a technical debt finding. The PO arbitrates whether an immediate refactor is required before certifying (`REJECTED → doing`) or the delivery is approved while registering a properly prioritized refactor task in the backlog to avoid blocking priority value delivery.
 - **Anti-God-File & Decoupling:** Verify that UI, pure domain logic, and network/data-access calls have not been concentrated in a single monolithic file. Business logic must reside in its own decoupled domain modules.
+- **Anti-Slop Debt & Health Non-Regression:** Verify that changes do not introduce type evasions (`as unknown as`, `as any as`) or AI code slop. When `@gripm/board` is active, check `gripm_get_repo_health` via MCP (or run `npm run audit:repo` in terminal when absent) to confirm that the health score was not degraded by the pull request or task.
 
 ---
 
