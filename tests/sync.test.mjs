@@ -162,4 +162,37 @@ describe('runPlaybookSync with local source', () => {
     fs.rmSync(srcDir, { recursive: true, force: true });
     fs.rmSync(targetDir, { recursive: true, force: true });
   });
+
+  test('supports optional script selection including audit:repo without imposing them', async () => {
+    const srcDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-src-scripts-'));
+    const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-tgt-scripts-'));
+
+    const manifest = {
+      version: '2.8.0',
+      core: ['.agents/STATE_MACHINE.md', '.agents/TEAM_PLAYBOOK.md'],
+    };
+    fs.writeFileSync(path.join(srcDir, '.playbook-manifest.json'), JSON.stringify(manifest), 'utf8');
+    fs.mkdirSync(path.join(srcDir, '.agents'), { recursive: true });
+    fs.writeFileSync(path.join(srcDir, '.agents/STATE_MACHINE.md'), '# State Machine Local', 'utf8');
+    fs.writeFileSync(path.join(srcDir, '.agents/TEAM_PLAYBOOK.md'), '# Team Playbook Local', 'utf8');
+
+    const result = await runPlaybookSync(targetDir, {
+      source: srcDir,
+      yes: true,
+      selection: {
+        skills: ['qa-auditor'],
+        scripts: ['audit:repo', 'audit:repo:strict'],
+        docs: [],
+      },
+    });
+
+    assert.equal(result.created, 2);
+
+    const lockFile = path.join(targetDir, '.gripm', 'playbook-lock.json');
+    const lock = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+    assert.deepEqual(lock.selection.scripts, ['audit:repo', 'audit:repo:strict']);
+
+    fs.rmSync(srcDir, { recursive: true, force: true });
+    fs.rmSync(targetDir, { recursive: true, force: true });
+  });
 });

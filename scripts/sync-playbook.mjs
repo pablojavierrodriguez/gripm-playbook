@@ -78,6 +78,7 @@ export const FALLBACK_CORE_FILES = [
   'scripts/gate-qa.mjs',
   'scripts/gate-review-items.mjs',
   'scripts/check-loc.mjs',
+  'scripts/audit-engine.mjs',
   'scripts/validate-commit-msg.mjs',
   'scripts/ux-rules.json',
   'scripts/sync-playbook.mjs',
@@ -484,15 +485,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
       printUsage();
     } else if (opts.listStacks) {
       // --list-stacks keeps its historical remote behaviour; auto-detect arms only sync/init.
-      listStacks(opts.remote || DEFAULT_REMOTE, opts.source).catch((err) => {
-        console.error('Fatal:', err.message);
-        process.exit(2);
-      });
+      listStacks(opts.remote || DEFAULT_REMOTE, opts.source).catch((err) => { console.error('Fatal:', err.message); process.exit(2); });
     } else {
-      runPlaybookSync(opts.repo, opts).catch((err) => {
-        console.error('Fatal:', err.message);
-        process.exit(2);
-      });
+      runPlaybookSync(opts.repo, opts).catch((err) => { console.error('Fatal:', err.message); process.exit(2); });
     }
   });
 }

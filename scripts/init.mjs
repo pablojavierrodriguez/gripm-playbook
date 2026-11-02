@@ -79,6 +79,7 @@ const BOARD_DEFAULTS = {
     showDoneHistoryByDefault: false,
     wipLimits: { 'col-doing': 0, 'col-review': 0, 'col-ready': 0 },
   },
+  audit: { maxLines: 1000, warnLines: 500, strict: false },
   version: '1.0.0',
 };
 
@@ -265,6 +266,15 @@ function writeBoardConfig(repo, answers, opts) {
   const file = path.join(dir, 'config.json');
 
   if (fs.existsSync(file) && !opts.force) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (!existing.audit) {
+        existing.audit = { maxLines: 1000, warnLines: 500, strict: false };
+        fs.writeFileSync(file, `${JSON.stringify(existing, null, 2)}\n`, 'utf8');
+        console.log(`  ${c.green('✔')} ${c.green('updated'.padEnd(10))} .gripm/config.json ${c.dim('(audit thresholds added)')}`);
+        return;
+      }
+    } catch {}
     console.log(`  ${c.dim('•')} ${c.dim('preserved'.padEnd(10))} .gripm/config.json ${c.dim('(existing board settings)')}`);
   } else {
     const name = answers.projectName;
@@ -356,6 +366,10 @@ export async function runInit(argv = []) {
   }
 
   const repo = path.resolve(opts.repo);
+  const pkg = readPackageJson(repo);
+  const deps = dependenciesOf(pkg);
+  const hasBoardOrTasks = Boolean(deps['@gripm/board'] || fs.existsSync(path.join(repo, 'backlog', 'tasks')));
+
   printHeader('Playbook Init');
   console.log(`  ${c.dim('➜')}  ${c.dim('Target:')}      ${repo}`);
 
@@ -378,19 +392,10 @@ export async function runInit(argv = []) {
   console.log(`  ${c.dim('➜')}  ${c.dim('Gripm Board:')}  ${answers.board ? 'yes' : 'no'}\n`);
 
   await runPlaybookSync(repo, {
-    source: opts.source,
-    tag: opts.tag,
-    remote: opts.remote,
-    stacks: answers.stacks,
-    initAgents: true,
-    yes: opts.yes,
-    force: opts.force,
+    source: opts.source, tag: opts.tag, remote: opts.remote,
+    stacks: answers.stacks, initAgents: true, yes: opts.yes, force: opts.force,
     installScripts: opts.installScripts,
-    selection: {
-      skills: answers.skills,
-      scripts: answers.scripts,
-      docs: answers.docs,
-    },
+    selection: { skills: answers.skills, scripts: answers.scripts, docs: answers.docs },
   });
 
   if (!parametrizeAgentsMdFile(repo, answers)) return;
@@ -398,7 +403,9 @@ export async function runInit(argv = []) {
   writeAdapters(repo, answers, opts);
   writeItemPool(repo);
   addPlaybookScripts(repo, answers.scripts);
-  if (answers.board) writeBoardConfig(repo, answers, opts);
+  if (answers.board || (hasBoardOrTasks && opts.board !== false)) {
+    writeBoardConfig(repo, answers, opts);
+  }
 
   console.log(`
   ${c.bold('Next steps')}
@@ -411,26 +418,11 @@ export async function runInit(argv = []) {
 function parseArgs(argv) {
   const catalog = loadCatalogFromManifest();
   const opts = {
-    repo: process.cwd(),
-    source: null,
-    tag: null,
-    remote: undefined,
-    stacks: [],
-    harnesses: [],
-    name: null,
-    lang: null,
-    board: null,
-    force: false,
-    yes: false,
-    listHarnesses: false,
-    help: false,
-    installScripts: false,
-    mode: null,
-    skills: null,
-    scripts: null,
-    docs: null,
-    noScripts: false,
-    noDocs: false,
+    repo: process.cwd(), source: null, tag: null, remote: undefined,
+    stacks: [], harnesses: [], name: null, lang: null, board: null,
+    force: false, yes: false, listHarnesses: false, help: false,
+    installScripts: false, mode: null, skills: null, scripts: null,
+    docs: null, noScripts: false, noDocs: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {

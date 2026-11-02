@@ -26,6 +26,8 @@ export const VALID_SCRIPTS = [
   'gate:review',
   'audit:ux',
   'audit:ux:strict',
+  'audit:repo',
+  'audit:repo:strict',
   'check:loc',
   'validate:commit',
 ];
@@ -35,6 +37,8 @@ export const SCRIPT_DEFINITIONS = {
   'gate:review': 'playbook review',
   'audit:ux': 'playbook audit',
   'audit:ux:strict': 'playbook audit --strict',
+  'audit:repo': 'playbook audit-repo',
+  'audit:repo:strict': 'playbook audit-repo --strict',
   'check:loc': 'playbook check-loc',
   'validate:commit': 'playbook validate-commit',
 };
@@ -68,6 +72,8 @@ export const SCRIPT_LABELS = {
   'gate:review': 'gate:review       - playbook review (review items check)',
   'audit:ux': 'audit:ux          - playbook audit (static UX auditor)',
   'audit:ux:strict': 'audit:ux:strict   - playbook audit --strict',
+  'audit:repo': 'audit:repo        - playbook audit-repo (codebase health & anti-slop)',
+  'audit:repo:strict': 'audit:repo:strict - playbook audit-repo --strict',
   'check:loc': 'check:loc         - playbook check-loc (file budget & modularity)',
   'validate:commit': 'validate:commit   - playbook validate-commit (Conventional Commits)',
 };

@@ -11,6 +11,7 @@ import {
   resolveSelection,
   loadCatalogFromManifest,
   VALID_SCRIPTS,
+  SCRIPT_DEFINITIONS,
   VALID_DOCS,
   DEFAULT_CORE_SKILLS,
 } from '../scripts/lib/selection.mjs';
@@ -83,6 +84,13 @@ describe('selection.mjs unit tests', () => {
     assert.deepEqual(res.skills, ['principal-engineer']);
     assert.deepEqual(res.scripts, ['check:loc']);
     assert.deepEqual(res.docs, ['domain']);
+  });
+
+  test('VALID_SCRIPTS includes audit:repo and audit:repo:strict with correct definitions', () => {
+    assert.ok(VALID_SCRIPTS.includes('audit:repo'));
+    assert.ok(VALID_SCRIPTS.includes('audit:repo:strict'));
+    assert.equal(SCRIPT_DEFINITIONS['audit:repo'], 'playbook audit-repo');
+    assert.equal(SCRIPT_DEFINITIONS['audit:repo:strict'], 'playbook audit-repo --strict');
   });
 });
 
@@ -346,6 +354,100 @@ describe('E2E init & sync with granular selection', () => {
     assert.ok(fs.existsSync(path.join(tmp, '.agents/skills/pm-orchestrator/SKILL.md')));
     assert.ok(fs.existsSync(path.join(tmp, '.agents/skills/principal-engineer/SKILL.md')));
     assert.ok(fs.existsSync(path.join(tmp, '.agents/skills/qa-auditor/SKILL.md')));
+
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  test('init with --scripts audit:repo,audit:repo:strict installs audit scripts into package.json', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-init-audit-scripts-'));
+    fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'audit-scripts-proj' }), 'utf8');
+
+    const res = spawnSync(process.execPath, [
+      INIT_CLI,
+      '--repo', tmp,
+      '--source', REPO_ROOT,
+      '--mode', 'custom',
+      '--skills', 'qa-auditor',
+      '--scripts', 'audit:repo,audit:repo:strict',
+      '--no-docs',
+      '--no-board',
+      '--yes',
+    ], {
+      encoding: 'utf8',
+    });
+
+    assert.equal(res.status, 0, `Init failed: ${res.stderr || res.stdout}`);
+
+    const pkg = JSON.parse(fs.readFileSync(path.join(tmp, 'package.json'), 'utf8'));
+    assert.equal(pkg.scripts['audit:repo'], 'playbook audit-repo');
+    assert.equal(pkg.scripts['audit:repo:strict'], 'playbook audit-repo --strict');
+    assert.equal(pkg.scripts['gate:qa'], undefined);
+
+    const lock = readLock(tmp);
+    assert.deepEqual(lock.selection.scripts, ['audit:repo', 'audit:repo:strict']);
+
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  test('init synchronizes audit thresholds in .gripm/config.json when @gripm/board is present', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-board-sync-'));
+    fs.writeFileSync(
+      path.join(tmp, 'package.json'),
+      JSON.stringify({
+        name: 'board-sync-proj',
+        devDependencies: { '@gripm/board': '^1.0.0' },
+      }, null, 2),
+      'utf8'
+    );
+    fs.mkdirSync(path.join(tmp, '.gripm'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmp, '.gripm/config.json'),
+      JSON.stringify({ theme: 'dark', density: 'comfortable', version: '1.0.0' }, null, 2),
+      'utf8'
+    );
+
+    const res = spawnSync(process.execPath, [
+      INIT_CLI,
+      '--repo', tmp,
+      '--source', REPO_ROOT,
+      '--yes',
+    ], {
+      encoding: 'utf8',
+    });
+
+    assert.equal(res.status, 0, `Init failed: ${res.stderr || res.stdout}`);
+
+    const updatedConfig = JSON.parse(fs.readFileSync(path.join(tmp, '.gripm/config.json'), 'utf8'));
+    assert.deepEqual(updatedConfig.audit, { maxLines: 1000, warnLines: 500, strict: false });
+    assert.equal(updatedConfig.theme, 'dark');
+
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  test('init synchronizes audit thresholds when backlog/tasks/ directory exists', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-tasks-sync-'));
+    fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'tasks-sync-proj' }), 'utf8');
+    fs.mkdirSync(path.join(tmp, 'backlog', 'tasks'), { recursive: true });
+    fs.mkdirSync(path.join(tmp, '.gripm'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmp, '.gripm/config.json'),
+      JSON.stringify({ projectName: 'tasks-sync-proj', theme: 'dark' }, null, 2),
+      'utf8'
+    );
+
+    const res = spawnSync(process.execPath, [
+      INIT_CLI,
+      '--repo', tmp,
+      '--source', REPO_ROOT,
+      '--yes',
+    ], {
+      encoding: 'utf8',
+    });
+
+    assert.equal(res.status, 0, `Init failed: ${res.stderr || res.stdout}`);
+
+    const updatedConfig = JSON.parse(fs.readFileSync(path.join(tmp, '.gripm/config.json'), 'utf8'));
+    assert.deepEqual(updatedConfig.audit, { maxLines: 1000, warnLines: 500, strict: false });
 
     fs.rmSync(tmp, { recursive: true, force: true });
   });
