@@ -530,14 +530,14 @@ const EXPRESSION_LABEL = 'label';
  * Removes `{...}` expression containers, respecting nesting and quotes.
  *
  * A JSX expression renders whatever it evaluates to, not its own source, so the
- * source cannot be read as visible text — with one exception, `keep`. An
+ * source cannot be read as visible text - with one exception, `keep`. An
  * expression sitting in the CHILD LIST that is itself a label does render text:
  * `{t('header.newItem')}` is the whole reason an internationalized control used
  * to be indistinguishable from an icon-only one.
  *
  * LOCATION is the entire distinction, never "stop stripping". Attributes never
  * reach this function (they live in the opening tag, which the child-region
- * segments skip), so `onClick={() => go()}` is still discarded — and
+ * segments skip), so `onClick={() => go()}` is still discarded - and
  * `isTextExpression` rejects any arrow outright, so a handler that somehow landed
  * in a child position could not become a label either.
  */
@@ -593,15 +593,14 @@ function stripExpressions(source, keep = () => false) {
 /**
  * Whether a child-position expression is itself a visible label.
  *
- * A call or a literal renders text — `t('common.delete')`, `i18n.t('x')` and
+ * A call or a literal renders text - `t('common.delete')`, `i18n.t('x')` and
  * `` `Saved ${n}` `` are the everyday spelling of a localized label. Anything
  * that builds a subtree (`{cond && <X />}`, `{items.map(...)}`) renders
  * elements, not text, and whatever text it eventually shows belongs to that
  * subtree, which is parsed and weighted on its own.
  *
  * Quoted arguments are blanked before the verdict so a key cannot decide it:
- * `t('is it?')` is a label, `cond && label` is not. `=>` is rejected outright —
- * an arrow is code, never a name.
+ * `t('is it?')` is a label, `cond && label` is not. `=>` is rejected outright - * an arrow is code, never a name.
  */
 function isTextExpression(inner) {
   const code = inner.trim().replace(/\?\./g, '.');
@@ -634,7 +633,7 @@ function isTextExpression(inner) {
  *
  * `{cond && <span>Guardar</span>}` is not a label. When the condition is false
  * the control renders no name at all, and deciding which branch is live is the
- * author's call, not the detector's — counting that subtree upwards would
+ * author's call, not the detector's - counting that subtree upwards would
  * silence a finding for a control whose accessible name is not guaranteed.
  */
 const CONDITIONAL_PREFIX = /[&|?:(]/;
@@ -798,7 +797,7 @@ function buildUnits(lines) {
   }
 
   // An element's own content: its source minus the source of every nested
-  // element. Without this level a wrapper inherits its child's signature — a
+  // element. Without this level a wrapper inherits its child's signature - a
   // `<div>` around `<span>{format(date, "MMMM")}</span>` would report the date
   // leak and point at the wrapper instead of the element rendering the value.
   // Renderable text, bottom-up: an element's own text plus the text its
@@ -810,7 +809,7 @@ function buildUnits(lines) {
   //
   // Descendant text has to be included. A control labelled `<Icon /><span>
   // Guardar</span>` shows "Guardar" to the user, so counting only the element's
-  // direct text nodes would call it unlabelled — which is how `unlessVisibleText`
+  // direct text nodes would call it unlabelled - which is how `unlessVisibleText`
   // ended up inert for the most common button shape there is.
   for (const frame of allFrames) {
     const segments = [];
@@ -867,7 +866,7 @@ function ruleAppliesToProject(rule, relPath, deps) {
   if ((check.unlessFile || []).some((token) => relPath.includes(token))) return false;
 
   // The positive counterpart of `unlessFile`. Without it a rule scoped by
-  // context — "`truncate` inside a dialog" — cannot be expressed at all, because
+  // context - "`truncate` inside a dialog" - cannot be expressed at all, because
   // a file filter can only ever switch a rule off.
   if ((check.onlyFile || []).length
     && !(check.onlyFile || []).some((token) => relPath.includes(token))) return false;
@@ -934,8 +933,8 @@ function isWithinComponent(unit, tokens) {
  *
  *   `needsContent`, `unlessContent`  →  `unit.scopeText`, the element plus every
  *       descendant. "Does this button contain an icon?" is a question about the
- *       subtree, so evaluating it against the whole file — as an earlier version
- *       did — made one `Icon` declaration turn every button in the file into an
+ *       subtree, so evaluating it against the whole file - as an earlier version
+ *       did - made one `Icon` declaration turn every button in the file into an
  *       icon-only button.
  *
  * `unlessVisibleText` reads that same subtree but semantically, for rules about
@@ -978,7 +977,7 @@ function auditFile(filePath, rules, deps, disabledRules, root = ROOT) {
   // match the same snapshot read on macOS and vice versa. Without the
   // normalization the keys are `src\App.tsx` on one platform and `src/App.tsx`
   // on the other, nothing matches, and the gate silently reports every
-  // accepted observation as new — the same normalization `applyExcludes`
+  // accepted observation as new - the same normalization `applyExcludes`
   // already performs for `exclude` globs.
   const relPath = toPosixPath(path.relative(root, filePath));
 

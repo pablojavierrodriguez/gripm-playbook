@@ -9,12 +9,14 @@
     "gripm-playbook": "scripts/sync-playbook.mjs",
     "gate-qa": "scripts/gate-qa.mjs",
     "audit-ux": "scripts/audit-ux-code.cjs",
+    "audit-repo": "scripts/audit-engine.mjs",
     "check-loc": "scripts/check-loc.mjs",
     "validate-commit": "scripts/validate-commit-msg.mjs"
   },
   "exports": {
     ".": "./scripts/sync-playbook.mjs",
     "./audit": "./scripts/audit-ux-code.cjs",
+    "./audit-engine": "./scripts/audit-engine.mjs",
     "./gate": "./scripts/gate-qa.mjs",
     "./check-loc": "./scripts/check-loc.mjs",
     "./validate-commit": "./scripts/validate-commit-msg.mjs",
@@ -30,6 +32,8 @@
     "audit:ux": "node scripts/audit-ux-code.cjs",
     "audit:ux:strict": "node scripts/audit-ux-code.cjs --strict",
     "audit:ux:baseline": "node scripts/audit-ux-code.cjs --update-baseline",
+    "audit:repo": "node scripts/audit-engine.mjs",
+    "audit:repo:strict": "node scripts/audit-engine.mjs --strict",
     "rules": "node scripts/audit-ux-code.cjs --list-rules",
     "validate": "node scripts/validate-repo.mjs",
     "test": "node --test tests/*.test.mjs",

@@ -35,7 +35,7 @@ function sandbox(mutate) {
       fs.cpSync(from, path.join(dir, rel), { recursive: true });
     }
   }
-  for (const rel of ['package.json', '.playbook-manifest.json', 'AGENTS.md', 'CONTRIBUTING.md', 'CHANGELOG.md']) {
+  for (const rel of ['package.json', '.playbook-manifest.json', 'AGENTS.md', 'CONTRIBUTING.md', 'CHANGELOG.md', '.locignore', '.gitignore']) {
     const from = path.join(ROOT, rel);
     if (fs.existsSync(from)) fs.copyFileSync(from, path.join(dir, rel));
   }

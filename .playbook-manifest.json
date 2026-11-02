@@ -16,6 +16,7 @@
     "scripts/gate-qa.mjs",
     "scripts/gate-review-items.mjs",
     "scripts/check-loc.mjs",
+    "scripts/audit-engine.mjs",
     "scripts/validate-commit-msg.mjs",
     "scripts/ux-rules.json",
     "scripts/sync-playbook.mjs",
