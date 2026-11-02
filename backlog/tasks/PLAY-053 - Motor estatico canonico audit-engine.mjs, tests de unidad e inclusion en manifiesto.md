@@ -1,9 +1,9 @@
 ---
 id: PLAY-053
 title: "Motor estatico canonico audit-engine.mjs, tests de unidad e inclusion en manifiesto"
-status: ready
+status: done
 created_date: '2026-11-01'
-updated_date: '2026-11-01'
+updated_date: '2026-11-02'
 labels: []
 dependencies: []
 priority: high

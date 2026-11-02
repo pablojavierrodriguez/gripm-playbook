@@ -1,14 +1,14 @@
 ---
 id: PLAY-050
 title: "Reestructuracion del README bajo piramide invertida y progressive disclosure"
-status: ready
+status: done
 created_date: '2026-10-26'
-updated_date: '2026-10-26'
+updated_date: '2026-11-02'
 labels: ["docs", "ux", "onboarding", "craftsmanship"]
 dependencies: []
 priority: high
 type: chore
-claimed_by: "antigravity:dev"
+claimed_by: ""
 ---
 
 ## Description

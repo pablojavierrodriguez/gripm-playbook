@@ -1,9 +1,9 @@
 ---
 id: PLAY-056
 title: "Sinergia opcional con gripm board y exportacion modular en selection.mjs e init.mjs"
-status: ready
+status: done
 created_date: '2026-11-01'
-updated_date: '2026-11-01'
+updated_date: '2026-11-02'
 labels: []
 dependencies:
   - PLAY-053

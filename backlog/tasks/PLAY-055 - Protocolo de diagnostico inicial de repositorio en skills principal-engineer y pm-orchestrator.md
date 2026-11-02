@@ -1,9 +1,9 @@
 ---
 id: PLAY-055
 title: "Protocolo de diagnostico inicial de repositorio en skills principal-engineer y pm-orchestrator"
-status: ready
+status: done
 created_date: '2026-11-01'
-updated_date: '2026-11-01'
+updated_date: '2026-11-02'
 labels: []
 dependencies: []
 priority: medium

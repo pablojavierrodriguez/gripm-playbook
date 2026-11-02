@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.8.0] - 2026-11-02
+
+`PLAY-050` · `PLAY-051` · `PLAY-052` · `PLAY-053` · `PLAY-054` · `PLAY-055` · `PLAY-056`
+
+### Added
+
+- **Canonical Codebase Health & Diagnostic Engine** (`PLAY-052`, `PLAY-053`). Implemented `scripts/audit-engine.mjs` (accessible via binary `audit-repo`, `playbook audit`, or programmatically). Provides automated multi-stack analysis (Node, React, Vue, TypeScript, Python, Rust, Go), test runner detection (vitest, jest, node:test, pytest, cargo test, go test), modularity budget scanning, quality anti-slop suppression auditing (@ts-ignore, @ts-nocheck, eslint-disable, console.log), hidden debt marker extraction (TODO, FIXME, HACK, BUG), and a deterministic weighted Health Score (0 - 100). Includes dedicated CLI flags (`--format json`, `--strict`, `--quiet`, `--exclude`) and unit test suite (`tests/audit-engine.test.mjs`).
+- **Mechanical Health Gate Integration in `gate-qa` and CLI Routing** (`PLAY-054`). Integrated structural codebase health verification into `scripts/gate-qa.mjs` and binary routing via `scripts/lib/anti-slop.mjs`. Enforces modular file ceilings (< 1000 LOC, advisory by default to respect PO sovereignty, and blocking with `--strict` or when critical quality suppressions occur in audited diffs).
+- **Initial Repository Diagnostic Protocol in Agent Skills** (`PLAY-055`). Updated canonical skills `principal-engineer/SKILL.md` and `pm-orchestrator/SKILL.md` to incorporate the Initial Repository Diagnostic Protocol. Mandates static health and modularity inspection (`playbook audit` or `audit-repo`) before modifying architecture, establishing baseline awareness of file ceilings, existing tech debt markers, and test harness availability.
+- **Granular Component Selection and Quick Presets in `init` and `sync`** (`PLAY-051`). Modularized `scripts/init.mjs` and `scripts/sync-playbook.mjs` into dedicated libraries (`scripts/lib/selection.mjs`, `scripts/lib/sync-classifier.mjs`, `scripts/lib/cli-router.mjs`). Added support for Quick Presets ("Batteries Included") vs Granular Multi-Select ("Full Control"), enabling opt-in installation of individual agent roles, package.json scripts, and documentation templates, cleanly persisted in `.gripm/playbook-lock.json`.
+- **Modular Audit Export and Board Synergy** (`PLAY-056`). Added modular selection for the `audit:repo` script in `selection.mjs` and manifest definitions, enabling consumer projects to adopt the static audit engine independently or synergistically alongside Gripm Board (`@gripm/board`).
+
+### Changed
+
+- **README Architecture Restructuring via Inverted Pyramid and Progressive Disclosure** (`PLAY-050`). Streamlined `README.md` from over 500 lines to under 250 lines, placing the pitch and Quickstart (`npx @gripm/playbook init`) directly in the first fold (first 35 lines). Consolidated Hub Orchestrator, clean-context QA subagent discipline, and operating modes into a cohesive visual overview, encapsulating advanced AST configuration and polyglot bridges into collapsible `<details>` sections.
+
+---
+
 ## [2.7.1] - 2026-10-26
 
 `PLAY-049`

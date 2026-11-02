@@ -28,7 +28,7 @@ const __filename = fileURLToPath(import.meta.url);
 
 const COMMENT_PREFIX = '(?:\\/\\/|#|\\/\\*+|\\*)\\s*';
 
-export const TODO_RE = /(?:\/\/|#|\/\*+|\*)\s*(?:(TODO|FIXME|HACK|BUG|XXX)(?:\([^)]*\))?[:\-\s]|(TODO|FIXME|HACK|BUG|XXX)$|(todo|fixme|hack|bug|xxx)(?:\([^)]*\))?[:\-])\s*(.*?)(?:\*\/|$)/;
+export const TODO_RE = /(?:\/\/|#|\/\*+|\*)\s*(?:(TODO|FIXME|HACK|BUG|XXX)(?:(?:\([^)]*\))?[:\-]|(?!\s+(?:el|la|los|las|un|una|este|esta|ese|esa|del|al)\b)\s+|$)|(todo|fixme|hack|bug|xxx)(?:\([^)]*\))?[:\-])\s*(.*?)(?:\*\/|$)/;
 
 export const ANTI_SLOP_PATTERNS = {
   tsIgnore: new RegExp(COMMENT_PREFIX + '@' + 'ts-ignore\\b'),
@@ -37,10 +37,8 @@ export const ANTI_SLOP_PATTERNS = {
   consoleLog: new RegExp('\\bconsole\\.' + 'log\\s*\\(')
 };
 
-export const TS_IGNORE_RE = ANTI_SLOP_PATTERNS.tsIgnore;
-export const TS_NOCHECK_RE = ANTI_SLOP_PATTERNS.tsNocheck;
-export const ESLINT_DISABLE_RE = ANTI_SLOP_PATTERNS.eslintDisable;
-export const CONSOLE_LOG_RE = ANTI_SLOP_PATTERNS.consoleLog;
+export const TS_IGNORE_RE = ANTI_SLOP_PATTERNS.tsIgnore, TS_NOCHECK_RE = ANTI_SLOP_PATTERNS.tsNocheck;
+export const ESLINT_DISABLE_RE = ANTI_SLOP_PATTERNS.eslintDisable, CONSOLE_LOG_RE = ANTI_SLOP_PATTERNS.consoleLog;
 
 export function checkAntiSlop(line) {
   if (!line || typeof line !== 'string') return null;
@@ -167,33 +165,46 @@ export function detectTests(rootPath) {
 }
 
 export function computeHealthScore(params = {}) {
-  const { totalFilesScanned = 0, locViolations = [], suppressions = [], todos = [], tests = { detected: false, hasTests: false } } = params;
+  const { totalFilesScanned = 0, locViolations = [], suppressions = [], todos = [], tests = { detected: false, hasTests: false }, rules = {} } = params;
   if (!totalFilesScanned || totalFilesScanned <= 0) return 100;
 
-  let score = 100;
-  const errorCount = locViolations.filter((v) => v.status === 'error').length;
-  const warnCount = locViolations.filter((v) => v.status === 'warning').length;
-  score -= Math.min(40, errorCount * 10);
-  score -= Math.min(15, warnCount * 3);
-  score -= Math.min(25, suppressions.length * 5);
+  const locActive = rules.loc !== false;
+  const suppressionsActive = rules.suppressions !== false;
+  const debtMarkersActive = rules.debtMarkers !== false;
+  const testRunnerActive = rules.testRunner !== false;
 
-  let todoPenalty = 0;
-  for (const item of todos) {
-    if (item.type === 'BUG' || item.type === 'FIXME') todoPenalty += 3;
-    else if (item.type === 'HACK' || item.type === 'XXX') todoPenalty += 2;
-    else todoPenalty += 1;
+  let score = 100;
+  if (locActive) {
+    const errorCount = locViolations.filter((v) => v.status === 'error').length;
+    const warnCount = locViolations.filter((v) => v.status === 'warning').length;
+    score -= Math.min(40, errorCount * 10);
+    score -= Math.min(15, warnCount * 3);
   }
-  score -= Math.min(15, todoPenalty);
-  if (!tests.detected && !tests.hasTests) score -= 15;
+  if (suppressionsActive) {
+    score -= Math.min(25, suppressions.length * 5);
+  }
+  if (debtMarkersActive) {
+    let todoPenalty = 0;
+    for (const item of todos) {
+      if (item.type === 'BUG' || item.type === 'FIXME') todoPenalty += 3;
+      else if (item.type === 'HACK' || item.type === 'XXX') todoPenalty += 2;
+      else todoPenalty += 1;
+    }
+    score -= Math.min(15, todoPenalty);
+  }
+  if (testRunnerActive && !tests.detected && !tests.hasTests) {
+    score -= 15;
+  }
 
   if (Number.isNaN(score) || !Number.isFinite(score)) return 100;
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
-function createEmptyReport(maxLines = DEFAULT_MAX_LINES, warnLines = DEFAULT_WARN_LINES) {
+function createEmptyReport(maxLines = DEFAULT_MAX_LINES, warnLines = DEFAULT_WARN_LINES, rules = {}) {
   return {
     score: 100, stack: [],
     summary: { totalFilesScanned: 0, locViolationsCount: 0, suppressionsCount: 0, todosCount: 0, testFramework: null, verifyCommand: null, stack: null },
+    rules,
     loc: { maxLines, warnLines, violations: [] },
     quality: { suppressions: [] },
     todos: [],
@@ -203,12 +214,35 @@ function createEmptyReport(maxLines = DEFAULT_MAX_LINES, warnLines = DEFAULT_WAR
 
 export async function scanCodebase(targetPath, options = {}) {
   const root = path.resolve(targetPath || options.cwd || options.root || process.cwd());
-  const maxLines = Number(options.maxLines ?? options.max ?? DEFAULT_MAX_LINES);
-  const warnLines = Number(options.warnLines ?? options.warn ?? DEFAULT_WARN_LINES);
+
+  let auditConfig = {};
+  try {
+    const parentDir = path.dirname(root);
+    const configCandidates = [path.join(root, '.gripm', 'config.json'), path.join(root, '.devboard', 'config.json')];
+    if (parentDir && parentDir !== root) {
+      configCandidates.push(path.join(parentDir, '.gripm', 'config.json'), path.join(parentDir, '.devboard', 'config.json'));
+    }
+    const configPath = configCandidates.find((p) => fs.existsSync(p));
+    if (configPath) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (parsed?.audit && typeof parsed.audit === 'object') auditConfig = parsed.audit;
+    }
+  } catch {}
+
+  const rules = {
+    loc: options.rules?.loc ?? auditConfig.rules?.loc ?? true,
+    suppressions: options.rules?.suppressions ?? auditConfig.rules?.suppressions ?? true,
+    debtMarkers: options.rules?.debtMarkers ?? auditConfig.rules?.debtMarkers ?? true,
+    consoleLog: options.rules?.consoleLog ?? auditConfig.rules?.consoleLog ?? options.includeConsoleLog ?? auditConfig.includeConsoleLog ?? false,
+    testRunner: options.rules?.testRunner ?? auditConfig.rules?.testRunner ?? true
+  };
+
+  const maxLines = Number(options.thresholds?.maxLines ?? options.maxLines ?? options.max ?? auditConfig.thresholds?.maxLines ?? auditConfig.maxLines ?? DEFAULT_MAX_LINES);
+  const warnLines = Number(options.thresholds?.warnLines ?? options.warnLines ?? options.warn ?? auditConfig.thresholds?.warnLines ?? auditConfig.warnLines ?? DEFAULT_WARN_LINES);
   const customExts = options.extensions ? new Set(options.extensions) : DEFAULT_EXTENSIONS;
   const customIgnoredDirs = options.ignoredDirs ? new Set(options.ignoredDirs) : DEFAULT_IGNORED_DIRS;
 
-  if (!fs.existsSync(root)) return createEmptyReport(maxLines, warnLines);
+  if (!fs.existsSync(root)) return createEmptyReport(maxLines, warnLines, rules);
   const stat = fs.statSync(root);
 
   const gitignoreRules = parseIgnoreFile(path.join(root, '.gitignore'));
@@ -216,7 +250,10 @@ export async function scanCodebase(targetPath, options = {}) {
     path.join(root, '.gripm', 'locignore'), path.join(root, '.gripm', '.locignore'), path.join(root, '.locignore')
   ].find((p) => fs.existsSync(p)) || path.join(root, '.locignore');
   const locignoreRules = parseIgnoreFile(locignorePath);
-  const extraExcludes = parseIgnoreLines(Array.isArray(options.exclude) ? options.exclude : options.exclude ? [options.exclude] : []);
+
+  const configExcludes = Array.isArray(auditConfig.exclude) ? auditConfig.exclude : auditConfig.exclude ? [auditConfig.exclude] : [];
+  const optExcludes = Array.isArray(options.exclude) ? options.exclude : options.exclude ? [options.exclude] : [];
+  const extraExcludes = parseIgnoreLines([...configExcludes, ...optExcludes]);
   const combinedRules = [...gitignoreRules, ...locignoreRules, ...extraExcludes];
 
   const locViolations = [], suppressions = [], todos = [];
@@ -231,31 +268,37 @@ export async function scanCodebase(targetPath, options = {}) {
     const lines = content.replace(/\r\n/g, '\n').split('\n');
     const lineCount = lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length;
 
-    if (lineCount >= maxLines) locViolations.push({ file: normRel, lines: lineCount, status: 'error' });
-    else if (lineCount >= warnLines) locViolations.push({ file: normRel, lines: lineCount, status: 'warning' });
+    if (rules.loc) {
+      if (lineCount >= maxLines) locViolations.push({ file: normRel, lines: lineCount, status: 'error' });
+      else if (lineCount >= warnLines) locViolations.push({ file: normRel, lines: lineCount, status: 'warning' });
+    }
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i], lineNum = i + 1, trimmed = line.trim();
       if (!trimmed) continue;
 
-      if (ANTI_SLOP_PATTERNS.tsIgnore.test(line)) {
-        suppressions.push({ file: normRel, line: lineNum, type: '@' + 'ts-ignore', snippet: trimmed });
-      } else if (ANTI_SLOP_PATTERNS.tsNocheck.test(line)) {
-        suppressions.push({ file: normRel, line: lineNum, type: '@' + 'ts-nocheck', snippet: trimmed });
-      } else if (ANTI_SLOP_PATTERNS.eslintDisable.test(line)) {
-        suppressions.push({ file: normRel, line: lineNum, type: 'eslint-' + 'disable', snippet: trimmed });
-      } else if (options.includeConsoleLog && ANTI_SLOP_PATTERNS.consoleLog.test(line)) {
-        suppressions.push({ file: normRel, line: lineNum, type: 'console.log', snippet: trimmed });
+      if (rules.suppressions) {
+        if (ANTI_SLOP_PATTERNS.tsIgnore.test(line)) {
+          suppressions.push({ file: normRel, line: lineNum, type: '@' + 'ts-ignore', snippet: trimmed });
+        } else if (ANTI_SLOP_PATTERNS.tsNocheck.test(line)) {
+          suppressions.push({ file: normRel, line: lineNum, type: '@' + 'ts-nocheck', snippet: trimmed });
+        } else if (ANTI_SLOP_PATTERNS.eslintDisable.test(line)) {
+          suppressions.push({ file: normRel, line: lineNum, type: 'eslint-' + 'disable', snippet: trimmed });
+        } else if (rules.consoleLog && ANTI_SLOP_PATTERNS.consoleLog.test(line)) {
+          suppressions.push({ file: normRel, line: lineNum, type: 'console.log', snippet: trimmed });
+        }
       }
 
-      const todoMatch = line.match(TODO_RE);
-      if (todoMatch) {
-        const type = (todoMatch[1] || todoMatch[2] || todoMatch[3]).toUpperCase();
-        const text = (todoMatch[4] || '').replace(/\*\/$/, '').trim();
-        todos.push({
-          id: `${normRel}:${lineNum}`, file: normRel, line: lineNum,
-          type, text, snippet: trimmed
-        });
+      if (rules.debtMarkers) {
+        const todoMatch = line.match(TODO_RE);
+        if (todoMatch) {
+          const type = (todoMatch[1] || todoMatch[2]).toUpperCase();
+          const text = (todoMatch[3] || todoMatch[4] || '').replace(/\*\/$/, '').trim();
+          todos.push({
+            id: `${normRel}:${lineNum}`, file: normRel, line: lineNum,
+            type, text, snippet: trimmed
+          });
+        }
       }
     }
   }
@@ -283,16 +326,24 @@ export async function scanCodebase(targetPath, options = {}) {
 
   locViolations.sort((a, b) => b.lines - a.lines);
   const targetDir = stat.isDirectory() ? root : path.dirname(root);
-  const tests = detectTests(targetDir);
+  const tests = rules.testRunner !== false
+    ? detectTests(targetDir)
+    : { detected: false, framework: null, verifyCommand: null, hasTests: false };
   const stack = detectStack(targetDir);
-  const score = computeHealthScore({ totalFilesScanned, locViolations, suppressions, todos, tests });
+  const score = computeHealthScore({ totalFilesScanned, locViolations, suppressions, todos, tests, rules });
 
   return {
     score, stack,
     summary: {
-      totalFilesScanned, locViolationsCount: locViolations.length, suppressionsCount: suppressions.length,
-      todosCount: todos.length, testFramework: tests.framework, verifyCommand: tests.verifyCommand, stack: stack.join(', ') || null
+      totalFilesScanned,
+      locViolationsCount: locViolations.length,
+      suppressionsCount: suppressions.length,
+      todosCount: todos.length,
+      testFramework: tests.framework,
+      verifyCommand: tests.verifyCommand,
+      stack: stack.join(', ') || null
     },
+    rules,
     loc: { maxLines, warnLines, violations: locViolations },
     quality: { suppressions },
     todos, tests
@@ -325,9 +376,10 @@ function makeBoxLine(label, value = '', width = 68) {
 export async function runCli(argv = process.argv.slice(2)) {
   if (Array.isArray(argv) && argv[0] === 'audit') argv = argv.slice(1);
 
-  let targetPath = null, maxLines = DEFAULT_MAX_LINES, warnLines = DEFAULT_WARN_LINES;
+  let targetPath = null, maxLines = null, warnLines = null;
   let formatJson = false, isStrict = false, isQuiet = false;
   const excludes = [];
+  const rules = {};
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -336,17 +388,28 @@ export async function runCli(argv = process.argv.slice(2)) {
     else if (arg === '--path' || arg === '--src' || arg === '--root' || arg === '--cwd' || arg === '--repo' || arg === '-r') targetPath = argv[++i];
     else if (arg.startsWith('--root=') || arg.startsWith('--cwd=') || arg.startsWith('--path=') || arg.startsWith('--repo=')) targetPath = arg.split('=')[1];
     else if (arg === '--exclude') excludes.push(argv[++i]);
+    else if (arg === '--no-loc') rules.loc = false;
+    else if (arg === '--no-suppressions' || arg === '--no-slop') rules.suppressions = false;
+    else if (arg === '--no-todos' || arg === '--no-debt') rules.debtMarkers = false;
+    else if (arg === '--no-tests') rules.testRunner = false;
+    else if (arg === '--console-log') rules.consoleLog = true;
     else if (arg === '--json' || arg === '--format=json' || (arg === '--format' && argv[++i] === 'json')) formatJson = true;
     else if (arg === '--strict') isStrict = true;
     else if (arg === '--quiet' || arg === '-q') isQuiet = true;
     else if (arg === '--help' || arg === '-h') {
-      console.log(`\nUsage: gripm audit [options] [path]\n       node scripts/audit-engine.mjs [options] [path]\n\nOptions:\n  --format json, --json    Output results strictly as structured JSON\n  --strict                 Exit code 1 if critical violations (>= 1000 LOC or suppressions) exist\n  --quiet, -q              Minimal one-line summary output\n  --repo, -r <dir>         Directory to scan (default: current directory)\n  --max, --max-lines <n>   Ceiling lines limit (default: ${DEFAULT_MAX_LINES})\n  --warn, --warn-lines <n> Soft warning threshold (default: ${DEFAULT_WARN_LINES})\n  --exclude <pattern>      Exclude pattern (repeatable)\n  --help, -h               Show this help message\n`);
+      console.log(`\nUsage: gripm audit [options] [path]\n       node scripts/audit-engine.mjs [options] [path]\n\nOptions:\n  --format json, --json    Output results strictly as structured JSON\n  --strict                 Exit code 1 if critical violations (>= 1000 LOC or suppressions) exist\n  --quiet, -q              Minimal one-line summary output\n  --repo, -r <dir>         Directory to scan (default: current directory)\n  --max, --max-lines <n>   Ceiling lines limit (default: ${DEFAULT_MAX_LINES})\n  --warn, --warn-lines <n> Soft warning threshold (default: ${DEFAULT_WARN_LINES})\n  --exclude <pattern>      Exclude pattern (repeatable)\n  --no-loc                 Disable LOC modularity budget checks\n  --no-suppressions        Disable anti-slop suppression checks\n  --no-todos               Disable TODO and hidden debt checks\n  --no-tests               Disable test runner check\n  --console-log            Enable console.log suppression check\n  --help, -h               Show this help message\n`);
       process.exit(0);
     } else if (!arg.startsWith('-')) targetPath = arg;
   }
 
-  const report = await scanCodebase(targetPath, { maxLines, warnLines, exclude: excludes });
-  const criticalLocViolations = report.loc.violations.filter((v) => v.status === 'error' || v.lines >= maxLines);
+  const scanOptions = { exclude: excludes };
+  if (maxLines !== null) scanOptions.maxLines = maxLines;
+  if (warnLines !== null) scanOptions.warnLines = warnLines;
+  if (Object.keys(rules).length > 0) scanOptions.rules = rules;
+
+  const report = await scanCodebase(targetPath, scanOptions);
+  const resolvedMax = report.loc.maxLines || DEFAULT_MAX_LINES;
+  const criticalLocViolations = report.loc.violations.filter((v) => v.status === 'error' || v.lines >= resolvedMax);
   const criticalSuppressions = report.quality.suppressions;
   const hasCriticalViolations = criticalLocViolations.length > 0 || criticalSuppressions.length > 0;
 
@@ -363,7 +426,7 @@ export async function runCli(argv = process.argv.slice(2)) {
 
   const scoreText = report.score >= 80 ? c.green(report.score + '/100') : report.score >= 50 ? c.yellow(report.score + '/100') : c.red(report.score + '/100');
   const runnerText = report.summary.testFramework ? `${report.summary.testFramework} (verify: ${report.summary.verifyCommand || 'npm test'})` : c.dim('None detected');
-  const locDetail = `${report.summary.locViolationsCount} (${criticalLocViolations.length} critical >= ${maxLines} LOC)`;
+  const locDetail = `${report.summary.locViolationsCount} (${criticalLocViolations.length} critical >= ${resolvedMax} LOC)`;
   const stackText = report.summary.stack ? report.summary.stack : c.dim('Not detected');
 
   console.log('\n  ┌──────────────────────────────────────────────────────────────────┐');
@@ -376,6 +439,15 @@ export async function runCli(argv = process.argv.slice(2)) {
   console.log(makeBoxLine('LOC Issues:', locDetail));
   console.log(makeBoxLine('Suppressions:', String(criticalSuppressions.length)));
   console.log(makeBoxLine('TODO / Debt:', `${report.summary.todosCount} markers`));
+
+  const disabledRuleNames = [];
+  if (report.rules?.loc === false) disabledRuleNames.push('loc: off');
+  if (report.rules?.suppressions === false) disabledRuleNames.push('suppressions: off');
+  if (report.rules?.debtMarkers === false) disabledRuleNames.push('todos: off');
+  if (report.rules?.testRunner === false) disabledRuleNames.push('tests: off');
+  if (report.rules?.consoleLog) disabledRuleNames.push('console.log: on');
+  const rulesDisplay = disabledRuleNames.length > 0 ? disabledRuleNames.join(', ') : 'Standard (all active)';
+  console.log(makeBoxLine('Active Rules:', rulesDisplay));
   console.log('  └──────────────────────────────────────────────────────────────────┘\n');
 
   if (report.loc.violations.length > 0) {
@@ -405,7 +477,7 @@ export async function runCli(argv = process.argv.slice(2)) {
   }
 
   if (isStrict && hasCriticalViolations) {
-    console.error(`  ${c.red('✖ Strict audit failed:')} ${criticalLocViolations.length} critical LOC violation(s) (>= ${maxLines} lines) and ${criticalSuppressions.length} suppression(s) detected.\n`);
+    console.error(`  ${c.red('✖ Strict audit failed:')} ${criticalLocViolations.length} critical LOC violation(s) (>= ${resolvedMax} lines) and ${criticalSuppressions.length} suppression(s) detected.\n`);
     process.exit(1);
   }
   process.exit(0);

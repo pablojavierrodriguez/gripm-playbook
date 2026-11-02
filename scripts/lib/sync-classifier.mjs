@@ -64,11 +64,12 @@ export function pruneLegacyScripts(targetRepo, lockFiles = {}, customizations = 
 
   const candidates = [
     'scripts/audit-ux-code.cjs', 'scripts/gate-qa.mjs', 'scripts/gate-review-items.mjs',
-    'scripts/check-loc.mjs', 'scripts/ux-rules.json', 'scripts/sync-playbook.mjs',
-    'scripts/init.mjs', 'scripts/lib/frontmatter.mjs', 'scripts/lib/terminal.mjs',
-    'scripts/lib/adapters.mjs', 'scripts/lib/pyramid.mjs', 'scripts/lib/task-inspection.mjs',
+    'scripts/check-loc.mjs', 'scripts/audit-engine.mjs', 'scripts/validate-commit-msg.mjs',
+    'scripts/ux-rules.json', 'scripts/sync-playbook.mjs', 'scripts/init.mjs',
+    'scripts/lib/frontmatter.mjs', 'scripts/lib/terminal.mjs', 'scripts/lib/adapters.mjs',
+    'scripts/lib/pyramid.mjs', 'scripts/lib/task-inspection.mjs', 'scripts/lib/anti-slop.mjs',
     'scripts/lib/provenance.mjs', 'scripts/lib/sync-classifier.mjs', 'scripts/lib/cli-router.mjs',
-    'scripts/lib/doc-checks.mjs', 'scripts/lib/catalog-validator.mjs',
+    'scripts/lib/selection.mjs', 'scripts/lib/doc-checks.mjs', 'scripts/lib/catalog-validator.mjs',
   ];
 
   const customSet = customizations instanceof Set ? customizations : new Set(customizations || []);

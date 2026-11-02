@@ -35,6 +35,7 @@ export const DEFAULT_IGNORED_DIRS = new Set([
   'dist',
   'build',
   'out',
+  'bin',
   '.next',
   '.nuxt',
   '.turbo',

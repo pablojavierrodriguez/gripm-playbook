@@ -1,9 +1,9 @@
 ---
 id: PLAY-054
 title: "Integracion de compuerta mecanica de salud en gate-qa.mjs y binarios"
-status: ready
+status: done
 created_date: '2026-11-01'
-updated_date: '2026-11-01'
+updated_date: '2026-11-02'
 labels: []
 dependencies:
   - PLAY-053

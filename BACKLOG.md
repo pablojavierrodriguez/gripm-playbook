@@ -1,155 +1,9 @@
-# Backlog: gripm-playbook
-> Consolidado generado el 2026-11-01 por gripm
+# Backlog: @gripm/playbook
+> Consolidado generado el 2026-11-02 por gripm
 
 ## Resumen de Estados
 
-### 🚀 Ready for Deploy (7)
-
-#### [PLAY-050] Reestructuracion del README bajo piramide invertida y progressive disclosure
-- **Prioridad**: `high` | **Tipo**: `chore`
-
-El README.md actual supera las 500 lineas y acumula cinco responsabilidades incompatibles en un unico archivo: pagina de aterrizaje, tutorial de inicio, especificacion profunda de arquitectura, catalogo de referencia de CLI/APIs y guia de contribucion interna del repositorio.
-
-Esta sobrecarga oculta el comando principal de inicio (`npx @gripm/playbook init`) hasta la linea 213, triplica la explicacion de los estados y roles del loop de entrega, e incluye detalles de bajo nivel (como selectores AST JSX del auditor UX o garantias de hash del sync) en el flujo de lectura inicial.
-
-Alcance:
-1. Reestructurar README.md bajo la regla de la piramide invertida y progressive disclosure, reduciendo su longitud total a menos de 250 lineas (~180-220 lineas).
-2. Ubicar el pitch y el Quickstart ("One Golden Path" con `npx @gripm/playbook init`) en el primer fold (primeras ~35 lineas).
-3. Consolidar la explicacion del Hub Orchestrator, la disciplina de subagentes limpios de QA y los 3 modos operativos en un unico bloque visual coherente, eliminando repeticiones y el bloque redundante "Framework Summary".
-4. Encapsular la configuracion avanzada del CLI/auditor UX y el puente poliglota para otros ecosistemas en bloques `<details>` colapsables o enlaces directos a su documentacion canonica.
-5. Preservar enlaces markdown relativos validos, badges, e invariante de guion simple anti-em-dash (` - `).
-
-**Criterios de Aceptación:**
-- [x] #1 README.md reestructurado con Quickstart (`npx @gripm/playbook init`) visible en las primeras 40 lineas.
-- [x] #2 Extension total de README.md reducida a menos de 250 lineas (~180-220 lineas), eliminando duplicaciones de estados y el bloque final "Framework Summary".
-- [x] #3 Configuraciones avanzadas del auditor UX (JSON AST, programmatic API) y puente poliglota agrupadas en bloques colapsables `<details>` o enlaces a especificacion.
-- [x] #4 Enlaces relativos a documentacion interna (.agents/STATE_MACHINE.md, .agents/TEAM_PLAYBOOK.md, CONTRIBUTING.md) completamente funcionales y validados.
-- [x] #5 Invariante anti-em-dash respetada al 100% (cero em-dash ni en-dash, solo guion simple ` - `).
-- [x] #6 `npm run check:all` (`npm run validate`, `npm run check:loc`, `npm test`) pasa con 0 errores.
-
----
-
-#### [PLAY-051] Modularizacion de playbook init y sync: seleccion granular de roles, scripts y plantillas con presets rapidos
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-Actualmente `playbook init` (`scripts/init.mjs`) y `playbook sync` (`scripts/sync-playbook.mjs`) operan bajo un modelo 'todo o nada':
-1. Inyectan silenciosamente 5 scripts en `package.json` del proyecto consumidor sin preguntar al usuario si los desea ni cuales prefiere.
-2. Instalan invariablemente los 6 roles de agentes (`pm-orchestrator`, `principal-engineer`, `qa-auditor`, `product-designer`, `market-researcher`, `code-level-ux-auditor`) en `.agents/skills/`.
-3. Copian plantillas opcionales a `docs/` (`DOMAIN_TEMPLATE.md` y `SPRINT_SPEC_TEMPLATE.md`) sin consultar si el proyecto utilizara sprints o glosario de dominio.
-4. Al configurar Gripm Board, clavan una configuracion rigida (`BOARD_DEFAULTS`) sin ofrecer modulos ni opciones del Cockpit.
-
-Bajo la vision de Gripm Suite y el principio de '100% ofrecido, 0% impuesto', esta tarea modulariza el init y sync de Gripm Playbook:
-- Soporte para **Modo Rapido** (defaults de confianza) vs **Componente por Componente** (control total mediante multi-select).
-- Seleccion granular de **Roles de Agentes** a instalar en `.agents/skills/`.
-- Seleccion granular y opt-in de **Scripts en package.json** (`gate:qa`, `gate:review`, `audit:ux`, `check:loc`, `validate:commit`).
-- Seleccion granular de **Plantillas en docs/** (`DOMAIN_TEMPLATE.md`, `SPRINT_SPEC_TEMPLATE.md`).
-- Persistencia de los componentes seleccionados en `.gripm/playbook-lock.json` (`selectedSkills`, `selectedScripts`, `selectedTemplates`) para que subsecuentes `playbook sync` respeten lo que el usuario eligio no instalar y no lo vuelvan a forzar.
-
-**Criterios de Aceptación:**
-- [x] #1 scripts/init.mjs ofrece selector de modo: 'Rapido (Baterias incluidas)' y 'Componente por componente (Control total)'.
-- [x] #2 En modo Componente por componente, se presenta un multi-select con los roles de agentes (coreSkills), permitiendo elegir que roles instalar en .agents/skills/.
-- [x] #3 La adicion de scripts a package.json es opt-in y permite seleccionar individualmente cuales incorporar (gate:qa, gate:review, audit:ux, check:loc, validate:commit).
-- [x] #4 La copia de plantillas a docs/ (DOMAIN_TEMPLATE.md, SPRINT_SPEC_TEMPLATE.md) es opt-in y seleccionable.
-- [x] #5 .gripm/playbook-lock.json registra los componentes seleccionados por el usuario, y scripts/sync-playbook.mjs sincroniza unicamente los componentes activos.
-- [x] #6 Soporte para flags no interactivas en init y sync (--skills <lista>, --no-scripts, --no-docs, --yes).
-- [x] #7 Tests en tests/ validando que la instalacion respete la seleccion granular sin inyecciones no autorizadas.
-- [x] #8 npm run check:all (validate, check:loc, test) pasa con codigo 0.
-
----
-
-#### [PLAY-052] Motor Canonico de Diagnostico de Codigo, Anti-Slop y Gobernanza de Salud de Repositorio
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-Épica paraguas para establecer en @gripm/playbook el motor canónico de diagnóstico estático, anti-slop y gobernanza de salud de repositorios para desarrollo con agentes de IA.
-
-Históricamente, Playbook distribuía reglas individuales como check-loc.mjs y audit-ux-code.cjs. Esta iniciativa incorpora el motor integral audit-engine.mjs como la fuente única de la verdad (SSOT) para métricas de calidad de código, límites modulares (<1000 LOC), supresiones de tipos y detección de deuda oculta, manteniendo 0 dependencias externas y sincronización criptográfica hacia proyectos consumidores (incluido @gripm/board).
-
-**Criterios de Aceptación:**
-- [x] #1 #1 audit-engine.mjs canónico instalado en scripts/ e incluido en .playbook-manifest.json bajo core.
-- [x] #2 #2 Suite de pruebas exhaustiva en tests/audit-engine.test.mjs pasando con 0 fallas (detección de stack, LOC, anti-slop, TODOs).
-- [x] #3 #3 gate-qa.mjs integra la compuerta mecánica de salud de código antes de certificar tareas a ready.
-- [x] #4 #4 Skills pm-orchestrator y principal-engineer actualizadas con el protocolo de diagnóstico inicial al abordar codebases.
-- [x] #5 #5 selection.mjs e init.mjs ofrecen audit:repo como script modular opt-in respetando el principio 100% ofrecido, 0% impuesto.
-- [x] #6 #6 npm run check:all pasa con código de salida 0 en gripm-playbook sin regresiones ni violaciones anti-em-dash.
-
----
-
-#### [PLAY-053] Motor estatico canonico audit-engine.mjs, tests de unidad e inclusion en manifiesto
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-Establecer scripts/audit-engine.mjs en @gripm/playbook como la fuente canónica de análisis estático del framework.
-
-El motor inspecciona el árbol de código sin dependencias externas (usando node:fs y node:path nativos):
-- Detecta el stack tecnológico (React, Vue, Node, TypeScript, Python, etc.) y frameworks de testing.
-- Computa presupuesto de modularidad (archivos con más de 1000 LOC y warning a partir de 500 LOC).
-- Detecta patrones de código degradado / anti-slop (@ts-ignore, @ts-nocheck, eslint-disable, console.log residuales).
-- Extrae deudas técnicas comentadas en código (TODO, FIXME, HACK, XXX) con número de línea y contexto.
-- Calcula el índice de salud determinista de 0 a 100 puntos y soporta flags CLI (--strict, --format json, --quiet).
-
-**Criterios de Aceptación:**
-- [x] #1 #1 audit-engine.mjs copiado canónicamente a scripts/audit-engine.mjs en @gripm/playbook con cero dependencias externas.
-- [x] #2 #2 .playbook-manifest.json incluye scripts/audit-engine.mjs en la lista core para distribución universal.
-- [x] #3 #3 tests/audit-engine.test.mjs implementa cobertura unitaria completa de detección de stack, conteo LOC, regexes anti-slop y TODOs.
-- [x] #4 #4 package.json de playbook expone los scripts audit:repo y audit:repo:strict.
-- [x] #5 #5 node --test tests/audit-engine.test.mjs ejecuta y pasa con código 0.
-
----
-
-#### [PLAY-054] Integracion de compuerta mecanica de salud en gate-qa.mjs y binarios
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-Integrar el motor de auditoría de código como guardrail mecánico dentro de scripts/gate-qa.mjs.
-
-Actualmente gate-qa.mjs verifica tests, criterios de aceptación y frontmatter YAML. Esta tarea añade la verificación de salud estructural del repositorio:
-- Impide que una tarea pase a ready si el agente introdujo archivos monolíticos (>1000 LOC).
-- Valida que no se hayan introducido suppressions críticas de TypeScript/linter sin justificación.
-- Expone el ejecutable global audit-repo en el mapa bin de package.json.
-
-**Criterios de Aceptación:**
-- [x] #1 #1 gate-qa.mjs ejecuta una comprobación de presupuesto y anti-slop invocando la lógica de audit-engine.mjs.
-- [x] #2 #2 Si el código introduce archivos mayores a 1000 LOC o violaciones críticas no suprimidas, gate-qa.mjs emite fallo y aborta la promoción a ready (con bypass explícito --force si el PO lo autoriza).
-- [x] #3 #3 bin en package.json de @gripm/playbook expone audit-repo apuntando a scripts/audit-engine.mjs.
-- [x] #4 #4 tests de integración de gate-qa validan que la compuerta de salud detenga promociones con violaciones estructurales.
-
----
-
-#### [PLAY-055] Protocolo de diagnostico inicial de repositorio en skills principal-engineer y pm-orchestrator
-- **Prioridad**: `medium` | **Tipo**: `feature`
-
-Actualizar las directivas de las skills de agentes en @gripm/playbook (.agents/skills/) para incorporar la cultura de diagnóstico estático preventivo.
-
-Cualquier agente que adopte los roles del Playbook debe:
-1. Al ingresar a un repositorio existente, ejecutar o consultar la auditoría estática para conocer la baseline (LOC, suppressions, TODOs, stack).
-2. Si @gripm/board está activo, interactuar vía MCP con gripm_get_repo_health.
-3. Si el proyecto no tiene @gripm/board, correr npx @gripm/playbook audit (o npm run audit:repo) para operar con la misma disciplina de Staff Engineer mecánico.
-
-**Criterios de Aceptación:**
-- [x] #1 #1 .agents/skills/principal-engineer/SKILL.md incorpora el protocolo de diagnóstico inicial estático antes de modificar código en proyectos existentes.
-- [x] #2 #2 .agents/skills/pm-orchestrator/SKILL.md añade la evaluación de salud del repositorio como paso previo al refinamiento de iniciativas grandes o sprints.
-- [x] #3 #3 .agents/skills/qa-auditor/SKILL.md documenta la auditoría de salud de código en el paso de verificación estructural.
-- [x] #4 #4 Se instruye a los agentes a consultar gripm_get_repo_health vía MCP si detectan que @gripm/board está presente, o ejecutar audit:repo en terminal si no lo está.
-
----
-
-#### [PLAY-056] Sinergia opcional con gripm board y exportacion modular en selection.mjs e init.mjs
-- **Prioridad**: `medium` | **Tipo**: `feature`
-
-Integrar el nuevo script audit:repo en el sistema modular de selección de scripts de @gripm/playbook (PLAY-051).
-
-Garantizar:
-1. 100% ofrecido, 0% impuesto: el usuario puede elegir si desea incorporar audit:repo a sus scripts en package.json tanto en modo Quick como en modo Componente por Componente.
-2. Detección no invasiva de @gripm/board: si Board está presente, enlazar la configuración sin forzar dependencias.
-3. Actualización de tests de selección y sincronización.
-
-**Criterios de Aceptación:**
-- [x] #1 #1 scripts/lib/selection.mjs incluye audit:repo y audit:repo:strict dentro de VALID_SCRIPTS y SCRIPT_DEFINITIONS.
-- [x] #2 #2 init.mjs y sync-playbook.mjs soportan la instalación opcional de audit:repo sin imponerlo.
-- [x] #3 #3 Si se detecta @gripm/board o directorio backlog/tasks/, init.mjs sincroniza umbrales de auditoría en .gripm/config.json.
-- [x] #4 #4 tests unitarios de selection.test.mjs y sync.test.mjs actualizados y pasando con código 0.
-
----
-
-### ✅ Done / Deployed (46)
+### ✅ Done / Deployed (53)
 
 #### [PLAY-001] Anatomía de unidad en el motor de reglas: text, ownContent y scopeText
 - **Prioridad**: `high` | **Tipo**: `bug`
@@ -1161,6 +1015,150 @@ Alcance:
 - [x] #4 Actualizar `tests/validate-repo.test.mjs` verificando la coherencia y guardrails del protocolo consolidado.
 - [x] #5 Incrementar versión a 2.7.1 en `package.json` y `.playbook-manifest.json`, y registrar sección 2.7.1 en `CHANGELOG.md`.
 - [x] #6 `npm test` y `npm run validate` pasan con 0 errores.
+
+---
+
+#### [PLAY-050] Reestructuracion del README bajo piramide invertida y progressive disclosure
+- **Prioridad**: `high` | **Tipo**: `chore`
+
+El README.md actual supera las 500 lineas y acumula cinco responsabilidades incompatibles en un unico archivo: pagina de aterrizaje, tutorial de inicio, especificacion profunda de arquitectura, catalogo de referencia de CLI/APIs y guia de contribucion interna del repositorio.
+
+Esta sobrecarga oculta el comando principal de inicio (`npx @gripm/playbook init`) hasta la linea 213, triplica la explicacion de los estados y roles del loop de entrega, e incluye detalles de bajo nivel (como selectores AST JSX del auditor UX o garantias de hash del sync) en el flujo de lectura inicial.
+
+Alcance:
+1. Reestructurar README.md bajo la regla de la piramide invertida y progressive disclosure, reduciendo su longitud total a menos de 250 lineas (~180-220 lineas).
+2. Ubicar el pitch y el Quickstart ("One Golden Path" con `npx @gripm/playbook init`) en el primer fold (primeras ~35 lineas).
+3. Consolidar la explicacion del Hub Orchestrator, la disciplina de subagentes limpios de QA y los 3 modos operativos en un unico bloque visual coherente, eliminando repeticiones y el bloque redundante "Framework Summary".
+4. Encapsular la configuracion avanzada del CLI/auditor UX y el puente poliglota para otros ecosistemas en bloques `<details>` colapsables o enlaces directos a su documentacion canonica.
+5. Preservar enlaces markdown relativos validos, badges, e invariante de guion simple anti-em-dash (` - `).
+
+**Criterios de Aceptación:**
+- [x] #1 README.md reestructurado con Quickstart (`npx @gripm/playbook init`) visible en las primeras 40 lineas.
+- [x] #2 Extension total de README.md reducida a menos de 250 lineas (~180-220 lineas), eliminando duplicaciones de estados y el bloque final "Framework Summary".
+- [x] #3 Configuraciones avanzadas del auditor UX (JSON AST, programmatic API) y puente poliglota agrupadas en bloques colapsables `<details>` o enlaces a especificacion.
+- [x] #4 Enlaces relativos a documentacion interna (.agents/STATE_MACHINE.md, .agents/TEAM_PLAYBOOK.md, CONTRIBUTING.md) completamente funcionales y validados.
+- [x] #5 Invariante anti-em-dash respetada al 100% (cero em-dash ni en-dash, solo guion simple ` - `).
+- [x] #6 `npm run check:all` (`npm run validate`, `npm run check:loc`, `npm test`) pasa con 0 errores.
+
+---
+
+#### [PLAY-051] Modularizacion de playbook init y sync: seleccion granular de roles, scripts y plantillas con presets rapidos
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+Actualmente `playbook init` (`scripts/init.mjs`) y `playbook sync` (`scripts/sync-playbook.mjs`) operan bajo un modelo 'todo o nada':
+1. Inyectan silenciosamente 5 scripts en `package.json` del proyecto consumidor sin preguntar al usuario si los desea ni cuales prefiere.
+2. Instalan invariablemente los 6 roles de agentes (`pm-orchestrator`, `principal-engineer`, `qa-auditor`, `product-designer`, `market-researcher`, `code-level-ux-auditor`) en `.agents/skills/`.
+3. Copian plantillas opcionales a `docs/` (`DOMAIN_TEMPLATE.md` y `SPRINT_SPEC_TEMPLATE.md`) sin consultar si el proyecto utilizara sprints o glosario de dominio.
+4. Al configurar Gripm Board, clavan una configuracion rigida (`BOARD_DEFAULTS`) sin ofrecer modulos ni opciones del Cockpit.
+
+Bajo la vision de Gripm Suite y el principio de '100% ofrecido, 0% impuesto', esta tarea modulariza el init y sync de Gripm Playbook:
+- Soporte para **Modo Rapido** (defaults de confianza) vs **Componente por Componente** (control total mediante multi-select).
+- Seleccion granular de **Roles de Agentes** a instalar en `.agents/skills/`.
+- Seleccion granular y opt-in de **Scripts en package.json** (`gate:qa`, `gate:review`, `audit:ux`, `check:loc`, `validate:commit`).
+- Seleccion granular de **Plantillas en docs/** (`DOMAIN_TEMPLATE.md`, `SPRINT_SPEC_TEMPLATE.md`).
+- Persistencia de los componentes seleccionados en `.gripm/playbook-lock.json` (`selectedSkills`, `selectedScripts`, `selectedTemplates`) para que subsecuentes `playbook sync` respeten lo que el usuario eligio no instalar y no lo vuelvan a forzar.
+
+**Criterios de Aceptación:**
+- [x] #1 scripts/init.mjs ofrece selector de modo: 'Rapido (Baterias incluidas)' y 'Componente por componente (Control total)'.
+- [x] #2 En modo Componente por componente, se presenta un multi-select con los roles de agentes (coreSkills), permitiendo elegir que roles instalar en .agents/skills/.
+- [x] #3 La adicion de scripts a package.json es opt-in y permite seleccionar individualmente cuales incorporar (gate:qa, gate:review, audit:ux, check:loc, validate:commit).
+- [x] #4 La copia de plantillas a docs/ (DOMAIN_TEMPLATE.md, SPRINT_SPEC_TEMPLATE.md) es opt-in y seleccionable.
+- [x] #5 .gripm/playbook-lock.json registra los componentes seleccionados por el usuario, y scripts/sync-playbook.mjs sincroniza unicamente los componentes activos.
+- [x] #6 Soporte para flags no interactivas en init y sync (--skills <lista>, --no-scripts, --no-docs, --yes).
+- [x] #7 Tests en tests/ validando que la instalacion respete la seleccion granular sin inyecciones no autorizadas.
+- [x] #8 npm run check:all (validate, check:loc, test) pasa con codigo 0.
+
+---
+
+#### [PLAY-052] Motor Canonico de Diagnostico de Codigo, Anti-Slop y Gobernanza de Salud de Repositorio
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+Épica paraguas para establecer en @gripm/playbook el motor canónico de diagnóstico estático, anti-slop y gobernanza de salud de repositorios para desarrollo con agentes de IA.
+
+Históricamente, Playbook distribuía reglas individuales como check-loc.mjs y audit-ux-code.cjs. Esta iniciativa incorpora el motor integral audit-engine.mjs como la fuente única de la verdad (SSOT) para métricas de calidad de código, límites modulares (<1000 LOC), supresiones de tipos y detección de deuda oculta, manteniendo 0 dependencias externas y sincronización criptográfica hacia proyectos consumidores (incluido @gripm/board).
+
+**Criterios de Aceptación:**
+- [x] #1 #1 audit-engine.mjs canónico instalado en scripts/ e incluido en .playbook-manifest.json bajo core.
+- [x] #2 #2 Suite de pruebas exhaustiva en tests/audit-engine.test.mjs pasando con 0 fallas (detección de stack, LOC, anti-slop, TODOs).
+- [x] #3 #3 gate-qa.mjs integra la compuerta mecánica de salud de código antes de certificar tareas a ready.
+- [x] #4 #4 Skills pm-orchestrator y principal-engineer actualizadas con el protocolo de diagnóstico inicial al abordar codebases.
+- [x] #5 #5 selection.mjs e init.mjs ofrecen audit:repo como script modular opt-in respetando el principio 100% ofrecido, 0% impuesto.
+- [x] #6 #6 npm run check:all pasa con código de salida 0 en gripm-playbook sin regresiones ni violaciones anti-em-dash.
+
+---
+
+#### [PLAY-053] Motor estatico canonico audit-engine.mjs, tests de unidad e inclusion en manifiesto
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+Establecer scripts/audit-engine.mjs en @gripm/playbook como la fuente canónica de análisis estático del framework.
+
+El motor inspecciona el árbol de código sin dependencias externas (usando node:fs y node:path nativos):
+- Detecta el stack tecnológico (React, Vue, Node, TypeScript, Python, etc.) y frameworks de testing.
+- Computa presupuesto de modularidad (archivos con más de 1000 LOC y warning a partir de 500 LOC).
+- Detecta patrones de código degradado / anti-slop (@ts-ignore, @ts-nocheck, eslint-disable, console.log residuales).
+- Extrae deudas técnicas comentadas en código (TODO, FIXME, HACK, XXX) con número de línea y contexto.
+- Calcula el índice de salud determinista de 0 a 100 puntos y soporta flags CLI (--strict, --format json, --quiet).
+
+**Criterios de Aceptación:**
+- [x] #1 #1 audit-engine.mjs copiado canónicamente a scripts/audit-engine.mjs en @gripm/playbook con cero dependencias externas.
+- [x] #2 #2 .playbook-manifest.json incluye scripts/audit-engine.mjs en la lista core para distribución universal.
+- [x] #3 #3 tests/audit-engine.test.mjs implementa cobertura unitaria completa de detección de stack, conteo LOC, regexes anti-slop y TODOs.
+- [x] #4 #4 package.json de playbook expone los scripts audit:repo y audit:repo:strict.
+- [x] #5 #5 node --test tests/audit-engine.test.mjs ejecuta y pasa con código 0.
+
+---
+
+#### [PLAY-054] Integracion de compuerta mecanica de salud en gate-qa.mjs y binarios
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+Integrar el motor de auditoría de código como guardrail mecánico dentro de scripts/gate-qa.mjs.
+
+Actualmente gate-qa.mjs verifica tests, criterios de aceptación y frontmatter YAML. Esta tarea añade la verificación de salud estructural del repositorio:
+- Impide que una tarea pase a ready si el agente introdujo archivos monolíticos (>1000 LOC).
+- Valida que no se hayan introducido suppressions críticas de TypeScript/linter sin justificación.
+- Expone el ejecutable global audit-repo en el mapa bin de package.json.
+
+**Criterios de Aceptación:**
+- [x] #1 #1 gate-qa.mjs ejecuta una comprobación de presupuesto y anti-slop invocando la lógica de audit-engine.mjs.
+- [x] #2 #2 Si el código introduce archivos mayores a 1000 LOC o violaciones críticas no suprimidas, gate-qa.mjs emite fallo y aborta la promoción a ready (con bypass explícito --force si el PO lo autoriza).
+- [x] #3 #3 bin en package.json de @gripm/playbook expone audit-repo apuntando a scripts/audit-engine.mjs.
+- [x] #4 #4 tests de integración de gate-qa validan que la compuerta de salud detenga promociones con violaciones estructurales.
+
+---
+
+#### [PLAY-055] Protocolo de diagnostico inicial de repositorio en skills principal-engineer y pm-orchestrator
+- **Prioridad**: `medium` | **Tipo**: `feature`
+
+Actualizar las directivas de las skills de agentes en @gripm/playbook (.agents/skills/) para incorporar la cultura de diagnóstico estático preventivo.
+
+Cualquier agente que adopte los roles del Playbook debe:
+1. Al ingresar a un repositorio existente, ejecutar o consultar la auditoría estática para conocer la baseline (LOC, suppressions, TODOs, stack).
+2. Si @gripm/board está activo, interactuar vía MCP con gripm_get_repo_health.
+3. Si el proyecto no tiene @gripm/board, correr npx @gripm/playbook audit (o npm run audit:repo) para operar con la misma disciplina de Staff Engineer mecánico.
+
+**Criterios de Aceptación:**
+- [x] #1 #1 .agents/skills/principal-engineer/SKILL.md incorpora el protocolo de diagnóstico inicial estático antes de modificar código en proyectos existentes.
+- [x] #2 #2 .agents/skills/pm-orchestrator/SKILL.md añade la evaluación de salud del repositorio como paso previo al refinamiento de iniciativas grandes o sprints.
+- [x] #3 #3 .agents/skills/qa-auditor/SKILL.md documenta la auditoría de salud de código en el paso de verificación estructural.
+- [x] #4 #4 Se instruye a los agentes a consultar gripm_get_repo_health vía MCP si detectan que @gripm/board está presente, o ejecutar audit:repo en terminal si no lo está.
+
+---
+
+#### [PLAY-056] Sinergia opcional con gripm board y exportacion modular en selection.mjs e init.mjs
+- **Prioridad**: `medium` | **Tipo**: `feature`
+
+Integrar el nuevo script audit:repo en el sistema modular de selección de scripts de @gripm/playbook (PLAY-051).
+
+Garantizar:
+1. 100% ofrecido, 0% impuesto: el usuario puede elegir si desea incorporar audit:repo a sus scripts en package.json tanto en modo Quick como en modo Componente por Componente.
+2. Detección no invasiva de @gripm/board: si Board está presente, enlazar la configuración sin forzar dependencias.
+3. Actualización de tests de selección y sincronización.
+
+**Criterios de Aceptación:**
+- [x] #1 #1 scripts/lib/selection.mjs incluye audit:repo y audit:repo:strict dentro de VALID_SCRIPTS y SCRIPT_DEFINITIONS.
+- [x] #2 #2 init.mjs y sync-playbook.mjs soportan la instalación opcional de audit:repo sin imponerlo.
+- [x] #3 #3 Si se detecta @gripm/board o directorio backlog/tasks/, init.mjs sincroniza umbrales de auditoría en .gripm/config.json.
+- [x] #4 #4 tests unitarios de selection.test.mjs y sync.test.mjs actualizados y pasando con código 0.
 
 ---
 

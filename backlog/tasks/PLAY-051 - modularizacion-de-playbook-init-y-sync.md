@@ -1,9 +1,9 @@
 ---
 id: PLAY-051
 title: "Modularizacion de playbook init y sync: seleccion granular de roles, scripts y plantillas con presets rapidos"
-status: ready
+status: done
 created_date: '2026-10-26'
-updated_date: '2026-10-26'
+updated_date: '2026-11-02'
 labels:
   - "cli"
   - "onboarding"
@@ -15,7 +15,7 @@ type: feature
 dependencies:
   - PLAY-037
   - PLAY-041
-claimed_by: "antigravity:e159a2ac-4db3-4e69-b2e1-bb098846ea5a"
+claimed_by: ""
 ---
 
 ## Description
