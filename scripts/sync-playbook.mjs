@@ -93,6 +93,8 @@ export const FALLBACK_CORE_FILES = [
   'scripts/lib/sync-classifier.mjs',
   'scripts/lib/cli-router.mjs',
   'scripts/lib/selection.mjs',
+  'scripts/lib/ux-catalog.cjs',
+  'scripts/lib/ux-jsx-parser.cjs',
   'docs/sprints/SPRINT_SPEC_TEMPLATE.md',
   'docs/DOMAIN_TEMPLATE.md',
 ];
@@ -137,10 +139,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
   const targetDir = path.resolve(targetRepo);
   const hasLocalPackageBundle = fs.existsSync(path.join(packageBundleRoot, MANIFEST_PATH));
   const shouldDefaultToLocalBundle =
-    !options.source &&
-    !options.remote &&
-    hasLocalPackageBundle &&
-    targetDir !== packageBundleRoot;
+    !options.source && !options.remote && hasLocalPackageBundle && targetDir !== packageBundleRoot;
 
   const isLocalSource =
     !!options.source ||
@@ -150,9 +149,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
     ? path.resolve(options.source)
     : shouldDefaultToLocalBundle
       ? packageBundleRoot
-      : isLocalSource
-        ? path.resolve(options.remote)
-        : null;
+      : isLocalSource ? path.resolve(options.remote) : null;
   const remote = localSourceDir || options.remote || DEFAULT_REMOTE;
   const requestedRef = options.tag || options.branch;
   const stacks = options.stacks || [];
@@ -176,7 +173,13 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
   const catalog = loadCatalogFromManifest(manifest || localSourceDir || packageBundleRoot);
   const activeSelection = resolveSyncSelection(options.selection, lock.selection, catalog.skills);
 
-  const isConsumerPackage = targetDir !== packageBundleRoot && !options.installScripts;
+  let isPlaybookSourceRepo = false;
+  try {
+    const pkgPath = path.join(targetDir, 'package.json');
+    isPlaybookSourceRepo = fs.existsSync(pkgPath) && JSON.parse(fs.readFileSync(pkgPath, 'utf8')).name === '@gripm/playbook';
+  } catch {}
+
+  const isConsumerPackage = !isPlaybookSourceRepo && !options.installScripts;
   const { files, stackSource, unknown } = planFiles(
     manifest,
     stacks,
@@ -358,7 +361,8 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
   }
 
   if (isConsumerPackage && !isDryRun) {
-    const cleaned = pruneLegacyScripts(targetRepo, lock.files, nextCustomizations, packageBundleRoot);
+    const scriptsSource = localSourceDir || packageBundleRoot;
+    const cleaned = pruneLegacyScripts(targetRepo, lock.files, nextCustomizations, scriptsSource);
     if (cleaned.length) {
       console.log(`  ${c.green('✔')} ${c.green('cleaned'.padEnd(10))} ${cleaned.length} legacy script(s) from scripts/ (running via package)`);
     }

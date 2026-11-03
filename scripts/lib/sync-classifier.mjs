@@ -70,6 +70,7 @@ export function pruneLegacyScripts(targetRepo, lockFiles = {}, customizations = 
     'scripts/lib/pyramid.mjs', 'scripts/lib/task-inspection.mjs', 'scripts/lib/anti-slop.mjs',
     'scripts/lib/provenance.mjs', 'scripts/lib/sync-classifier.mjs', 'scripts/lib/cli-router.mjs',
     'scripts/lib/selection.mjs', 'scripts/lib/doc-checks.mjs', 'scripts/lib/catalog-validator.mjs',
+    'scripts/lib/ux-catalog.cjs', 'scripts/lib/ux-jsx-parser.cjs',
   ];
 
   const customSet = customizations instanceof Set ? customizations : new Set(customizations || []);

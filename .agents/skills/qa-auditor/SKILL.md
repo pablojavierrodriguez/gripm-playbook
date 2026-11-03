@@ -33,9 +33,10 @@ Execute **in strict order**. Each step is cheaper than the next; skipping one is
 ### Step 4 - File Budget & Modularity
 
 ```bash
-node scripts/check-loc.mjs
+npx playbook check-loc
 # or in gate-qa with strict enforcement:
-node scripts/gate-qa.mjs TASK-ID --strict
+npx playbook gate TASK-ID --strict
+# (or node scripts/check-loc.mjs / node scripts/gate-qa.mjs TASK-ID --strict)
 ```
 
 Verifies the 1000 LOC ceiling per source file, structural modularity, and repository code health:
@@ -46,26 +47,28 @@ Verifies the 1000 LOC ceiling per source file, structural modularity, and reposi
 ### Step 5 - Static UX Audit
 
 ```bash
-node scripts/audit-ux-code.cjs --strict
+npx playbook audit --strict
+# (or node scripts/audit-ux-code.cjs --strict)
 ```
 
 Covers 15 static signatures: decimal comma blocker, keyboard shortcuts on touch, drag/scroll collision, time localization leak, autocapitalize trap, fixed-UI occlusion, horizontal crowding, micro-jank, touch targets, icon buttons without accessible name, typographic scale, tactile feedback, tabular numerals, anti-em-dash / anti-AI cliché (UX-014), and viewport touch zoom lock (UX-015).
 
-If the project does not have the script (framework not installed), manually audit the signatures in the `code-level-ux-auditor` skill.
+If the project does not have the package installed, manually audit the signatures in the `code-level-ux-auditor` skill.
 
-### Double Gate: `node scripts/gate-qa.mjs` + Blind Diff Audit
+### Double Gate: `npx playbook gate` / `gate-qa` + Blind Diff Audit
 
 > [!CAUTION]
 > **Neither prose nor same-thread roleplay constitutes a gate.** An agent asked to "act as QA Auditor" in the same thread that wrote the code ticks the ACs by inertia and justifies its own shortcuts. That is why T2 requires **both conditions**:
-> 1. **Mechanical Gate:** `node scripts/gate-qa.mjs TASK-ID` with **exit code 0**.
+> 1. **Mechanical Gate:** `npx playbook gate TASK-ID` (or `node scripts/gate-qa.mjs TASK-ID`) with **exit code 0**.
 > 2. **Semantic Gate in Clean Context:** an isolated `qa-auditor` sub-agent inspects the `git diff` against each AC marked `- [x]`, verifying that the implementation is real, without unjustified `as unknown as`, without global `vi.mock()` that fakes coverage, with strict modularity (files < 1000 LOC, no cross-layer coupling in God-Files), and satisfying all 7 mandatory headless audits.
 
 ```bash
-node scripts/gate-qa.mjs TASK-ID                     # full gate (promotes review → ready on disk if exit 0)
-node scripts/gate-qa.mjs TASK-ID --no-run   # inspection only; exits with 2, never certifies or mutates the file
-node scripts/gate-qa.mjs start TASK-ID      # transition T0: draft → doing (verifies Gate R1 + dependencies)
-node scripts/gate-qa.mjs submit TASK-ID     # transition T1: doing → review (verifies marked ACs + dependencies)
-node scripts/gate-qa.mjs unblock TASK-ID    # transition T_unblock: blocked → doing (clears blocked_reason if dependencies are done)
+npx playbook gate TASK-ID                     # full gate (promotes review → ready on disk if exit 0)
+npx playbook gate TASK-ID --no-run            # inspection only; exits with 2, never certifies or mutates the file
+npx playbook gate start TASK-ID               # transition T0: draft → doing (verifies Gate R1 + dependencies)
+npx playbook gate submit TASK-ID              # transition T1: doing → review (verifies marked ACs + dependencies)
+npx playbook gate unblock TASK-ID             # transition T_unblock: blocked → doing (clears blocked_reason if dependencies are done)
+# Note: In projects maintaining scripts locally, 'node scripts/gate-qa.mjs ...' is also fully supported.
 ```
 
 > [!CAUTION]
@@ -92,7 +95,8 @@ Exit codes: `0` certified (all checks pass, the script mutates `status: ready` o
 The T_unblock rule has its own entry, separate from certification: the T2 gate only inspects items in `review`, so a `blocked` item always fails the status check before the guard is evaluated.
 
 ```bash
-node scripts/gate-qa.mjs unblock TASK-ID
+npx playbook gate unblock TASK-ID
+# or node scripts/gate-qa.mjs unblock TASK-ID
 ```
 
 Rejects the unblocking (`exit 1`) if any dependency is still unresolved. A **non-existent** dependency also blocks: it is not in `done` nor unlinked, it is still declared in the array. To unblock it, resolve it or **explicitly remove it from the array** (silently omitting it is not unlinking). When it passes green (`exit 0`), **the script itself changes `status: blocked` → `doing` (or `draft` with `--to draft`) and removes `blocked_reason` from the frontmatter**.

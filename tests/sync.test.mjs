@@ -195,4 +195,52 @@ describe('runPlaybookSync with local source', () => {
     fs.rmSync(srcDir, { recursive: true, force: true });
     fs.rmSync(targetDir, { recursive: true, force: true });
   });
+
+  test('consumer sync with --source never copies scripts/ unless --install-scripts (PLAY-057)', async () => {
+    const srcDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-src-scripts-'));
+    const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-tgt-consumer-'));
+
+    // Setup source with manifest containing scripts and core docs
+    const manifest = {
+      version: '2.8.0',
+      core: ['.agents/STATE_MACHINE.md', 'scripts/gate-qa.mjs', 'scripts/lib/pyramid.mjs'],
+    };
+    fs.writeFileSync(path.join(srcDir, '.playbook-manifest.json'), JSON.stringify(manifest), 'utf8');
+    fs.mkdirSync(path.join(srcDir, '.agents'), { recursive: true });
+    fs.mkdirSync(path.join(srcDir, 'scripts', 'lib'), { recursive: true });
+    fs.writeFileSync(path.join(srcDir, '.agents/STATE_MACHINE.md'), '# State Machine Local', 'utf8');
+    fs.writeFileSync(path.join(srcDir, 'scripts/gate-qa.mjs'), '// gate-qa script', 'utf8');
+    fs.writeFileSync(path.join(srcDir, 'scripts/lib/pyramid.mjs'), '// pyramid script', 'utf8');
+
+    // Consumer repo has package.json with another name (e.g. consumer-project)
+    fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({ name: 'consumer-project' }), 'utf8');
+
+    // Sync without --install-scripts
+    const result = await runPlaybookSync(targetDir, {
+      source: srcDir,
+      yes: true,
+    });
+
+    assert.equal(result.created, 1);
+    assert.ok(fs.existsSync(path.join(targetDir, '.agents/STATE_MACHINE.md')));
+    assert.equal(fs.existsSync(path.join(targetDir, 'scripts/gate-qa.mjs')), false, 'scripts must not be copied to consumer');
+    assert.equal(fs.existsSync(path.join(targetDir, 'scripts/lib/pyramid.mjs')), false, 'scripts/lib must not be copied to consumer');
+
+    // Now test pruning of existing legacy scripts
+    fs.mkdirSync(path.join(targetDir, 'scripts', 'lib'), { recursive: true });
+    fs.writeFileSync(path.join(targetDir, 'scripts/gate-qa.mjs'), '// gate-qa script', 'utf8');
+    fs.writeFileSync(path.join(targetDir, 'scripts/lib/pyramid.mjs'), '// pyramid script', 'utf8');
+    assert.ok(fs.existsSync(path.join(targetDir, 'scripts/gate-qa.mjs')));
+
+    await runPlaybookSync(targetDir, {
+      source: srcDir,
+      yes: true,
+    });
+
+    assert.equal(fs.existsSync(path.join(targetDir, 'scripts/gate-qa.mjs')), false, 'legacy scripts must be pruned');
+    assert.equal(fs.existsSync(path.join(targetDir, 'scripts/lib/pyramid.mjs')), false, 'legacy scripts/lib must be pruned');
+
+    fs.rmSync(srcDir, { recursive: true, force: true });
+    fs.rmSync(targetDir, { recursive: true, force: true });
+  });
 });

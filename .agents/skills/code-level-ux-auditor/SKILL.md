@@ -18,18 +18,18 @@ This skill defines the inspection rules and delegates mechanical detection to a 
 Detection is **not** hardcoded in the script. It lives in `scripts/ux-rules.json`, the canonical source of truth shared by this skill and the runner:
 
 ```bash
-node scripts/audit-ux-code.cjs            # human report
-node scripts/audit-ux-code.cjs --strict   # fails on WARNING too
-node scripts/audit-ux-code.cjs --format json
-node scripts/audit-ux-code.cjs --list-rules
-node scripts/audit-ux-code.cjs --rule UX-006
-node scripts/audit-ux-code.cjs --update-baseline   # snapshot what was already reviewed
+npx playbook audit            # human report (or npx audit-ux / node scripts/audit-ux-code.cjs)
+npx playbook audit --strict   # fails on WARNING too
+npx playbook audit --format json
+npx playbook audit --list-rules
+npx playbook audit --rule UX-006
+npx playbook audit --update-baseline   # snapshot what was already reviewed
 ```
 
 - **The engine is stack-agnostic.** Rules that depend on a library declare `requires.deps` and skip themselves when the dependency is not in the project's `package.json`. The engine contains no file or project names.
 - **Severities:** `ERROR` (breaks tactile functionality, fails the audit without `--strict`), `WARNING` (degrades, fails with `--strict`), `INFO` (hygiene).
 - **Suppression:** `// ux-audit-ignore` disables every rule on that line; `// ux-audit-ignore UX-004` disables only that one. Per-project opt-out lives in `.uxaudit.json` (`disableRules`, `exclude`).
-- **Baseline:** `audit-ux-baseline.json` records observations already reviewed, so the auditor can be adopted on a codebase that already has hundreds of findings without silencing the gate or drowning in unrecoverable noise. `node scripts/audit-ux-code.cjs --update-baseline` rewrites the snapshot. **`ERROR` is never absorbed:** a severity that breaks the build is never silenced by a file.
+- **Baseline:** `audit-ux-baseline.json` records observations already reviewed, so the auditor can be adopted on a codebase that already has hundreds of findings without silencing the gate or drowning in unrecoverable noise. `npx playbook audit --update-baseline` rewrites the snapshot. **`ERROR` is never absorbed:** a severity that breaks the build is never silenced by a file.
 
 ### Anatomy of a unit
 
@@ -178,7 +178,7 @@ Importing the module does **not** run an audit; only executing it as a binary do
 - [ ] Do UI text, titles, and metadata use the standard hyphen (` - `) and avoid em-dash (`—`) or en-dash (`–`)?
 - [ ] Does the mobile viewport allow pinch zoom without locking it (no `maximum-scale=1` nor `user-scalable=no`)?
 - [ ] Does the manual review catch decorative overload (background gradients and orbs, stacked `backdrop-blur` across several surfaces, uniformly large shadows) that degrades text contrast or flattens visual hierarchy? Look for the cumulative effect on text and surface edges, not the isolated technique: the vice appears through repetition, and a technique justified on one plane becomes noise across three.
-- [ ] Does `node scripts/audit-ux-code.cjs --strict` exit green?
+- [ ] Does `npx playbook audit --strict` (or `node scripts/audit-ux-code.cjs --strict`) exit green?
 
 > [!NOTE]
 > Decorative overload **has no mechanical signature**: the same `backdrop-blur` is correct in one sheet and slop in five. It is a manual-review item, not a runner finding. If it ever becomes declarable, its signature must be added to `scripts/ux-rules.json` first and only then documented here.

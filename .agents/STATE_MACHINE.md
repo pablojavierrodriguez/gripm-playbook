@@ -70,7 +70,7 @@ Problem statement and bounded scope.
 <!-- AC:END -->
 ```
 
-An unrefined item remains in `draft` (or `ideas` if discovery) in the backlog. It cannot transition to `doing` (`node scripts/gate-qa.mjs start <ID>`) until Gate R1 passes.
+An unrefined item remains in `draft` (or `ideas` if discovery) in the backlog. It cannot transition to `doing` (`npx playbook gate start <ID>` or `node scripts/gate-qa.mjs start <ID>`) until Gate R1 passes.
 
 ---
 
@@ -80,13 +80,13 @@ An unrefined item remains in `draft` (or `ideas` if discovery) in the backlog. I
 | :--- | :--- | :--- | :--- |
 | T0 | `draft` → `doing` | Principal Engineer | **Gate R1 approved** + prioritized by PO + **all `dependencies:` in `done` (or `ready` within the same release cycle)** + atomic registration of `claimed_by: "<provider>:<session_or_agent_id>"` (e.g., `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) in frontmatter + branch/worktree ready. |
 | T1 | `doing` → `review` | Principal Engineer | Code implemented, ACs checked (`- [x]`), and Pyramid steps 1 - 2 green locally (`typecheck` + tests). |
-| T2 | `review` → `ready` | **QA Auditor (Isolated Sub-Agent)** | Complete Verification Pyramid green, **`node scripts/gate-qa.mjs` exit code 0**, and **blind diff audit executed in an isolated clean-context sub-agent (`invoke_subagent`)**. Neither prose nor the coding thread may self-certify. |
+| T2 | `review` → `ready` | **QA Auditor (Isolated Sub-Agent)** | Complete Verification Pyramid green, **`npx playbook gate <ID>` (or `node scripts/gate-qa.mjs <ID>`) exit code 0**, and **blind diff audit executed in an isolated clean-context sub-agent (`invoke_subagent`)**. Neither prose nor the coding thread may self-certify. |
 | T3 | `review` → `doing` | QA Auditor (Isolated Sub-Agent) | Rejected, with actionable findings (`file:line`) recorded in the QA Matrix. |
 | T4 | `ready` → `done` | Release Management | Package deployed to production from `main` trunk (Anti-Dev-Production-Deploy invariant). |
 | T5 | `doing` → `draft` | PO | Sprint timebox expired, or explicitly deprioritized. |
 | T_block | `draft` → `blocked` | PO / Dev | External impediment identified. Mandatory `blocked_reason`. |
 | T_block | `doing` → `blocked` | PO / Dev | External impediment identified. Mandatory `blocked_reason`. |
-| T_unblock | `blocked` → `doing` / `draft` | PO / Dev | Impediment resolved **or** all `dependencies:` reached `done` or `ready` or were **explicitly unlinked from the array**. A dependency missing on disk is not unlinked: it remains declared. Verified with `node scripts/gate-qa.mjs unblock <id>`. |
+| T_unblock | `blocked` → `doing` / `draft` | PO / Dev | Impediment resolved **or** all `dependencies:` reached `done` or `ready` or were **explicitly unlinked from the array**. A dependency missing on disk is not unlinked: it remains declared. Verified with `npx playbook gate unblock <id>` (or `node scripts/gate-qa.mjs unblock <id>`). |
 | T_dismiss | `ideas` / `draft` / `doing` → `dismissed` | PO / Release Management | Mandatory `dismissed_reason`. Allowed only from `ideas`, `draft`, or `doing`: **never from `ready`**, because a certified item is delivered or reverted to `doing`, never dismissed. |
 | T_revive | `dismissed` → `draft` | PO | Dismissal was made in error, or premise evolved. Returns to the pool **retaining its prior refinement**, consistent with any return to the pool. |
 
@@ -100,7 +100,7 @@ An unrefined item remains in `draft` (or `ideas` if discovery) in the backlog. I
 4. **T4 requires an actual deployment.** Marking `done` without deploying is a state lie.
 5. **Sprints and retrospectives never close by deduction.** Both require explicit, textual commands from the Product Owner.
 6. **Refinement is never lost.** An item returning to the backlog pool retains its refinement record; it is not re-refined from scratch.
-7. **`ready` is earned via Double Gate (Mechanical Runner + Blind Sub-Agent).** Transition T2 requires exit code 0 from `node scripts/gate-qa.mjs` **plus** an independent review of the `git diff` against acceptance criteria in a clean QA sub-agent without developer bias. An agent simulating QA in the coding thread violates this invariant, regardless of intent.
+7. **`ready` is earned via Double Gate (Mechanical Runner + Blind Sub-Agent).** Transition T2 requires exit code 0 from `npx playbook gate <ID>` (or `node scripts/gate-qa.mjs <ID>`) **plus** an independent review of the `git diff` against acceptance criteria in a clean QA sub-agent without developer bias. An agent simulating QA in the coding thread violates this invariant, regardless of intent.
 8. **Dependencies are never assumed.** An item cannot enter `doing` or certify into `ready` while any task in its `dependencies:` array is not in `done` or `ready`. Unlinking a dependency requires an explicit modification of the array, never a silent omission.
 9. **Pre-Flight Concurrency Probe & Dynamic Claiming:** No agent starts code changes or creates branches without first running the synchronous concurrency probe (`status: doing` in backlog and `git status`). Upon claiming a task, it atomically stamps `claimed_by: "<provider>:<session_or_agent_id>"` (e.g., `antigravity:<id>`, `cursor:<id>`, `claude-code:<id>`, `human:<id>`) in the frontmatter. If an item in `doing` is claimed by another actor, **it is strictly prohibited to execute `git restore .`, `git checkout .`, or `git clean` on the shared working tree**. Coordination across peer agents proceeds autonomously: if sharing a harness (e.g., `antigravity:` to `antigravity:`), communicate via `send_message`; if across heterogeneous providers (`cursor:`, `claude-code:`, `human:`), recognize the messaging boundary, respect the active lease without attempting failing RPC calls, and self-isolate mechanically via `git worktree`.
 10. **Anti-Dev-Production-Deploy.** Prohibited to trigger production deployments (`vercel --prod`, cloud release CLIs, or production publish commands) from the `dev` branch or task worktrees. Production releases must originate physically and mechanically from the canonical trunk `main` (either via automated CI upon merge to `refs/heads/main` or controlled fast-forward merge and checkout). Marking `ready` ➔ `done` on items deployed from `dev` constitutes an infrastructure state lie.

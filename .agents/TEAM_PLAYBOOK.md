@@ -35,7 +35,7 @@ When the host `pm-orchestrator` delegates to a specialist via `invoke_subagent`,
 | **Market Researcher** | `TypeName: "research"`<br>`Workspace: "inherit"`<br>*(Read-only + Web search)* | [`.agents/skills/market-researcher/SKILL.md`](skills/market-researcher/SKILL.md) | Problem statement + domain + specific UX/API questions. | `[RESEARCH]` brief: >= 3 product benchmarks, filtered domain edge-case table, and concrete recommendations. |
 | **Product Designer** | `TypeName: "research"` *(or `"self"` if generating visual assets)*<br>`Workspace: "inherit"`<br>*(Read-first design specification)* | [`.agents/skills/product-designer/SKILL.md`](skills/product-designer/SKILL.md) | Problem statement + ACs + Research brief + project design tokens. | `[DESIGN SPEC]`: semantic tokens, >= 44×44px touch targets, all 7 interactive states, Purpose Test verdicts, and copy veracity check. |
 | **Principal Engineer** | `TypeName: "self"`<br>`Workspace: "inherit"` *(or `"share"` in parallel SDD)*<br>*(Full write + Terminal tools)* | [`.agents/skills/principal-engineer/SKILL.md`](skills/principal-engineer/SKILL.md) | Refined task (`doing`) + ACs + Design Spec + Architecture boundaries + files in scope + `.agents/rules/`. | Implemented modular code (< 1000 LOC per file, layers decoupled), checked ACs (`- [x]`), green local typecheck/tests, Honest Scope & Residual Risk Declaration (what was not tested + residual risk), task in `review`. |
-| **QA Auditor** *(NEVER in the coder's thread)* | `TypeName: "self"`<br>`Workspace: "inherit"`<br>*(Contract-bounded: NO source code edits, terminal execution only)* | [`.agents/skills/qa-auditor/SKILL.md`](skills/qa-auditor/SKILL.md) & [`.agents/skills/code-level-ux-auditor/SKILL.md`](skills/code-level-ux-auditor/SKILL.md) | **Blind audit payload only:** Task file path (ACs) + `git diff` (or commit range) + command to run `node scripts/gate-qa.mjs <ID>`. Zero developer rationalization history. | `[QA MATRIX]`: mechanical `gate:qa` exit code + blind semantic audit of `git diff` vs. ACs + verdict (`APPROVED -> ready` or `REJECTED -> doing` with file:line findings). |
+| **QA Auditor** *(NEVER in the coder's thread)* | `TypeName: "self"`<br>`Workspace: "inherit"`<br>*(Contract-bounded: NO source code edits, terminal execution only)* | [`.agents/skills/qa-auditor/SKILL.md`](skills/qa-auditor/SKILL.md) & [`.agents/skills/code-level-ux-auditor/SKILL.md`](skills/code-level-ux-auditor/SKILL.md) | **Blind audit payload only:** Task file path (ACs) + `git diff` (or commit range) + command to run `npx playbook gate <ID>` (or `node scripts/gate-qa.mjs <ID>`). Zero developer rationalization history. | `[QA MATRIX]`: mechanical `gate:qa` exit code + blind semantic audit of `git diff` vs. ACs + verdict (`APPROVED -> ready` or `REJECTED -> doing` with file:line findings). |
 
 ### 🟢 When to Parallelize (Sub-Agents / Background Tasks):
 1. **Blind QA Certification (`qa-auditor`):**
@@ -43,7 +43,7 @@ When the host `pm-orchestrator` delegates to a specialist via `invoke_subagent`,
 2. **Exploratory Research & Benchmarking (`market-researcher`):**
    - Investigate industry references (Linear, Stripe, Notion, Obsidian) or analyze external API documentation without polluting the core technical context.
 3. **Accessibility (a11y) & Static Code Audits (`code-level-ux-auditor`):**
-   - Execute contrast ratios, accessibility checks, or static UX scans (`node scripts/audit-ux-code.cjs`) asynchronously.
+   - Execute contrast ratios, accessibility checks, or static UX scans (`npx playbook audit` or `node scripts/audit-ux-code.cjs`) asynchronously.
 4. **Auditing Visual Layouts (`browser_subagent`):**
    - Reserved **exclusively** for visual layout/CSS issues not deducible statically, complex viewport rendering, or upon explicit user request.
 
@@ -143,19 +143,19 @@ Transitions, actors, and guards are specified in [STATE_MACHINE.md](STATE_MACHIN
   2. ✅ Unit & integration tests (`npm test`, headless code 0)
   3. ✅ Backlog & spec consistency checks
   4. ✅ Production build (`npm run build`)
-  5. ✅ `node scripts/audit-ux-code.cjs --strict` (static UX audit, headless)
+  5. ✅ `npx playbook audit --strict` / `node scripts/audit-ux-code.cjs --strict` (static UX audit, headless)
 - **Blind Semantic Diff Audit:** Beyond mechanical checks, the clean-context QA sub-agent verifies that every checked AC (`- [x]`) is genuinely implemented in the `git diff`, with no module-wide `vi.mock()` evasions, no `as unknown as` type escapes, strict modularity (zero files >= 1000 LOC, zero God-Files bundling multi-layer logic), and all mandatory headless audits satisfied.
 - **Anti-Browser-Subagent Inefficiency:** Prohibited to invoke `browser_subagent` for logic, state, API contracts, or persistence that can be audited in milliseconds headlessly. Reserved strictly for static-undeducible CSS/layout issues or explicit user prompt.
-- **Output:** Once both `node scripts/gate-qa.mjs <ID>` (`exit 0`) and the blind diff audit pass, moves the item to `status: ready`. On failure, records actionable findings (`file:line`) and moves it back to `doing` (transition T3).
+- **Output:** Once both `npx playbook gate <ID>` (or `node scripts/gate-qa.mjs <ID>`) (`exit 0`) and the blind diff audit pass, moves the item to `status: ready`. On failure, records actionable findings (`file:line`) and moves it back to `doing` (transition T3).
 - **`ready` is the formal delivery of development**: the item is validated and immediately eligible for packaging and deployment. A certified item is frozen: any post-QA code change invalidates the certification and requires a return to `doing`.
 
 #### Double Gate: Mechanical Runner + Blind Sub-Agent
 
-> **Neither prose nor same-thread roleplay is a gate.** An agent asked to "act as the QA Auditor" in the same turn that it wrote the code will tick the ACs by inertia and rationalize its own shortcuts. This playbook prevents both failure modes: `scripts/gate-qa.mjs` enforces the mechanical gate (**exit code 0**), and **context isolation (`invoke_subagent`)** enforces an unbiased semantic audit of the `git diff`.
+> **Neither prose nor same-thread roleplay is a gate.** An agent asked to "act as the QA Auditor" in the same turn that it wrote the code will tick the ACs by inertia and rationalize its own shortcuts. This playbook prevents both failure modes: `npx playbook gate` / `gate-qa` enforces the mechanical gate (**exit code 0**), and **context isolation (`invoke_subagent`)** enforces an unbiased semantic audit of the `git diff`.
 
 ```bash
-node scripts/gate-qa.mjs TASK-ID                    # full mechanical gate
-node scripts/gate-qa.mjs TASK-ID --no-run  # inspection only; exits 2, never certifies
+npx playbook gate TASK-ID                    # full mechanical gate (or node scripts/gate-qa.mjs TASK-ID)
+npx playbook gate TASK-ID --no-run           # inspection only; exits 2, never certifies
 ```
 
 The runner rejects, mechanically: an item not in `review`; any unchecked acceptance criterion; a `blocked_reason` that is missing, empty or whitespace on a `blocked` item (and a stray `blocked_reason` on an item that is not blocked); and any declared dependency that is missing from disk or not in `done`. It then runs the pyramid, and a step that cannot execute is reported `SKIPPED` - **a pyramid where nothing ran fails the gate rather than passing it**, because certification on an unexecuted gate is the exact theatre this runner exists to prevent.
