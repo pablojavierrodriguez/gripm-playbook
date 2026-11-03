@@ -42,16 +42,16 @@ import { fileURLToPath } from 'node:url';
 import { c, printHeader, promptText, promptConfirm, promptSelect, promptMultiSelect } from './lib/terminal.mjs';
 import {
   HARNESS_CHOICES, LANGUAGE_LABELS, isBaseTemplate, parametrizeAgentsMd, renderAdapters,
-  detectStacks, detectTechStack, getStackChoices,
+  detectStacks, detectTechStack, getStackChoices, printHarnesses, printUsage,
 } from './lib/adapters.mjs';
 import { FALLBACK_STACKS, runPlaybookSync } from './sync-playbook.mjs';
 import {
-  MODE_CHOICES, DEFAULT_CORE_SKILLS, VALID_SCRIPTS, VALID_DOCS,
+  MODE_CHOICES, DEFAULT_CORE_SKILLS, VALID_SCRIPTS, VALID_DOCS, VALID_RULES,
   SCRIPT_DEFINITIONS, parseSelectionList, loadCatalogFromManifest,
-  getSkillChoices, getScriptChoices, getDocChoices, resolveSelection,
+  getSkillChoices, getScriptChoices, getDocChoices, getRuleChoices,
+  PRESET_CHOICES, AUTOMATION_CHOICES, resolveSelection,
   applySelectionFlag,
 } from './lib/selection.mjs';
-
 const __filename = fileURLToPath(import.meta.url);
 
 /** Human label of a project language code, e.g. `es` -> `Spanish`. */
@@ -111,8 +111,11 @@ async function collectAnswers(repo, opts) {
     techStack: detectTechStack(deps),
     mode: opts.mode || (opts.yes || !process.stdin.isTTY ? 'quick' : null),
     skills: opts.skills,
+    rules: opts.noRules ? [] : opts.rules,
     scripts: opts.noScripts ? [] : opts.scripts,
     docs: opts.noDocs ? [] : opts.docs,
+    preset: opts.preset || 'pragmatic',
+    automation: opts.automation || 'automated',
   };
 
   const isInteractive = !opts.yes && process.stdin.isTTY;
@@ -143,6 +146,14 @@ async function collectAnswers(repo, opts) {
         }
       }
 
+      if (answers.rules === null && !opts.noRules) {
+        answers.rules = await promptMultiSelect(
+          'Governance rules (.agents/)',
+          getRuleChoices(),
+          VALID_RULES
+        );
+      }
+
       if (answers.scripts === null && !opts.noScripts) {
         answers.scripts = await promptMultiSelect(
           'Scripts to inject in package.json',
@@ -158,6 +169,14 @@ async function collectAnswers(repo, opts) {
           VALID_DOCS
         );
       }
+
+      if (!opts.preset) {
+        answers.preset = await promptSelect('Audit rigor preset', PRESET_CHOICES, answers.preset);
+      }
+
+      if (!opts.automation) {
+        answers.automation = await promptSelect('Delivery automation mode', AUTOMATION_CHOICES, answers.automation);
+      }
     }
 
     if (opts.board === null) {
@@ -168,12 +187,14 @@ async function collectAnswers(repo, opts) {
   const resolved = resolveSelection({
     mode: answers.mode || 'quick',
     skills: answers.skills,
+    rules: answers.rules,
     scripts: answers.scripts,
     docs: answers.docs,
     availableSkills: catalog.skills,
   });
   answers.mode = answers.mode || 'quick';
   answers.skills = resolved.skills;
+  answers.rules = resolved.rules;
   answers.scripts = resolved.scripts;
   answers.docs = resolved.docs;
 
@@ -268,8 +289,20 @@ function writeBoardConfig(repo, answers, opts) {
   if (fs.existsSync(file) && !opts.force) {
     try {
       const existing = JSON.parse(fs.readFileSync(file, 'utf8'));
+      let changed = false;
       if (!existing.audit) {
         existing.audit = { maxLines: 1000, warnLines: 500, strict: false };
+        changed = true;
+      }
+      if (opts.preset && existing.preset !== opts.preset) {
+        existing.preset = opts.preset;
+        changed = true;
+      }
+      if (opts.automation && existing.automation !== opts.automation) {
+        existing.automation = opts.automation;
+        changed = true;
+      }
+      if (changed) {
         fs.writeFileSync(file, `${JSON.stringify(existing, null, 2)}\n`, 'utf8');
         console.log(`  ${c.green('✔')} ${c.green('updated'.padEnd(10))} .gripm/config.json ${c.dim('(audit thresholds added)')}`);
         return;
@@ -283,6 +316,8 @@ function writeBoardConfig(repo, answers, opts) {
       projectId: name.toLowerCase().replace(/^@[^/]+\//, '').replace(/[^a-z0-9_-]/g, '-'),
       codePrefix: name.replace(/^@[^/]+\//, '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 4).toUpperCase() || 'PROJ',
       language: answers.language,
+      preset: answers.preset || 'pragmatic',
+      automation: answers.automation || 'automated',
       ...BOARD_DEFAULTS,
     };
 
@@ -331,37 +366,15 @@ function addPlaybookScripts(repo, selectedScripts = null) {
   }
 }
 
-function printHarnesses() {
-  console.log(`\n  ${c.bold('gripm')} ${c.dim('· Playbook Harnesses')}\n`);
-  for (const harness of HARNESS_CHOICES) {
-    console.log(`  • ${c.bold(harness.value.padEnd(12))} ${harness.label}`);
-  }
-  console.log(`
-  ${c.dim('Install with:')}  node scripts/init.mjs --harness <name>
-  ${c.dim('Default:')}       antigravity (AGENTS.md + .agents/)
-  ${c.dim('All of them:')}   node scripts/init.mjs --harness cursor --harness claude
-`);
-}
-
-function printUsage() {
-  console.log(
-    fs
-      .readFileSync(__filename, 'utf8')
-      .split('*/')[0]
-      .replace(/^\/\*\*?/, '')
-      .replace(/^ \* ?/gm, ''),
-  );
-}
-
 export async function runInit(argv = []) {
   const opts = parseArgs(argv);
 
   if (opts.help) {
-    printUsage();
+    printUsage(fs.readFileSync(__filename, 'utf8'));
     return;
   }
   if (opts.listHarnesses) {
-    printHarnesses();
+    printHarnesses(c);
     return;
   }
 
@@ -381,21 +394,13 @@ export async function runInit(argv = []) {
     return;
   }
 
-  console.log(`  ${c.dim('➜')}  ${c.dim('Project:')}     ${answers.projectName}`);
-  console.log(`  ${c.dim('➜')}  ${c.dim('Language:')}     ${languageLabel(answers.language)}`);
-  console.log(`  ${c.dim('➜')}  ${c.dim('Harnesses:')}    ${answers.harnesses.join(', ')}`);
-  console.log(`  ${c.dim('➜')}  ${c.dim('Stack packs:')}  ${answers.stacks.length ? answers.stacks.join(', ') : '(core only)'}`);
-  console.log(`  ${c.dim('➜')}  ${c.dim('Mode:')}         ${answers.mode}`);
-  console.log(`  ${c.dim('➜')}  ${c.dim('Skills:')}       ${answers.skills.length ? answers.skills.join(', ') : '(none)'}`);
-  console.log(`  ${c.dim('➜')}  ${c.dim('Scripts:')}      ${answers.scripts.length ? answers.scripts.join(', ') : '(none)'}`);
-  console.log(`  ${c.dim('➜')}  ${c.dim('Docs:')}         ${answers.docs.length ? answers.docs.join(', ') : '(none)'}`);
-  console.log(`  ${c.dim('➜')}  ${c.dim('Gripm Board:')}  ${answers.board ? 'yes' : 'no'}\n`);
+  console.log(`  ${c.dim('➜')}  ${c.dim('Project:')}     ${answers.projectName}\n  ${c.dim('➜')}  ${c.dim('Language:')}     ${languageLabel(answers.language)}\n  ${c.dim('➜')}  ${c.dim('Harnesses:')}    ${answers.harnesses.join(', ')}\n  ${c.dim('➜')}  ${c.dim('Stack packs:')}  ${answers.stacks.length ? answers.stacks.join(', ') : '(core only)'}\n  ${c.dim('➜')}  ${c.dim('Mode:')}         ${answers.mode}\n  ${c.dim('➜')}  ${c.dim('Skills:')}       ${answers.skills.length ? answers.skills.join(', ') : '(none)'}\n  ${c.dim('➜')}  ${c.dim('Rules:')}        ${answers.rules.length ? answers.rules.join(', ') : '(none)'}\n  ${c.dim('➜')}  ${c.dim('Scripts:')}      ${answers.scripts.length ? answers.scripts.join(', ') : '(none)'}\n  ${c.dim('➜')}  ${c.dim('Docs:')}         ${answers.docs.length ? answers.docs.join(', ') : '(none)'}\n  ${c.dim('➜')}  ${c.dim('Preset:')}       ${answers.preset}\n  ${c.dim('➜')}  ${c.dim('Automation:')}   ${answers.automation}\n  ${c.dim('➜')}  ${c.dim('Gripm Board:')}  ${answers.board ? 'yes' : 'no'}\n`);
 
   await runPlaybookSync(repo, {
     source: opts.source, tag: opts.tag, remote: opts.remote,
     stacks: answers.stacks, initAgents: true, yes: opts.yes, force: opts.force,
     installScripts: opts.installScripts,
-    selection: { skills: answers.skills, scripts: answers.scripts, docs: answers.docs },
+    selection: { skills: answers.skills, rules: answers.rules, scripts: answers.scripts, docs: answers.docs },
   });
 
   if (!parametrizeAgentsMdFile(repo, answers)) return;
@@ -421,8 +426,9 @@ function parseArgs(argv) {
     repo: process.cwd(), source: null, tag: null, remote: undefined,
     stacks: [], harnesses: [], name: null, lang: null, board: null,
     force: false, yes: false, listHarnesses: false, help: false,
-    installScripts: false, mode: null, skills: null, scripts: null,
-    docs: null, noScripts: false, noDocs: false,
+    installScripts: false, mode: null, skills: null, rules: null, scripts: null,
+    docs: null, noRules: false, noScripts: false, noDocs: false,
+    preset: null, automation: null,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -449,7 +455,26 @@ function parseArgs(argv) {
         opts.mode = val;
         break;
       }
+      case '--preset': {
+        const val = next();
+        if (val !== 'pragmatic' && val !== 'strict') {
+          console.error(`Unknown preset "${val}". Available: pragmatic, strict`);
+          process.exit(2);
+        }
+        opts.preset = val;
+        break;
+      }
+      case '--automation': {
+        const val = next();
+        if (val !== 'automated' && val !== 'manual') {
+          console.error(`Unknown automation mode "${val}". Available: automated, manual`);
+          process.exit(2);
+        }
+        opts.automation = val;
+        break;
+      }
       case '--skills': case '--scripts': case '--no-scripts': case '--docs': case '--no-docs':
+      case '--rules': case '--no-rules':
         applySelectionFlag(arg, next, catalog, opts);
         break;
       case '--install-scripts': opts.installScripts = true; break;
@@ -465,7 +490,6 @@ function parseArgs(argv) {
 
   return opts;
 }
-
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
   runInit(process.argv.slice(2)).catch((err) => {
     console.error('Fatal:', err.message);

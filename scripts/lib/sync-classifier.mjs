@@ -192,6 +192,7 @@ export function readLock(targetRepo) {
         skills: Array.isArray(lock.selection.skills) ? lock.selection.skills : null,
         scripts: Array.isArray(lock.selection.scripts) ? lock.selection.scripts : null,
         docs: Array.isArray(lock.selection.docs) ? lock.selection.docs : null,
+        rules: Array.isArray(lock.selection.rules) ? lock.selection.rules : null,
       } : null,
       isLegacyPath: lockPath.endsWith(LEGACY_LOCK_PATH),
     };
@@ -220,12 +221,29 @@ export function planFiles(manifest, stacks, fallbackCore = [], fallbackStacks = 
   if (options.selection) {
     const selSkills = options.selection.skills;
     const selDocs = options.selection.docs;
+    const selRules = options.selection.rules;
 
     files = files.filter((f) => {
       const skillMatch = f.match(/^\.agents\/skills\/([^/]+)/);
       if (skillMatch) {
         const skillName = skillMatch[1];
         if (Array.isArray(selSkills) && !selSkills.includes(skillName)) {
+          return false;
+        }
+      }
+
+      if (f === '.agents/TEAM_PLAYBOOK.md') {
+        if (Array.isArray(selRules) && !selRules.includes('team-playbook')) {
+          return false;
+        }
+      }
+      if (f === '.agents/STATE_MACHINE.md') {
+        if (Array.isArray(selRules) && !selRules.includes('state-machine')) {
+          return false;
+        }
+      }
+      if (f === '.agents/rules/git-workflow.md') {
+        if (Array.isArray(selRules) && !selRules.includes('git-workflow')) {
           return false;
         }
       }

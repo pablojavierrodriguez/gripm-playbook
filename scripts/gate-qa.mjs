@@ -162,7 +162,14 @@ export function resolvePyramid(root = resolveProjectRoot(), options = {}) {
         const auditScript = path.resolve(SCRIPT_DIR, 'audit-ux-code.cjs');
         step.available = true;
         step.runner = (r) => {
-          const res = spawnSync(process.execPath, [auditScript, '--strict', '--quiet'], { cwd: r, encoding: 'utf8', env: { ...process.env, AUDIT_UX_ROOT: r } });
+          const presetArg = [];
+          const argvPresetIdx = process.argv ? process.argv.indexOf('--preset') : -1;
+          if (argvPresetIdx !== -1 && process.argv[argvPresetIdx + 1]) {
+            presetArg.push('--preset', process.argv[argvPresetIdx + 1]);
+          } else if (options.preset) {
+            presetArg.push('--preset', options.preset);
+          }
+          const res = spawnSync(process.execPath, [auditScript, '--strict', '--quiet', ...presetArg], { cwd: r, encoding: 'utf8', env: { ...process.env, AUDIT_UX_ROOT: r } });
           if (res.status === 0) return { state: 'passed', detail: 'packaged audit-ux --strict passed' };
           const tail = `${res.stdout || ''}${res.stderr || ''}`.trim().split('\n').slice(-4).join('\n      ');
           return { state: 'failed', detail: `audit-ux failed (exit code ${res.status})${tail ? `\n      ${tail}` : ''}` };

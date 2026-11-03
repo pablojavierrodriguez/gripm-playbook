@@ -13,6 +13,7 @@ import {
   VALID_SCRIPTS,
   SCRIPT_DEFINITIONS,
   VALID_DOCS,
+  VALID_RULES,
   DEFAULT_CORE_SKILLS,
 } from '../scripts/lib/selection.mjs';
 import { planFiles, readLock } from '../scripts/lib/sync-classifier.mjs';
@@ -218,6 +219,7 @@ describe('E2E init & sync with granular selection', () => {
       skills: ['pm-orchestrator', 'qa-auditor'],
       scripts: ['gate:qa', 'check:loc'],
       docs: ['domain'],
+      rules: VALID_RULES,
     });
 
     // Run playbook sync without flags: it MUST NOT re-install unselected skills or docs
@@ -266,6 +268,7 @@ describe('E2E init & sync with granular selection', () => {
       skills: ['qa-auditor'],
       scripts: [],
       docs: [],
+      rules: VALID_RULES,
     });
 
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -448,6 +451,103 @@ describe('E2E init & sync with granular selection', () => {
 
     const updatedConfig = JSON.parse(fs.readFileSync(path.join(tmp, '.gripm/config.json'), 'utf8'));
     assert.deepEqual(updatedConfig.audit, { maxLines: 1000, warnLines: 500, strict: false });
+
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  test('VALID_RULES defines canonical governance rules', () => {
+    assert.deepEqual(VALID_RULES, ['team-playbook', 'state-machine', 'git-workflow']);
+    assert.deepEqual(parseSelectionList('team-playbook,state-machine', VALID_RULES, 'rule'), ['team-playbook', 'state-machine']);
+    assert.deepEqual(parseSelectionList('all', VALID_RULES, 'rule'), VALID_RULES);
+    assert.deepEqual(parseSelectionList('none', VALID_RULES, 'rule'), []);
+    assert.throws(() => parseSelectionList('invalid-rule', VALID_RULES, 'rule'), /Unknown rule "invalid-rule"/);
+  });
+
+  test('resolveSelection: handles rules in quick and custom mode', () => {
+    const quick = resolveSelection({ mode: 'quick' });
+    assert.deepEqual(quick.rules, VALID_RULES);
+
+    const custom = resolveSelection({ mode: 'custom', rules: ['team-playbook'] });
+    assert.deepEqual(custom.rules, ['team-playbook']);
+  });
+
+  test('planFiles filters governance rules based on selection.rules', () => {
+    const manifest = {
+      core: [
+        '.agents/TEAM_PLAYBOOK.md',
+        '.agents/STATE_MACHINE.md',
+        '.agents/rules/git-workflow.md',
+        '.agents/skills/pm-orchestrator/SKILL.md',
+      ],
+      stacks: {},
+    };
+
+    const { files: filtered } = planFiles(manifest, [], [], {}, {
+      selection: {
+        rules: ['team-playbook'],
+      },
+    });
+
+    assert.ok(filtered.includes('.agents/TEAM_PLAYBOOK.md'));
+    assert.ok(!filtered.includes('.agents/STATE_MACHINE.md'));
+    assert.ok(!filtered.includes('.agents/rules/git-workflow.md'));
+    assert.ok(filtered.includes('.agents/skills/pm-orchestrator/SKILL.md'));
+  });
+
+  test('init with --rules installs only selected governance rules', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-init-rules-'));
+    fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'rules-proj' }), 'utf8');
+
+    const res = spawnSync(process.execPath, [
+      INIT_CLI,
+      '--repo', tmp,
+      '--source', REPO_ROOT,
+      '--rules', 'team-playbook',
+      '--preset', 'pragmatic',
+      '--automation', 'manual',
+      '--yes',
+    ], {
+      encoding: 'utf8',
+    });
+
+    assert.equal(res.status, 0, `Init failed: ${res.stderr || res.stdout}`);
+
+    assert.ok(fs.existsSync(path.join(tmp, '.agents/TEAM_PLAYBOOK.md')));
+    assert.ok(!fs.existsSync(path.join(tmp, '.agents/STATE_MACHINE.md')));
+    assert.ok(!fs.existsSync(path.join(tmp, '.agents/rules/git-workflow.md')));
+
+    const lock = JSON.parse(fs.readFileSync(path.join(tmp, '.gripm/playbook-lock.json'), 'utf8'));
+    assert.deepEqual(lock.selection.rules, ['team-playbook']);
+
+    const cfg = JSON.parse(fs.readFileSync(path.join(tmp, '.gripm/config.json'), 'utf8'));
+    assert.equal(cfg.preset, 'pragmatic');
+    assert.equal(cfg.automation, 'manual');
+
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  test('init with --no-rules installs zero governance rules', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-init-norules-'));
+    fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'norules-proj' }), 'utf8');
+
+    const res = spawnSync(process.execPath, [
+      INIT_CLI,
+      '--repo', tmp,
+      '--source', REPO_ROOT,
+      '--no-rules',
+      '--yes',
+    ], {
+      encoding: 'utf8',
+    });
+
+    assert.equal(res.status, 0, `Init failed: ${res.stderr || res.stdout}`);
+
+    assert.ok(!fs.existsSync(path.join(tmp, '.agents/TEAM_PLAYBOOK.md')));
+    assert.ok(!fs.existsSync(path.join(tmp, '.agents/STATE_MACHINE.md')));
+    assert.ok(!fs.existsSync(path.join(tmp, '.agents/rules/git-workflow.md')));
+
+    const lock = JSON.parse(fs.readFileSync(path.join(tmp, '.gripm/playbook-lock.json'), 'utf8'));
+    assert.deepEqual(lock.selection.rules, []);
 
     fs.rmSync(tmp, { recursive: true, force: true });
   });

@@ -434,7 +434,7 @@ function parseArgs(argv) {
     repo: process.cwd(), source: null, tag: null, remote: null, stacks: [],
     initAgents: false, dryRun: false, force: false, yes: false, manifest: true,
     adopt: false, history: true, listStacks: false, help: false, installScripts: false,
-    skills: null, scripts: null, docs: null, noScripts: false, noDocs: false,
+    skills: null, rules: null, scripts: null, docs: null, noSkills: false, noRules: false, noScripts: false, noDocs: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -448,6 +448,7 @@ function parseArgs(argv) {
       case '--remote': opts.remote = next(); break;
       case '--stack': case '-s': opts.stacks.push(next()); break;
       case '--skills': case '--scripts': case '--no-scripts': case '--docs': case '--no-docs':
+      case '--rules': case '--no-rules':
         applySelectionFlag(arg, next, catalog, opts);
         break;
       case '--init-agents': opts.initAgents = true; break;
@@ -466,9 +467,10 @@ function parseArgs(argv) {
     }
   }
 
-  if (opts.skills !== null || opts.scripts !== null || opts.docs !== null || opts.noScripts || opts.noDocs) {
+  if (opts.skills !== null || opts.rules !== null || opts.scripts !== null || opts.docs !== null || opts.noScripts || opts.noDocs || opts.noRules) {
     opts.selection = {
       skills: opts.skills,
+      rules: opts.noRules ? [] : opts.rules,
       scripts: opts.noScripts ? [] : opts.scripts,
       docs: opts.noDocs ? [] : opts.docs,
     };
@@ -476,7 +478,6 @@ function parseArgs(argv) {
 
   return opts;
 }
-
 function printUsage() {
   console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0].replace(/^\/\*\*?/, '').replace(/^ \* ?/gm, ''));
 }

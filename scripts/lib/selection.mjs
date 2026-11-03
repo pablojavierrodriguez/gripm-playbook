@@ -53,9 +53,31 @@ export const DOC_FILE_MAP = {
   'sprint-spec': 'docs/sprints/SPRINT_SPEC_TEMPLATE.md',
 };
 
+export const VALID_RULES = [
+  'team-playbook',
+  'state-machine',
+  'git-workflow',
+];
+
+export const RULE_FILE_MAP = {
+  'team-playbook': '.agents/TEAM_PLAYBOOK.md',
+  'state-machine': '.agents/STATE_MACHINE.md',
+  'git-workflow': '.agents/rules/git-workflow.md',
+};
+
 export const MODE_CHOICES = [
-  { value: 'quick', label: 'Quick (Batteries Included) - all roles, scripts and docs' },
+  { value: 'quick', label: 'Quick (Batteries Included) - all roles, rules, scripts and docs' },
   { value: 'custom', label: 'Custom (Component by Component) - granular selection' },
+];
+
+export const PRESET_CHOICES = [
+  { value: 'pragmatic', label: 'Pragmatic - Critical engineering & a11y checks (ignores cosmetic style warnings)' },
+  { value: 'strict', label: 'Strict    - Full catalog enforcement (touch ergonomics, anti-slop, typography)' },
+];
+
+export const AUTOMATION_CHOICES = [
+  { value: 'automated', label: 'Automated - Delivery state flow (draft -> doing -> review -> ready -> done) managed by sub-agents' },
+  { value: 'manual', label: 'Manual    - Human-driven state transitions with agent assistance' },
 ];
 
 export const SKILL_LABELS = {
@@ -83,6 +105,12 @@ export const DOC_LABELS = {
   'sprint-spec': 'sprint-spec - docs/sprints/SPRINT_SPEC_TEMPLATE.md (sprint spec template)',
 };
 
+export const RULE_LABELS = {
+  'team-playbook': 'team-playbook - .agents/TEAM_PLAYBOOK.md (roles and sub-agent contracts)',
+  'state-machine': 'state-machine - .agents/STATE_MACHINE.md (delivery status lifecycle: draft -> done)',
+  'git-workflow': 'git-workflow  - .agents/rules/git-workflow.md (Git discipline, worktrees, commits)',
+};
+
 /**
  * Loads the skills catalog from .playbook-manifest.json when available.
  */
@@ -105,6 +133,7 @@ export function loadCatalogFromManifest(manifestOrRoot = null) {
     skills,
     scripts: VALID_SCRIPTS,
     docs: VALID_DOCS,
+    rules: VALID_RULES,
   };
 }
 
@@ -159,6 +188,13 @@ export function getDocChoices() {
   }));
 }
 
+export function getRuleChoices() {
+  return VALID_RULES.map((value) => ({
+    value,
+    label: RULE_LABELS[value] || value,
+  }));
+}
+
 /**
  * Resolves final selection object from mode, explicit flags, and existing lockfile.
  */
@@ -167,6 +203,7 @@ export function resolveSelection({
   skills = null,
   scripts = null,
   docs = null,
+  rules = null,
   existingSelection = null,
   availableSkills = DEFAULT_CORE_SKILLS,
 } = {}) {
@@ -174,6 +211,7 @@ export function resolveSelection({
     skills: [...availableSkills],
     scripts: [...VALID_SCRIPTS],
     docs: [...VALID_DOCS],
+    rules: [...VALID_RULES],
   };
 
   if (mode === 'quick') {
@@ -181,6 +219,7 @@ export function resolveSelection({
       skills: skills !== null ? skills : quickDefaults.skills,
       scripts: scripts !== null ? scripts : quickDefaults.scripts,
       docs: docs !== null ? docs : quickDefaults.docs,
+      rules: rules !== null ? rules : quickDefaults.rules,
     };
   }
 
@@ -189,6 +228,7 @@ export function resolveSelection({
     skills: skills !== null ? skills : (existingSelection?.skills ?? quickDefaults.skills),
     scripts: scripts !== null ? scripts : (existingSelection?.scripts ?? quickDefaults.scripts),
     docs: docs !== null ? docs : (existingSelection?.docs ?? quickDefaults.docs),
+    rules: rules !== null ? rules : (existingSelection?.rules ?? quickDefaults.rules),
   };
 }
 
@@ -199,6 +239,7 @@ export function resolveSyncSelection(optionsSelection, lockSelection, availableS
       skills: optionsSelection.skills ?? null,
       scripts: optionsSelection.scripts ?? null,
       docs: optionsSelection.docs ?? null,
+      rules: optionsSelection.rules ?? null,
       existingSelection: lockSelection,
       availableSkills,
     });
@@ -224,6 +265,8 @@ export function applySelectionFlag(arg, next, catalog, opts) {
       case '--no-scripts': opts.noScripts = true; opts.scripts = []; break;
       case '--docs': opts.docs = parseSelectionList(next(), VALID_DOCS, 'doc'); break;
       case '--no-docs': opts.noDocs = true; opts.docs = []; break;
+      case '--rules': opts.rules = parseSelectionList(next(), VALID_RULES, 'rule'); break;
+      case '--no-rules': opts.noRules = true; opts.rules = []; break;
     }
   } catch (err) {
     console.error(`\n  ✖  ${err.message}\n`);

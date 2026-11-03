@@ -60,17 +60,46 @@ function resolveBaselineFile(root = process.cwd(), forWrite = false) {
   return rootBaseline;
 }
 
+const PRAGMATIC_EXCLUDED_RULES = ['UX-011', 'UX-012', 'UX-013', 'UX-014'];
+
 function loadConfig(opts = {}, root = process.cwd()) {
   const configPath = resolveConfigFile(opts.config, root);
+  let config = {};
 
-  if (!fs.existsSync(configPath)) return { configPath, config: {} };
-
-  try {
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    return { configPath, config: config || {} };
-  } catch (err) {
-    fatal(`Config file ${configPath} is not valid JSON: ${err.message}`);
+  if (fs.existsSync(configPath)) {
+    try {
+      config = JSON.parse(fs.readFileSync(configPath, 'utf8')) || {};
+    } catch (err) {
+      fatal(`Config file ${configPath} is not valid JSON: ${err.message}`);
+    }
   }
+
+  // Also read from .gripm/config.json if preset or disableRules are configured there
+  let gripmPreset = null;
+  const gripmConfigPath = path.join(root, '.gripm', 'config.json');
+  if (fs.existsSync(gripmConfigPath)) {
+    try {
+      const gripmCfg = JSON.parse(fs.readFileSync(gripmConfigPath, 'utf8'));
+      gripmPreset = gripmCfg.preset || gripmCfg.audit?.preset || gripmCfg.rigor || null;
+      if (Array.isArray(gripmCfg.audit?.disableRules)) {
+        config.disableRules = [...new Set([...(config.disableRules || []), ...gripmCfg.audit.disableRules])];
+      }
+    } catch {}
+  }
+
+  const resolvedPreset = opts.preset || config.preset || gripmPreset || null;
+  if (resolvedPreset) {
+    config.preset = resolvedPreset;
+    if (resolvedPreset === 'pragmatic') {
+      const disabled = new Set(Array.isArray(config.disableRules) ? config.disableRules : []);
+      for (const r of PRAGMATIC_EXCLUDED_RULES) {
+        disabled.add(r);
+      }
+      config.disableRules = [...disabled];
+    }
+  }
+
+  return { configPath, config };
 }
 
 function detectSourceDir(explicit, config = {}, root = process.cwd()) {
@@ -365,17 +394,9 @@ function diffAgainstBaseline(all, root = process.cwd()) {
 
 function parseArgs(argv) {
   const opts = {
-    src: null,
-    config: null,
-    strict: false,
-    canonicalOnly: false,
-    only: null,
-    format: 'human',
-    listRules: false,
-    rules: [],
-    quiet: false,
-    help: false,
-    updateBaseline: false,
+    src: null, config: null, preset: null, strict: false,
+    canonicalOnly: false, only: null, format: 'human',
+    listRules: false, rules: [], quiet: false, help: false, updateBaseline: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -387,6 +408,7 @@ function parseArgs(argv) {
         break;
       case '--src': opts.src = argv[++i]; break;
       case '--config': opts.config = argv[++i]; break;
+      case '--preset': opts.preset = argv[++i]; break;
       case '--strict': opts.strict = true; break;
       case '--canonical-only': opts.canonicalOnly = true; break;
       case '--only': opts.only = argv[++i]; break;
@@ -407,6 +429,10 @@ function parseArgs(argv) {
 
   if (!['human', 'json'].includes(opts.format)) {
     fatal(`Unknown --format "${opts.format}". Expected "human" or "json".`);
+  }
+
+  if (opts.preset && !['pragmatic', 'strict'].includes(opts.preset)) {
+    fatal(`Unknown --preset "${opts.preset}". Expected "pragmatic" or "strict".`);
   }
 
   if (opts.only && !['canonical', 'local'].includes(opts.only)) {
@@ -435,6 +461,7 @@ function printRuleCatalog(catalog) {
 }
 
 module.exports = {
+  PRAGMATIC_EXCLUDED_RULES,
   DEFAULT_RULES_PATH,
   CONFIG_NAME,
   BASELINE_NAME,

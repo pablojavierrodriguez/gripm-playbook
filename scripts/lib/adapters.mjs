@@ -226,3 +226,32 @@ export function detectTechStack(deps) {
 export function getStackChoices(stacksObj) {
   return Object.keys(stacksObj).map((value) => ({ value, label: STACK_LABELS[value] || value }));
 }
+
+/**
+ * Prints the list of supported AI harnesses to stdout.
+ * @param {import('../terminal.mjs').ColorHelper} c - terminal color helpers.
+ */
+export function printHarnesses(c) {
+  console.log(`\n  ${c.bold('gripm')} ${c.dim('· Playbook Harnesses')}\n`);
+  for (const harness of HARNESS_CHOICES) {
+    console.log(`  • ${c.bold(harness.value.padEnd(12))} ${harness.label}`);
+  }
+  console.log(
+    `\n  ${c.dim('Install with:')}  node scripts/init.mjs --harness <name>\n` +
+    `  ${c.dim('Default:')}       antigravity (AGENTS.md + .agents/)\n` +
+    `  ${c.dim('All of them:')}   node scripts/init.mjs --harness cursor --harness claude\n`,
+  );
+}
+
+/**
+ * Prints the CLI usage block extracted from the file-level JSDoc comment.
+ * @param {string} scriptSource - raw source of the script file.
+ */
+export function printUsage(scriptSource) {
+  console.log(
+    scriptSource
+      .split('*/')[0]
+      .replace(/^\/\*\*?/, '')
+      .replace(/^ \* ?/gm, ''),
+  );
+}

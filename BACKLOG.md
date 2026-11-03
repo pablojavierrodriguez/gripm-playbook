@@ -1,9 +1,9 @@
-# Backlog: gripm-playbook
+# Backlog: @gripm/playbook
 > Consolidado generado el 2026-11-03 por gripm
 
 ## Resumen de Estados
 
-### ⚡ In Progress / Doing (1)
+### 🔍 Review & QA (1)
 
 #### [PLAY-058] Modularidad total en init y sync: gobernanza opcional, presets de rigor y modo manual
 - **Prioridad**: `high` | **Tipo**: `feature`
@@ -25,11 +25,11 @@ El flujo actual de `playbook init` y `playbook sync` (`PLAY-051`) permite elegir
   - Crear reglas nuevas en `ux-rules.json`.
 
 **Criterios de Aceptación:**
-- [ ] #1 `scripts/lib/selection.mjs` y `planFiles` en `scripts/lib/sync-classifier.mjs` soportan la selección granular de artefactos de gobernanza (`team-playbook`, `state-machine`, `git-workflow`) vía modo interactivo `custom` y flag `--rules <lista|all|none>`, persistiendo la elección en `.gripm/playbook-lock.json` y podando archivos desmarcados.
-- [ ] #2 `scripts/audit-ux-code.cjs` y `scripts/gate-qa.mjs` respetan el preset configurado en `.gripm/config.json` o `.gripm/.uxaudit.json` (`pragmatic` vs `strict`), evitando bloqueos por reglas estilísticas (`UX-011`, `UX-014`) cuando el proyecto opera en perfil `pragmatic`.
-- [ ] #3 `scripts/init.mjs` permite configurar el nivel de rigor (`pragmatic` vs `strict`) y el modo de operación (100% automatizado con excepciones humanas vs manual), exponiendo flags no interactivas (`--preset`, `--rules`) para consumo programático desde `gripm --init`.
-- [ ] #4 Suite de pruebas en `tests/selection.test.mjs` y `tests/audit-ux.test.mjs` validando el filtrado de `rules`, la auto-poda y el comportamiento de los presets `pragmatic` y `strict`.
-- [ ] #5 `npm run check:all` pasa con código 0.
+- [x] #1 `scripts/lib/selection.mjs` y `planFiles` en `scripts/lib/sync-classifier.mjs` soportan la selección granular de artefactos de gobernanza (`team-playbook`, `state-machine`, `git-workflow`) vía modo interactivo `custom` y flag `--rules <lista|all|none>`, persistiendo la elección en `.gripm/playbook-lock.json` y podando archivos desmarcados.
+- [x] #2 `scripts/audit-ux-code.cjs` y `scripts/gate-qa.mjs` respetan el preset configurado en `.gripm/config.json` o `.gripm/.uxaudit.json` (`pragmatic` vs `strict`), evitando bloqueos por reglas estilísticas (`UX-011`, `UX-014`) cuando el proyecto opera en perfil `pragmatic`.
+- [x] #3 `scripts/init.mjs` permite configurar el nivel de rigor (`pragmatic` vs `strict`) y el modo de operación (100% automatizado con excepciones humanas vs manual), exponiendo flags no interactivas (`--preset`, `--rules`) para consumo programático desde `gripm --init`.
+- [x] #4 Suite de pruebas en `tests/selection.test.mjs` y `tests/audit-ux.test.mjs` validando el filtrado de `rules`, la auto-poda y el comportamiento de los presets `pragmatic` y `strict`.
+- [x] #5 `npm run check:all` pasa con código 0.
 
 ---
 

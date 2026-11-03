@@ -144,9 +144,6 @@ function fatal(message) {
   }
   process.exit(2);
 }
-
-
-
 function ruleAppliesToProject(rule, relPath, deps) {
   const check = rule.check || {};
 
@@ -255,9 +252,6 @@ function printJson(report) {
     baseline: report.baseline,
   }, null, 2));
 }
-
-
-
 function printUsage() {
   console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0].replace(/^\/\*\*?/, '').replace(/^ \* ?/gm, ''));
 }
@@ -423,7 +417,7 @@ function main() {
  */
 function auditProject(options = {}) {
   const root = options.root ? path.resolve(options.root) : ROOT;
-  const { config } = loadConfig({ config: options.config }, root);
+  const { config } = loadConfig({ config: options.config, preset: options.preset }, root);
   const catalog = loadCatalog(config, root, RULES_PATH);
 
   const disabledRules = new Set(config.disableRules || []);
@@ -501,5 +495,4 @@ module.exports = {
   matchesComponentName,
   fingerprint,
 };
-
 if (require.main === module) main();

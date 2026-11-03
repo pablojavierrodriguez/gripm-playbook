@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -958,5 +958,104 @@ describe('UX-015: viewport touch zoom lock', () => {
   test('inline suppression works for UX-015', () => {
     const findings = auditSnippet('export const Viewport = () => <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />; // ux-audit-ignore UX-015\n');
     assert.equal(findings.length, 0);
+  });
+});
+
+describe('Audit rigor presets: pragmatic vs strict (PLAY-058)', () => {
+  const { auditProject } = requireCjs(AUDITOR);
+
+  function createFixtureProject(files = {}, gripmConfig = null) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-preset-'));
+    fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'package.json'), '{"name":"preset-test"}');
+    for (const [relPath, content] of Object.entries(files)) {
+      const full = path.join(temp, relPath);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content, 'utf8');
+    }
+    if (gripmConfig) {
+      fs.mkdirSync(path.join(temp, '.gripm'), { recursive: true });
+      fs.writeFileSync(path.join(temp, '.gripm/config.json'), JSON.stringify(gripmConfig, null, 2), 'utf8');
+    }
+    return temp;
+  }
+
+  test('strict preset enforces stylistic rules (UX-011, UX-014)', () => {
+    const temp = createFixtureProject({
+      'src/Component.tsx': 'export const A = () => <span className="text-[10px]">Release — Notes</span>;\n',
+    });
+
+    try {
+      const report = auditProject({ root: temp, preset: 'strict', useBaseline: false });
+      const ruleIds = report.findings.map((f) => f.rule);
+      assert.ok(ruleIds.includes('UX-011'), 'UX-011 must fire under strict preset');
+      assert.ok(ruleIds.includes('UX-014'), 'UX-014 must fire under strict preset');
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  });
+
+  test('pragmatic preset ignores stylistic rules (UX-011, UX-014) but preserves critical checks (UX-010, UX-015)', () => {
+    const temp = createFixtureProject({
+      'src/Component.tsx': [
+        'const Icon = () => null;',
+        'export const A = () => <span className="text-[10px]">Release — Notes</span>;',
+        'export const Btn = () => <button onClick={() => {}}><Icon /></button>;', // UX-010
+      ].join('\n'),
+    });
+
+    try {
+      const report = auditProject({ root: temp, preset: 'pragmatic', useBaseline: false });
+      const ruleIds = report.findings.map((f) => f.rule);
+      assert.ok(!ruleIds.includes('UX-011'), 'UX-011 must be ignored under pragmatic preset');
+      assert.ok(!ruleIds.includes('UX-014'), 'UX-014 must be ignored under pragmatic preset');
+      assert.ok(ruleIds.includes('UX-010'), 'UX-010 must remain active under pragmatic preset');
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  });
+
+  test('pragmatic preset resolved from .gripm/config.json prevents gate failure on stylistic warnings', () => {
+    const temp = createFixtureProject({
+      'src/Component.tsx': 'export const A = () => <span>Option — Description</span>;\n', // UX-014 warning
+    }, {
+      preset: 'pragmatic',
+    });
+
+    try {
+      // CLI with --strict fails if warning fires, but pragmatic ignores UX-014 so it exits 0
+      const res = spawnSync(process.execPath, [AUDITOR, '--strict', '--quiet'], {
+        cwd: temp,
+        env: { ...process.env, AUDIT_UX_ROOT: temp },
+        encoding: 'utf8',
+      });
+      assert.equal(res.status, 0, `Audit should pass under pragmatic preset: ${res.stderr || res.stdout}`);
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  });
+
+  test('CLI --preset pragmatic flag overrides strict default and exits 0', () => {
+    const temp = createFixtureProject({
+      'src/Component.tsx': 'export const A = () => <span>Option — Description</span>;\n',
+    });
+
+    try {
+      const strictRes = spawnSync(process.execPath, [AUDITOR, '--strict', '--quiet'], {
+        cwd: temp,
+        env: { ...process.env, AUDIT_UX_ROOT: temp },
+        encoding: 'utf8',
+      });
+      assert.equal(strictRes.status, 1, 'Default strict mode must exit 1 on UX-014 warning');
+
+      const pragmaticRes = spawnSync(process.execPath, [AUDITOR, '--preset', 'pragmatic', '--strict', '--quiet'], {
+        cwd: temp,
+        env: { ...process.env, AUDIT_UX_ROOT: temp },
+        encoding: 'utf8',
+      });
+      assert.equal(pragmaticRes.status, 0, 'Pragmatic preset flag must exit 0 ignoring UX-014');
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
   });
 });
