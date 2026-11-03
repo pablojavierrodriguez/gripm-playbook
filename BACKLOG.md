@@ -3,6 +3,86 @@
 
 ## Resumen de Estados
 
+### 📋 Backlog / Draft (3)
+
+#### [PLAY-057] Erradicacion definitiva de copia de scripts en consumidores y comandos CLI agnosticos en skills
+- **Prioridad**: `high` | **Tipo**: `bug`
+
+### Problem Statement
+A pesar de la arquitectura Zero-Clutter introducida en `PLAY-041`, persiste un defecto estructural en `scripts/sync-playbook.mjs` al calcular `isConsumerPackage`: cuando un repositorio consumidor ejecuta `playbook sync` contra el repositorio remoto de GitHub o mediante `--source <dir>`, `shouldDefaultToLocalBundle` resulta `false` y el sincronizador **vuelve a copiar los 19 scripts internos del framework (`scripts/*.mjs`, `scripts/lib/*.mjs`, `scripts/audit-ux-code.cjs`, `scripts/ux-rules.json`) dentro de la carpeta `scripts/` del consumidor**, generando archivos duplicados y código muerto que no le pertenecen al proyecto.
+
+Adicionalmente, las skills canónicas (`.agents/skills/*/SKILL.md`, `.agents/TEAM_PLAYBOOK.md`, `.agents/STATE_MACHINE.md`) continúan instruyendo al agente a ejecutar rutas locales como `node scripts/gate-qa.mjs <ID>` o `node scripts/audit-ux-code.cjs --strict`, lo cual falla en cualquier consumidor Zero-Clutter donde `scripts/` fue erradicado.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Forzar `packageMode: true` en `scripts/sync-playbook.mjs` siempre que el repositorio destino (`targetDir`) no sea el propio repositorio fuente de `@gripm/playbook` (`targetDir !== packageBundleRoot` y no contenga `.playbook-manifest.json` con `"name": "@gripm/playbook"`), independientemente de si el sync proviene de paquete local, `--source` o GitHub remoto (salvo cuando el usuario pase explícitamente `--install-scripts`).
+  2. Ejecutar `pruneLegacyScripts` en todo consumidor (remoto o `--source`) para eliminar automáticamente cualquier copia previa de los 19 scripts del Playbook y limpiar sus entradas de `.gripm/playbook-lock.json`.
+  3. Actualizar todas las skills canónicas (`pm-orchestrator`, `principal-engineer`, `qa-auditor`, `code-level-ux-auditor`), `STATE_MACHINE.md` y `TEAM_PLAYBOOK.md` para invocar los binarios CLI del paquete (`npx playbook gate <ID>` / `npm run gate:qa -- <ID>`, `npx playbook audit --strict`, `npx playbook check-loc`, `npx playbook audit-repo`) en lugar de rutas `node scripts/...`.
+- **Out-of-Scope:**
+  - Modificar la lógica interna del parser UX o las reglas de negocio de las compuertas.
+
+**Criterios de Aceptación:**
+- [ ] #1 `scripts/sync-playbook.mjs` activa `packageMode: true` (excluyendo `scripts/*` del plan de instalación) para todo repositorio consumidor (`targetDir` distinto de la raíz del repositorio `@gripm/playbook`), tanto en modo paquete local como con `--source` o remoto desde GitHub, salvo que se indique explícitamente `--install-scripts`.
+- [ ] #2 Al sincronizar un consumidor que tenía scripts copiados en `.gripm/playbook-lock.json` (como `@gripm/board`), `pruneLegacyScripts` elimina los 19 scripts clonados de `scripts/` y `scripts/lib/` sin dejar archivos huérfanos ni directorios vacíos.
+- [ ] #3 Todas las referencias operativas en `.agents/skills/*/SKILL.md`, `.agents/STATE_MACHINE.md` y `.agents/TEAM_PLAYBOOK.md` priorizan los comandos del binario CLI (`npx playbook gate`, `npx playbook audit`, `npx playbook check-loc`, `npx playbook audit-repo`) eliminando la dependencia de archivos `scripts/*.mjs` copiados en el consumidor.
+- [ ] #4 `tests/sync.test.mjs` y `tests/package-portability.test.mjs` incluyen casos de prueba que verifican que `runPlaybookSync` con `--source` y remoto sobre un consumidor nunca copia `scripts/` y poda copias legadas existentes.
+- [ ] #5 `npm run check:all` (`validate`, `check:loc`, `test`) pasa con código 0.
+
+---
+
+#### [PLAY-058] Modularidad total en init y sync: gobernanza opcional, presets de rigor y modo manual
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+El flujo actual de `playbook init` y `playbook sync` (`PLAY-051`) permite elegir skills de `.agents/skills/` y plantillas de `docs/`, pero sigue imponiendo de forma rígida:
+1. La instalación obligatoria de `.agents/TEAM_PLAYBOOK.md`, `.agents/STATE_MACHINE.md` y `.agents/rules/git-workflow.md` incluso si el usuario solo desea instalar una skill puntual (ej. `code-level-ux-auditor` o `principal-engineer`).
+2. Un único nivel de rigor en la auditoría estática (`ux-rules.json` y `gate-qa.mjs`) donde preferencias estilísticas y editoriales (`UX-011` escala tipográfica, `UX-014` anti-em-dash) bloquean al mismo nivel que defectos críticos de accesibilidad o roturas de teclados móviles.
+3. Falta de una opción explícita en la personalización para usuarios avanzados que deseen operar las transiciones de forma manual versus el modo automatizado por defecto.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Extender `scripts/lib/selection.mjs`, `scripts/lib/sync-classifier.mjs` (`planFiles`), `scripts/init.mjs` y `scripts/sync-playbook.mjs` con la dimensión `rules` (`team-playbook`, `state-machine`, `git-workflow`) seleccionable en modo `custom` y mediante flag `--rules <list|all|none>`, con auto-poda si se desmarca.
+  2. Incorporar soporte de **Presets de Rigor** (`preset: "pragmatic" | "strict" | "dogmatic"`) y **Modo de Automatización** (`automation: "automated" | "manual-override"`) en `.gripm/config.json` y `.gripm/.uxaudit.json`:
+     - `pragmatic`: Activa por defecto solo reglas deterministas críticas de ingeniería y accesibilidad (excluyendo bloqueos estilísticos como `UX-011`, `UX-012`, `UX-013`, `UX-014`).
+     - `strict`: Activa el catálogo completo de ergonomía, LOC (< 1000) y anti-slop.
+  3. Soportar flags CLI no interactivas (`--preset <pragmatic|strict>`, `--rules <list>`) para integración directa desde `@gripm/board` sin doble interrogatorio.
+- **Out-of-Scope:**
+  - Crear reglas nuevas en `ux-rules.json`.
+
+**Criterios de Aceptación:**
+- [ ] #1 `scripts/lib/selection.mjs` y `planFiles` en `scripts/lib/sync-classifier.mjs` soportan la selección granular de artefactos de gobernanza (`team-playbook`, `state-machine`, `git-workflow`) vía modo interactivo `custom` y flag `--rules <lista|all|none>`, persistiendo la elección en `.gripm/playbook-lock.json` y podando archivos desmarcados.
+- [ ] #2 `scripts/audit-ux-code.cjs` y `scripts/gate-qa.mjs` respetan el preset configurado en `.gripm/config.json` o `.gripm/.uxaudit.json` (`pragmatic` vs `strict`), evitando bloqueos por reglas estilísticas (`UX-011`, `UX-014`) cuando el proyecto opera en perfil `pragmatic`.
+- [ ] #3 `scripts/init.mjs` permite configurar el nivel de rigor (`pragmatic` vs `strict`) y el modo de operación (100% automatizado con excepciones humanas vs manual), exponiendo flags no interactivas (`--preset`, `--rules`) para consumo programático desde `gripm --init`.
+- [ ] #4 Suite de pruebas en `tests/selection.test.mjs` y `tests/audit-ux.test.mjs` validando el filtrado de `rules`, la auto-poda y el comportamiento de los presets `pragmatic` y `strict`.
+- [ ] #5 `npm run check:all` pasa con código 0.
+
+---
+
+#### [PLAY-059] Descomposicion modular de scripts/audit-ux-code.cjs bajo el techo de 1000 LOC
+- **Prioridad**: `high` | **Tipo**: `refactor`
+
+### Problem Statement
+El repositorio `@gripm/playbook` establece como regla innegociable que ningún archivo de código fuente debe alcanzar o superar las 1000 líneas de código (`check-loc.mjs`). Sin embargo, `scripts/audit-ux-code.cjs` cuenta actualmente con **1.441 líneas**, concentrando en un único archivo monolítico el CLI parser, el cargador de catálogos y baselines, el motor heurístico de unidades JSX/AST y el formateador de reportes.
+
+Para predicar con el ejemplo y mantener un Health Score de **100/100** con `check:loc:strict` en verde, es obligatorio descomponer `scripts/audit-ux-code.cjs` en módulos cohesivos.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Extraer la lógica de parseo de unidades JSX, expresiones e internacionalización (`collectUnits`, `stripExpressions`, `findTagEnd`, jerarquía de componentes) a `scripts/lib/ux-jsx-parser.cjs`.
+  2. Extraer la carga de configuración, catálogos de reglas (canónicas y locales), compilación de globs `exclude` y gestión de snapshots `audit-ux-baseline.json` a `scripts/lib/ux-catalog.cjs`.
+  3. Mantener intacta la interfaz pública programática (`const { auditProject } = require('./audit-ux-code.cjs')`) y todos los flags de CLI.
+  4. Actualizar `.playbook-manifest.json` y `FALLBACK_CORE_FILES` si corresponde para empaquetar los submódulos en el tarball de npm.
+- **Out-of-Scope:**
+  - Alterar la semántica de detección de las reglas `UX-001` a `UX-015`.
+
+**Criterios de Aceptación:**
+- [ ] #1 `scripts/audit-ux-code.cjs` y cada uno de sus submódulos extraídos (`scripts/lib/ux-*.cjs`) se mantienen estrictamente por debajo de las 650 líneas de código (cumpliendo con creces el techo de < 1000 LOC).
+- [ ] #2 `node scripts/check-loc.mjs --strict` y `node scripts/audit-engine.mjs --strict` sobre el repositorio `@gripm/playbook` reportan **0 violaciones de LOC** y un **Health Score de 100/100**.
+- [ ] #3 La API exportada (`auditProject`, `loadRules`, etc.) y el comportamiento CLI de `scripts/audit-ux-code.cjs` conservan 100% de retrocompatibilidad.
+- [ ] #4 `npm test` (incluyendo los 13 archivos de test y todas las fixtures de `audit-ux.test.mjs`) y `npm run validate` pasan con código 0.
+
+---
+
 ### ✅ Done / Deployed (53)
 
 #### [PLAY-001] Anatomía de unidad en el motor de reglas: text, ownContent y scopeText
