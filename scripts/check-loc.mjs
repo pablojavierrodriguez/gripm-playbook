@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /**
  * scripts/check-loc.mjs
  *

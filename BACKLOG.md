@@ -1,34 +1,9 @@
-# Backlog: @gripm/playbook
-> Consolidado generado el 2026-11-02 por gripm
+# Backlog: gripm-playbook
+> Consolidado generado el 2026-11-03 por gripm
 
 ## Resumen de Estados
 
-### 📋 Backlog / Draft (3)
-
-#### [PLAY-057] Erradicacion definitiva de copia de scripts en consumidores y comandos CLI agnosticos en skills
-- **Prioridad**: `high` | **Tipo**: `bug`
-
-### Problem Statement
-A pesar de la arquitectura Zero-Clutter introducida en `PLAY-041`, persiste un defecto estructural en `scripts/sync-playbook.mjs` al calcular `isConsumerPackage`: cuando un repositorio consumidor ejecuta `playbook sync` contra el repositorio remoto de GitHub o mediante `--source <dir>`, `shouldDefaultToLocalBundle` resulta `false` y el sincronizador **vuelve a copiar los 19 scripts internos del framework (`scripts/*.mjs`, `scripts/lib/*.mjs`, `scripts/audit-ux-code.cjs`, `scripts/ux-rules.json`) dentro de la carpeta `scripts/` del consumidor**, generando archivos duplicados y código muerto que no le pertenecen al proyecto.
-
-Adicionalmente, las skills canónicas (`.agents/skills/*/SKILL.md`, `.agents/TEAM_PLAYBOOK.md`, `.agents/STATE_MACHINE.md`) continúan instruyendo al agente a ejecutar rutas locales como `node scripts/gate-qa.mjs <ID>` o `node scripts/audit-ux-code.cjs --strict`, lo cual falla en cualquier consumidor Zero-Clutter donde `scripts/` fue erradicado.
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  1. Forzar `packageMode: true` en `scripts/sync-playbook.mjs` siempre que el repositorio destino (`targetDir`) no sea el propio repositorio fuente de `@gripm/playbook` (`targetDir !== packageBundleRoot` y no contenga `.playbook-manifest.json` con `"name": "@gripm/playbook"`), independientemente de si el sync proviene de paquete local, `--source` o GitHub remoto (salvo cuando el usuario pase explícitamente `--install-scripts`).
-  2. Ejecutar `pruneLegacyScripts` en todo consumidor (remoto o `--source`) para eliminar automáticamente cualquier copia previa de los 19 scripts del Playbook y limpiar sus entradas de `.gripm/playbook-lock.json`.
-  3. Actualizar todas las skills canónicas (`pm-orchestrator`, `principal-engineer`, `qa-auditor`, `code-level-ux-auditor`), `STATE_MACHINE.md` y `TEAM_PLAYBOOK.md` para invocar los binarios CLI del paquete (`npx playbook gate <ID>` / `npm run gate:qa -- <ID>`, `npx playbook audit --strict`, `npx playbook check-loc`, `npx playbook audit-repo`) en lugar de rutas `node scripts/...`.
-- **Out-of-Scope:**
-  - Modificar la lógica interna del parser UX o las reglas de negocio de las compuertas.
-
-**Criterios de Aceptación:**
-- [ ] #1 `scripts/sync-playbook.mjs` activa `packageMode: true` (excluyendo `scripts/*` del plan de instalación) para todo repositorio consumidor (`targetDir` distinto de la raíz del repositorio `@gripm/playbook`), tanto en modo paquete local como con `--source` o remoto desde GitHub, salvo que se indique explícitamente `--install-scripts`.
-- [ ] #2 Al sincronizar un consumidor que tenía scripts copiados en `.gripm/playbook-lock.json` (como `@gripm/board`), `pruneLegacyScripts` elimina los 19 scripts clonados de `scripts/` y `scripts/lib/` sin dejar archivos huérfanos ni directorios vacíos.
-- [ ] #3 Todas las referencias operativas en `.agents/skills/*/SKILL.md`, `.agents/STATE_MACHINE.md` y `.agents/TEAM_PLAYBOOK.md` priorizan los comandos del binario CLI (`npx playbook gate`, `npx playbook audit`, `npx playbook check-loc`, `npx playbook audit-repo`) eliminando la dependencia de archivos `scripts/*.mjs` copiados en el consumidor.
-- [ ] #4 `tests/sync.test.mjs` y `tests/package-portability.test.mjs` incluyen casos de prueba que verifican que `runPlaybookSync` con `--source` y remoto sobre un consumidor nunca copia `scripts/` y poda copias legadas existentes.
-- [ ] #5 `npm run check:all` (`validate`, `check:loc`, `test`) pasa con código 0.
-
----
+### ⚡ In Progress / Doing (1)
 
 #### [PLAY-058] Modularidad total en init y sync: gobernanza opcional, presets de rigor y modo manual
 - **Prioridad**: `high` | **Tipo**: `feature`
@@ -58,6 +33,33 @@ El flujo actual de `playbook init` y `playbook sync` (`PLAY-051`) permite elegir
 
 ---
 
+### 🚀 Ready for Deploy (2)
+
+#### [PLAY-057] Erradicacion definitiva de copia de scripts en consumidores y comandos CLI agnosticos en skills
+- **Prioridad**: `high` | **Tipo**: `bug`
+
+### Problem Statement
+A pesar de la arquitectura Zero-Clutter introducida en `PLAY-041`, persiste un defecto estructural en `scripts/sync-playbook.mjs` al calcular `isConsumerPackage`: cuando un repositorio consumidor ejecuta `playbook sync` contra el repositorio remoto de GitHub o mediante `--source <dir>`, `shouldDefaultToLocalBundle` resulta `false` y el sincronizador **vuelve a copiar los 19 scripts internos del framework (`scripts/*.mjs`, `scripts/lib/*.mjs`, `scripts/audit-ux-code.cjs`, `scripts/ux-rules.json`) dentro de la carpeta `scripts/` del consumidor**, generando archivos duplicados y código muerto que no le pertenecen al proyecto.
+
+Adicionalmente, las skills canónicas (`.agents/skills/*/SKILL.md`, `.agents/TEAM_PLAYBOOK.md`, `.agents/STATE_MACHINE.md`) continúan instruyendo al agente a ejecutar rutas locales como `node scripts/gate-qa.mjs <ID>` o `node scripts/audit-ux-code.cjs --strict`, lo cual falla en cualquier consumidor Zero-Clutter donde `scripts/` fue erradicado.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Forzar `packageMode: true` en `scripts/sync-playbook.mjs` siempre que el repositorio destino (`targetDir`) no sea el propio repositorio fuente de `@gripm/playbook` (`targetDir !== packageBundleRoot` y no contenga `.playbook-manifest.json` con `"name": "@gripm/playbook"`), independientemente de si el sync proviene de paquete local, `--source` o GitHub remoto (salvo cuando el usuario pase explícitamente `--install-scripts`).
+  2. Ejecutar `pruneLegacyScripts` en todo consumidor (remoto o `--source`) para eliminar automáticamente cualquier copia previa de los 19 scripts del Playbook y limpiar sus entradas de `.gripm/playbook-lock.json`.
+  3. Actualizar todas las skills canónicas (`pm-orchestrator`, `principal-engineer`, `qa-auditor`, `code-level-ux-auditor`), `STATE_MACHINE.md` y `TEAM_PLAYBOOK.md` para invocar los binarios CLI del paquete (`npx playbook gate <ID>` / `npm run gate:qa -- <ID>`, `npx playbook audit --strict`, `npx playbook check-loc`, `npx playbook audit-repo`) en lugar de rutas `node scripts/...`.
+- **Out-of-Scope:**
+  - Modificar la lógica interna del parser UX o las reglas de negocio de las compuertas.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/sync-playbook.mjs` activa `packageMode: true` (excluyendo `scripts/*` del plan de instalación) para todo repositorio consumidor (`targetDir` distinto de la raíz del repositorio `@gripm/playbook`), tanto en modo paquete local como con `--source` o remoto desde GitHub, salvo que se indique explícitamente `--install-scripts`.
+- [x] #2 Al sincronizar un consumidor que tenía scripts copiados en `.gripm/playbook-lock.json` (como `@gripm/board`), `pruneLegacyScripts` elimina los 19 scripts clonados de `scripts/` y `scripts/lib/` sin dejar archivos huérfanos ni directorios vacíos.
+- [x] #3 Todas las referencias operativas en `.agents/skills/*/SKILL.md`, `.agents/STATE_MACHINE.md` y `.agents/TEAM_PLAYBOOK.md` priorizan los comandos del binario CLI (`npx playbook gate`, `npx playbook audit`, `npx playbook check-loc`, `npx playbook audit-repo`) eliminando la dependencia de archivos `scripts/*.mjs` copiados en el consumidor.
+- [x] #4 `tests/sync.test.mjs` y `tests/package-portability.test.mjs` incluyen casos de prueba que verifican que `runPlaybookSync` con `--source` y remoto sobre un consumidor nunca copia `scripts/` y poda copias legadas existentes.
+- [x] #5 `npm run check:all` (`validate`, `check:loc`, `test`) pasa con código 0.
+
+---
+
 #### [PLAY-059] Descomposicion modular de scripts/audit-ux-code.cjs bajo el techo de 1000 LOC
 - **Prioridad**: `high` | **Tipo**: `refactor`
 
@@ -76,10 +78,10 @@ Para predicar con el ejemplo y mantener un Health Score de **100/100** con `chec
   - Alterar la semántica de detección de las reglas `UX-001` a `UX-015`.
 
 **Criterios de Aceptación:**
-- [ ] #1 `scripts/audit-ux-code.cjs` y cada uno de sus submódulos extraídos (`scripts/lib/ux-*.cjs`) se mantienen estrictamente por debajo de las 650 líneas de código (cumpliendo con creces el techo de < 1000 LOC).
-- [ ] #2 `node scripts/check-loc.mjs --strict` y `node scripts/audit-engine.mjs --strict` sobre el repositorio `@gripm/playbook` reportan **0 violaciones de LOC** y un **Health Score de 100/100**.
-- [ ] #3 La API exportada (`auditProject`, `loadRules`, etc.) y el comportamiento CLI de `scripts/audit-ux-code.cjs` conservan 100% de retrocompatibilidad.
-- [ ] #4 `npm test` (incluyendo los 13 archivos de test y todas las fixtures de `audit-ux.test.mjs`) y `npm run validate` pasan con código 0.
+- [x] #1 `scripts/audit-ux-code.cjs` y cada uno de sus submódulos extraídos (`scripts/lib/ux-*.cjs`) se mantienen estrictamente por debajo de las 650 líneas de código (cumpliendo con creces el techo de < 1000 LOC).
+- [x] #2 `node scripts/check-loc.mjs --strict` y `node scripts/audit-engine.mjs --strict` sobre el repositorio `@gripm/playbook` reportan **0 violaciones de LOC** y un **Health Score de 100/100**.
+- [x] #3 La API exportada (`auditProject`, `loadRules`, etc.) y el comportamiento CLI de `scripts/audit-ux-code.cjs` conservan 100% de retrocompatibilidad.
+- [x] #4 `npm test` (incluyendo los 13 archivos de test y todas las fixtures de `audit-ux.test.mjs`) y `npm run validate` pasan con código 0.
 
 ---
 
