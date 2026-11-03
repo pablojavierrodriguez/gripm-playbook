@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.9.0] - 2026-11-03
+
+`PLAY-057` · `PLAY-058` · `PLAY-059` · `PLAY-060`
+
+### Added
+
+- **Package-first consumer sync and CLI-agnostic skills** (`PLAY-057`). Prevented consumer sync from copying Playbook runtime scripts, pruned legacy copies, and updated operational instructions to use package CLI commands.
+- **Optional governance and configurable audit rigor** (`PLAY-058`). Added selectable governance rules, pragmatic and strict audit presets, and manual-override operation for initialization and sync.
+
+### Changed
+
+- **Modularized the UX auditor** (`PLAY-059`). Extracted JSX parsing and catalog/configuration handling into focused modules while preserving the public API and CLI behavior.
+
+### Fixed
+
+- **Bound QA root discovery to the task project** (`PLAY-060`). Prevented temporary task paths from treating ambient `.agents/` directories as project roots and scanning unrelated parent directories.
+
+---
+
 ## [2.8.0] - 2026-11-02
 
 `PLAY-050` · `PLAY-051` · `PLAY-052` · `PLAY-053` · `PLAY-054` · `PLAY-055` · `PLAY-056`
@@ -300,7 +319,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Configured for npm publication under `@gripm/playbook` supporting `npx @gripm/playbook sync`.
 
-[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.7.0...HEAD
+[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.8.0
 [2.7.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.7.0
 [2.6.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.6.0
 [2.5.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.5.0
