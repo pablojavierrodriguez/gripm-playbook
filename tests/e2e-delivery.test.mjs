@@ -1472,6 +1472,22 @@ describe('Tier 2: Boundary & Corner Cases (F1 - F13)', () => {
 
   // F11 Edge Cases
   describe('F11 Boundary Cases: Anti-Self-Certification Invariants', () => {
+    test('F11-E0: isolated task paths do not scan an ancestor with a global .agents directory', () => {
+      const parent = path.join(createSandbox(), 'ambient');
+      const sandbox = path.join(parent, 'isolated-project');
+      fs.mkdirSync(path.join(parent, '.agents'), { recursive: true });
+      fs.mkdirSync(path.join(parent, 'src'), { recursive: true });
+      fs.mkdirSync(sandbox, { recursive: true });
+      fs.writeFileSync(path.join(parent, 'src', 'ambient.js'), '// eslint-disable no-alert\nexport const value = 1;\n');
+
+      const task = makeTaskFile(sandbox, { id: 'TASK-E110' });
+      const res = runCmd(GATE_BIN, [task, '--no-run'], { cwd: sandbox });
+
+      assert.equal(res.status, 2, `isolated inspection should pass without scanning its parent:\n${res.output}`);
+      assert.match(res.output, /TASK INSPECTION PASSED/);
+      assert.doesNotMatch(res.output, /ambient\.js|quality suppression/);
+    });
+
     test('F11-E1: Self-certification block operates even when --no-run flag is present', (t) => {
       if (!M3_READY) {
         t.skip('Milestone M3 (Anti-Self-Certification Gate) pending implementation');

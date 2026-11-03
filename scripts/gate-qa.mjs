@@ -11,6 +11,7 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -36,21 +37,35 @@ export function resolveProjectRoot(explicitRoot = null, targetPath = null) {
   if (targetPath) {
     const absTarget = path.resolve(targetPath);
     if (fs.existsSync(absTarget) || targetPath.includes('/') || targetPath.includes('\\')) {
-      let curr = fs.existsSync(absTarget) && fs.statSync(absTarget).isDirectory()
+      const targetRoot = fs.existsSync(absTarget) && fs.statSync(absTarget).isDirectory()
         ? absTarget
         : path.dirname(absTarget);
+      const tempRoot = path.resolve(os.tmpdir());
+      const relativeToTemp = path.relative(tempRoot, targetRoot);
+      const targetIsInTemp = relativeToTemp === '' ||
+        (relativeToTemp !== '..' &&
+          !relativeToTemp.startsWith(`..${path.sep}`) &&
+          !path.isAbsolute(relativeToTemp));
+      let curr = targetRoot;
       while (true) {
         if (
           fs.existsSync(path.join(curr, 'backlog', 'tasks')) ||
-          fs.existsSync(path.join(curr, '.agents')) ||
-          fs.existsSync(path.join(curr, 'package.json'))
+          fs.existsSync(path.join(curr, '.git')) ||
+          fs.existsSync(path.join(curr, '.playbook-manifest.json')) ||
+          fs.existsSync(path.join(curr, 'package.json')) ||
+          fs.existsSync(path.join(curr, 'AGENTS.md')) ||
+          fs.existsSync(path.join(curr, '.agents', 'TEAM_PLAYBOOK.md')) ||
+          fs.existsSync(path.join(curr, '.agents', 'STATE_MACHINE.md')) ||
+          fs.existsSync(path.join(curr, '.agents', 'rules', 'git-workflow.md'))
         ) {
           return curr;
         }
+        if (targetIsInTemp && curr === tempRoot) break;
         const parent = path.dirname(curr);
         if (parent === curr) break;
         curr = parent;
       }
+      return targetRoot;
     }
   }
 
