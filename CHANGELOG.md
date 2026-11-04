@@ -5,7 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+---
+
+## [2.9.1] - 2026-11-04
+
+`PLAY-061`
+
+### Fixed
+
+- **Scope structural QA failures to task changes** (`PLAY-061`). Keep pre-existing LOC and suppression findings advisory in normal gate runs, block newly introduced regressions, and retain repository-wide enforcement with `--strict`.
 
 ---
 
@@ -319,7 +327,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Configured for npm publication under `@gripm/playbook` supporting `npx @gripm/playbook sync`.
 
-[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.9.1...HEAD
+[2.9.1]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/pablojavierrodriguez/gripm-playbook/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.8.0
 [2.7.0]: https://github.com/pablojavierrodriguez/gripm-playbook/releases/tag/v2.7.0
