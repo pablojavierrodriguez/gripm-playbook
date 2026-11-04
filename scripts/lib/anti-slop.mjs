@@ -90,6 +90,80 @@ export function checkDiffAntiSlop(projectRoot) {
   };
 }
 
+function gitOutput(projectRoot, args) {
+  const result = spawnSync('git', args, {
+    cwd: projectRoot,
+    encoding: 'utf8',
+    timeout: 15000,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+
+  if (result.error || result.status !== 0) {
+    return {
+      ok: false,
+      error: result.error?.message || (result.stderr || '').trim() || `git exited with ${result.status}`,
+    };
+  }
+
+  return { ok: true, output: result.stdout || '' };
+}
+
+function getChangedFiles(projectRoot) {
+  const tracked = gitOutput(projectRoot, ['diff', '--name-only', '-z', '--diff-filter=ACMRTUXB', 'HEAD', '--']);
+  if (!tracked.ok) return { files: null, untracked: new Set(), error: tracked.error };
+
+  const untracked = gitOutput(projectRoot, ['ls-files', '--others', '--exclude-standard', '-z']);
+  if (!untracked.ok) return { files: null, untracked: new Set(), error: untracked.error };
+
+  const trackedFiles = tracked.output.split('\0').filter(Boolean);
+  const untrackedFiles = new Set(untracked.output.split('\0').filter(Boolean).map((file) => file.replace(/\\/g, '/')));
+  const files = new Set([...trackedFiles, ...untrackedFiles].map((file) => file.replace(/\\/g, '/')));
+  return { files, untracked: untrackedFiles, error: null };
+}
+
+function countLines(content) {
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  return lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length;
+}
+
+function getAddedLineNumbers(projectRoot, file, isUntracked) {
+  if (isUntracked) {
+    const fullPath = path.join(projectRoot, file);
+    if (!fs.existsSync(fullPath)) return { lines: new Set(), error: null };
+    return {
+      lines: new Set(Array.from({ length: countLines(fs.readFileSync(fullPath, 'utf8')) }, (_, index) => index + 1)),
+      error: null,
+    };
+  }
+
+  const diff = gitOutput(projectRoot, ['diff', '--unified=0', '--no-ext-diff', 'HEAD', '--', file]);
+  if (!diff.ok) return { lines: null, error: diff.error };
+
+  const addedLines = new Set();
+  let newLine = 0;
+  for (const line of diff.output.split('\n')) {
+    const hunk = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
+    if (hunk) {
+      newLine = Number(hunk[1]);
+      continue;
+    }
+    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('\\')) continue;
+    if (line.startsWith('+')) {
+      addedLines.add(newLine);
+      newLine += 1;
+    } else if (line.startsWith(' ')) {
+      newLine += 1;
+    }
+  }
+  return { lines: addedLines, error: null };
+}
+
+function getBaselineLineCount(projectRoot, file, isUntracked) {
+  if (isUntracked) return 0;
+  const baseline = gitOutput(projectRoot, ['show', `HEAD:${file}`]);
+  return baseline.ok ? countLines(baseline.output) : null;
+}
+
 export async function checkStructuralHealth(projectRoot, options = {}) {
   const failures = [];
   const warnings = [];
@@ -122,26 +196,81 @@ export async function checkStructuralHealth(projectRoot, options = {}) {
   const report = await scanCodebase(root, { maxLines });
 
   const criticalLocViolations = (report?.loc?.violations || []).filter(
-    (v) => v.status === 'error' || v.lines >= 1000,
+    (v) => v.status === 'error' || v.lines >= maxLines,
   );
   const criticalSuppressions = (report?.quality?.suppressions || []).filter(
     (s) => s.type !== 'console.log',
   );
 
-  const locCount = criticalLocViolations.length;
-  const suppCount = criticalSuppressions.length;
+  const strict = Boolean(options.strict);
+  const baselineLineCounts = new Map();
+  let blockingLocViolations = criticalLocViolations;
+  let blockingSuppressions = criticalSuppressions;
+
+  if (!strict) {
+    const changes = getChangedFiles(root);
+    if (!changes.files) {
+      if (criticalLocViolations.length || criticalSuppressions.length) {
+        warnings.push(`Structural baseline unavailable (${changes.error}); repository-wide findings remain advisory in normal mode.`);
+      }
+      blockingLocViolations = [];
+      blockingSuppressions = [];
+    } else {
+      blockingLocViolations = criticalLocViolations.filter((violation) => {
+        if (!changes.files.has(violation.file)) return false;
+        const baselineLines = getBaselineLineCount(root, violation.file, changes.untracked.has(violation.file));
+        baselineLineCounts.set(violation.file, baselineLines);
+        if (baselineLines === null) {
+          warnings.push(`Structural baseline unavailable for ${violation.file}; its LOC finding remains advisory in normal mode.`);
+          return false;
+        }
+        return baselineLines < maxLines || violation.lines > baselineLines;
+      });
+
+      const addedLinesByFile = new Map();
+      for (const file of changes.files) {
+        const addedResult = getAddedLineNumbers(root, file, changes.untracked.has(file));
+        if (addedResult.error) {
+          warnings.push(`Structural diff unavailable for ${file} (${addedResult.error}); new suppressions remain advisory in normal mode.`);
+        } else if (addedResult.lines) {
+          addedLinesByFile.set(file, addedResult.lines);
+        }
+      }
+      blockingSuppressions = criticalSuppressions.filter(
+        (suppression) => addedLinesByFile.get(suppression.file)?.has(suppression.line),
+      );
+
+      const existingLocCount = criticalLocViolations.length - blockingLocViolations.length;
+      const existingSuppressionCount = criticalSuppressions.length - blockingSuppressions.length;
+      if (existingLocCount || existingSuppressionCount) {
+        warnings.push(
+          `Structural baseline: ${existingLocCount} existing LOC violation(s), ${existingSuppressionCount} existing suppression(s); advisory in normal mode.`,
+        );
+      }
+    }
+  }
+
+  const locCount = blockingLocViolations.length;
+  const suppCount = blockingSuppressions.length;
 
   if (locCount > 0 || suppCount > 0) {
     if (options.force) {
       warnings.push(
-        `Structural health bypassed (--force): ${locCount} LOC violation(s), ${suppCount} suppression(s) skipped by PO authority.`,
+        `Structural health bypassed (--force): ${locCount} blocking LOC violation(s), ${suppCount} blocking suppression(s) skipped by PO authority.`,
       );
     } else {
-      for (const v of criticalLocViolations) {
-        failures.push(`file budget: "${v.file}" has ${v.lines} LOC, exceeding the 1000-line hard ceiling`);
+      for (const v of blockingLocViolations) {
+        const baselineLines = strict ? null : baselineLineCounts.get(v.file);
+        const reason = strict
+          ? `has ${v.lines} LOC, exceeding the ${maxLines}-line hard ceiling`
+          : baselineLines !== null && baselineLines >= maxLines
+            ? `grew from ${baselineLines} to ${v.lines} LOC while exceeding the ${maxLines}-line hard ceiling`
+            : `newly exceeds the ${maxLines}-line hard ceiling with ${v.lines} LOC`;
+        failures.push(`file budget: "${v.file}" ${reason}`);
       }
-      for (const s of criticalSuppressions) {
-        failures.push(`anti-slop: quality suppression "${s.type}" detected in ${s.file}:${s.line}`);
+      for (const s of blockingSuppressions) {
+        const finding = strict ? 'detected' : 'introduced';
+        failures.push(`anti-slop: quality suppression "${s.type}" ${finding} in ${s.file}:${s.line}`);
       }
     }
   }

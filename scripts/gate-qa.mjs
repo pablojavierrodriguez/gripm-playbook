@@ -406,7 +406,10 @@ export async function main(argv) {
   }
 
   const isForced = argv.includes('--force');
-  const health = await checkStructuralHealth(projectRoot, { force: isForced });
+  const health = await checkStructuralHealth(projectRoot, {
+    force: isForced,
+    strict: argv.includes('--strict'),
+  });
   failures.push(...health.failures);
 
   console.log(`  ${c.bold('Task inspection:')}`);
