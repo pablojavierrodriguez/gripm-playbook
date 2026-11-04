@@ -1,5 +1,5 @@
 # Backlog: @gripm/playbook
-> Consolidado generado el 2026-11-03 por gripm
+> Consolidado generado el 2026-11-04 por gripm
 
 ## Resumen de Estados
 
@@ -105,7 +105,7 @@ Al ejecutar `gate-qa` con una ruta de tarea temporal, la resolucion de raiz pued
 
 ---
 
-### ✅ Done / Deployed (53)
+### ✅ Done / Deployed (54)
 
 #### [PLAY-001] Anatomía de unidad en el motor de reglas: text, ownContent y scopeText
 - **Prioridad**: `high` | **Tipo**: `bug`
@@ -1261,6 +1261,35 @@ Garantizar:
 - [x] #2 #2 init.mjs y sync-playbook.mjs soportan la instalación opcional de audit:repo sin imponerlo.
 - [x] #3 #3 Si se detecta @gripm/board o directorio backlog/tasks/, init.mjs sincroniza umbrales de auditoría en .gripm/config.json.
 - [x] #4 #4 tests unitarios de selection.test.mjs y sync.test.mjs actualizados y pasando con código 0.
+
+---
+
+#### [PLAY-061] Alinear el gate estructural con strict y los cambios de la tarea
+- **Prioridad**: `high` | **Tipo**: `bug`
+
+### Problem Statement
+El gate de QA bloquea la certificación de tareas por violaciones de LOC y supresiones preexistentes en cualquier parte del repositorio, incluso en modo normal y cuando esos hallazgos no guardan relación con el diff de la tarea. Esto contradice la pirámide, que define LOC como advertencia fuera de `--strict`, y hace que cambios sin regresiones queden atrapados por deuda heredada.
+
+### Alcance y decisiones
+- **In-Scope:**
+  1. En modo normal, mantener los hallazgos estructurales globales como advertencias y bloquear únicamente nuevas violaciones duras de LOC o supresiones introducidas por los cambios sin commit.
+  2. En `--strict`, conservar el bloqueo por todas las violaciones estructurales del repositorio.
+  3. Conservar `--force` como bypass explícito de autoridad PO, con advertencia.
+  4. Agregar pruebas de regresión para deuda previa no bloqueante, regresiones nuevas bloqueantes y modo estricto global.
+- **Out-of-Scope:**
+  - Remediar LOC o supresiones preexistentes del repositorio consumidor.
+  - Cambiar los criterios de auditoría UX o la detección de supresiones del auditor.
+- **Decisiones:**
+  - Una violación de LOC preexistente bloquea en modo normal solo si el archivo vuelve a crecer; una violación nueva también bloquea.
+  - Una supresión bloquea en modo normal solo si la línea que la contiene fue añadida en el diff actual.
+  - Si no puede determinarse el baseline Git, el gate informa la limitación como advertencia y no atribuye deuda histórica al cambio.
+
+**Criterios de Aceptación:**
+- [x] #1 Con hallazgos de LOC y supresiones que ya existen en `HEAD`, el gate normal los reporta como advertencias y no bloquea la tarea.
+- [x] #2 En modo normal, una nueva violación de LOC o una supresión añadida por el diff bloquea la certificación.
+- [x] #3 `--strict` bloquea por hallazgos estructurales preexistentes en cualquier parte del repositorio.
+- [x] #4 `--force` conserva el bypass explícito y reporta que los hallazgos se omitieron.
+- [x] #5 Las pruebas enfocadas de gate y `npm run check:all` terminan con código 0.
 
 ---
 
