@@ -1,13 +1,14 @@
 ---
 id: PLAY-061
 title: "Alinear el gate estructural con strict y los cambios de la tarea"
-status: ready
+status: done
 created_date: '2026-11-04'
 updated_date: '2026-11-04'
 labels:
   - "qa"
   - "gate"
   - "regression"
+dependencies: []
 priority: high
 type: bug
 estimate: 3
