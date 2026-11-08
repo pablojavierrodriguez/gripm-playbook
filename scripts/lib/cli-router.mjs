@@ -27,6 +27,7 @@ export function printCliHelp() {
     ${c.cyan('audit')}              Static code-level UX & accessibility audit
     ${c.cyan('check-loc')}          Mechanical file line budget (< 1000 LOC) checker
     ${c.cyan('commit-msg')}         Validate Conventional Commits format and 100% English requirement
+    ${c.cyan('extract-notes')}      Extract user-facing release notes from releases.json or RELEASE_NOTES.md
     ${c.cyan('review')}             Audit all backlog tasks currently in review
     ${c.cyan('help')}               Show this help message
 
@@ -94,6 +95,13 @@ export function routeCli(subcommand, rest, fallbackSync) {
   } else if (subcommand === 'commit-msg' || subcommand === 'validate-commit' || subcommand === 'commit') {
     const commitScript = path.join(SCRIPT_DIR, 'validate-commit-msg.mjs');
     const result = spawnSync(process.execPath, [commitScript, ...rest], {
+      stdio: 'inherit',
+      env: process.env,
+    });
+    process.exit(result.status ?? 0);
+  } else if (subcommand === 'extract-notes' || subcommand === 'extract-release-notes') {
+    const extractScript = path.join(SCRIPT_DIR, 'extract-release-notes.mjs');
+    const result = spawnSync(process.execPath, [extractScript, ...rest], {
       stdio: 'inherit',
       env: process.env,
     });

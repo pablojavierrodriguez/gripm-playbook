@@ -11,7 +11,8 @@
     "audit-ux": "scripts/audit-ux-code.cjs",
     "audit-repo": "scripts/audit-engine.mjs",
     "check-loc": "scripts/check-loc.mjs",
-    "validate-commit": "scripts/validate-commit-msg.mjs"
+    "validate-commit": "scripts/validate-commit-msg.mjs",
+    "extract-release-notes": "scripts/extract-release-notes.mjs"
   },
   "exports": {
     ".": "./scripts/sync-playbook.mjs",
@@ -76,6 +77,7 @@
     ".playbook-manifest.json",
     "docs",
     "scripts",
+    "templates",
     "AGENTS.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",

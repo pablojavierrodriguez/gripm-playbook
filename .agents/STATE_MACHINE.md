@@ -16,7 +16,7 @@ The work lifecycle consists of clearly typed, unambiguous statuses:
 | **Delivery** | `doing` | In active development. The only status with code actively being written. | Working branch | Principal Engineer / Agent |
 | **Delivery** | `review` | Implementation complete and local tests green. Awaiting certification. | Working branch | Principal Engineer / Agent |
 | **Delivery** | `ready` | **Formal development delivery (developer/agent finish line).** Certified under Pyramid. | Branch / Staging | **QA Auditor / Test Suite** |
-| **Production** | `done` | **Deployed to production.** Packaged and published in a release. | Production / Tag | **Release Management / Deploy** |
+| **Production** | `done` | **Deployed to production.** Packaged and published in a release. | Production / Tag | **Release Management / Deploy ([release-management](skills/release-management/SKILL.md))** |
 | **Out of Flow** | `dismissed` | **Dismissed.** The item will not exist: premise was false, scope was absorbed, or the PO decided it is no longer valuable. Not blocked or abandoned. | Backlog (disk) | **PO / Release Management** |
 
 ### Fundamental State Rules:
@@ -82,7 +82,7 @@ An unrefined item remains in `draft` (or `ideas` if discovery) in the backlog. I
 | T1 | `doing` → `review` | Principal Engineer | Code implemented, ACs checked (`- [x]`), and Pyramid steps 1 - 2 green locally (`typecheck` + tests). |
 | T2 | `review` → `ready` | **QA Auditor (Isolated Sub-Agent)** | Complete Verification Pyramid green, **`npx playbook gate <ID>` (or `node scripts/gate-qa.mjs <ID>`) exit code 0**, and **blind diff audit executed in an isolated clean-context sub-agent (`invoke_subagent`)**. Neither prose nor the coding thread may self-certify. |
 | T3 | `review` → `doing` | QA Auditor (Isolated Sub-Agent) | Rejected, with actionable findings (`file:line`) recorded in the QA Matrix. |
-| T4 | `ready` → `done` | Release Management | Package deployed to production from `main` trunk (Anti-Dev-Production-Deploy invariant). |
+| T4 | `ready` → `done` | **Release Management** ([`release-management`](skills/release-management/SKILL.md)) | Package deployed to production from `main` trunk following the canonical 6-phase release protocol (Anti-Dev-Production-Deploy invariant). |
 | T5 | `doing` → `draft` | PO | Sprint timebox expired, or explicitly deprioritized. |
 | T_block | `draft` → `blocked` | PO / Dev | External impediment identified. Mandatory `blocked_reason`. |
 | T_block | `doing` → `blocked` | PO / Dev | External impediment identified. Mandatory `blocked_reason`. |
@@ -109,10 +109,13 @@ An unrefined item remains in `draft` (or `ideas` if discovery) in the backlog. I
 
 ## 5. Decoupled Release Management
 
+- Governed by the canonical [`.agents/skills/release-management/SKILL.md`](skills/release-management/SKILL.md) skill and its 6-phase release protocol (Pre-cut audit, Quality gate, SemVer calculation, User-facing notes, Git flow, and Backlog reconciliation).
 - Sprints and releases have **no 1:1 coupling**.
 - A release is assembled by grouping items in `ready`, whether from the active sprint or historical backlog.
 - Grouping criteria is **delivered value**, not arbitrary calendar dates.
 - The release `CHANGELOG` lists all included items by their canonical backlog ID.
+- Daily tasks never bump version numbers. Version bumps occur exclusively during formal release assembly.
+- Marking an item in `done` without an actual physical deployment is a state lie.
 
 ---
 

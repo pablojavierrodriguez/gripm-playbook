@@ -74,6 +74,7 @@ export const FALLBACK_CORE_FILES = [
   '.agents/skills/principal-engineer/references/oxlint-anti-slop.md',
   '.agents/skills/qa-auditor/SKILL.md',
   '.agents/skills/code-level-ux-auditor/SKILL.md',
+  '.agents/skills/release-management/SKILL.md',
   'scripts/audit-ux-code.cjs',
   'scripts/gate-qa.mjs',
   'scripts/gate-review-items.mjs',
@@ -95,6 +96,8 @@ export const FALLBACK_CORE_FILES = [
   'scripts/lib/selection.mjs',
   'scripts/lib/ux-catalog.cjs',
   'scripts/lib/ux-jsx-parser.cjs',
+  'scripts/extract-release-notes.mjs',
+  'templates/ci-release-template.yml',
   'docs/sprints/SPRINT_SPEC_TEMPLATE.md',
   'docs/DOMAIN_TEMPLATE.md',
 ];
@@ -203,15 +206,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
   const checkHistory = options.history !== false;
   const budget = makeBudget(HISTORY_BUDGET);
 
-  const stats = {
-    created: 0,
-    updated: 0,
-    unchanged: 0,
-    adopted: 0,
-    protected: 0,
-    recognizedCanonical: 0,
-    missingUpstream: 0,
-  };
+  const stats = { created: 0, updated: 0, unchanged: 0, adopted: 0, protected: 0, recognizedCanonical: 0, missingUpstream: 0 };
   const protectedFiles = [];
   const backupRoot = path.join(targetRepo, '.gripm', 'backups');
 
@@ -288,12 +283,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
       nextCustomizations.add(relativePath);
       nextLockFiles[relativePath] = localHash;
 
-      const detail =
-        provenance && provenance.reason
-          ? provenance.reason
-          : provenance && provenance.status === 'custom'
-            ? 'no published revision matches'
-            : 'local edits';
+      const detail = provenance?.reason || (provenance?.status === 'custom' ? 'no published revision matches' : 'local edits');
       console.log(`  ${c.yellow('▲')} ${c.yellow('protected'.padEnd(10))} ${relativePath} ${c.dim(`(${detail} - tracked as a customization)`)}`);
       stats.protected += 1;
       continue;
@@ -320,12 +310,7 @@ export async function runPlaybookSync(targetRepo = process.cwd(), options = {}) 
 
     nextCustomizations.delete(relativePath);
 
-    const note =
-      provenance && provenance.status === 'canonical'
-        ? ' (recognized as an older canonical revision)'
-        : classification === 'customization'
-          ? ' (local edits backed up)'
-          : '';
+    const note = provenance?.status === 'canonical' ? ' (recognized as an older canonical revision)' : (classification === 'customization' ? ' (local edits backed up)' : '');
 
     console.log(`  ${c.cyan('✔')} ${c.cyan('updated'.padEnd(10))} ${relativePath}${note ? c.dim(note) : ''}`);
     stats.updated += 1;
@@ -468,12 +453,7 @@ function parseArgs(argv) {
   }
 
   if (opts.skills !== null || opts.rules !== null || opts.scripts !== null || opts.docs !== null || opts.noScripts || opts.noDocs || opts.noRules) {
-    opts.selection = {
-      skills: opts.skills,
-      rules: opts.noRules ? [] : opts.rules,
-      scripts: opts.noScripts ? [] : opts.scripts,
-      docs: opts.noDocs ? [] : opts.docs,
-    };
+    opts.selection = { skills: opts.skills, rules: opts.noRules ? [] : opts.rules, scripts: opts.noScripts ? [] : opts.scripts, docs: opts.noDocs ? [] : opts.docs };
   }
 
   return opts;

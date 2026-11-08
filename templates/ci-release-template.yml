@@ -1,0 +1,119 @@
+name: Production Release & Deploy
+
+# Canonical idempotent release workflow for Gripm Playbook projects.
+# Triggers on push to the canonical main branch.
+
+on:
+  push:
+    branches:
+      - main
+
+# Safe concurrency: main deployments are queued sequentially (cancel-in-progress: false on main)
+# while branch/PR runs can be safely cancelled.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  release:
+    name: Production Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout canonical repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prior Quality Gate (Verification Pyramid)
+        run: npm run check:all
+
+      - name: Resolve Release Version
+        id: version_resolver
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "raw_version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract Release Notes
+        id: extract_notes
+        run: |
+          node scripts/extract-release-notes.mjs "${{ steps.version_resolver.outputs.raw_version }}"
+          echo "title=$(cat release-title.txt)" >> "$GITHUB_OUTPUT"
+
+      # Idempotence Guard 1: Verify whether Git Tag already exists
+      - name: Check Git Tag Existence
+        id: check_tag
+        run: |
+          TAG="${{ steps.version_resolver.outputs.version }}"
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1 || git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Git tag ${TAG} already exists."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Git tag ${TAG} does not exist yet."
+          fi
+
+      # Tag creation runs only if tag does not exist
+      - name: Create and Push Annotated Git Tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          TAG="${{ steps.version_resolver.outputs.version }}"
+          TITLE="${{ steps.extract_notes.outputs.title }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "${TITLE}"
+          git push origin "${TAG}"
+
+      # Idempotence Guard 2: Verify whether GitHub Release already exists
+      - name: Check GitHub Release Existence
+        id: check_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version_resolver.outputs.version }}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "GitHub release for ${TAG} already exists."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "GitHub release for ${TAG} does not exist yet."
+          fi
+
+      # Release creation runs only if GitHub Release does not exist
+      # Explicitly passes --latest to ensure default release pointer
+      - name: Create GitHub Release
+        if: steps.check_release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version_resolver.outputs.version }}"
+          TITLE="${{ steps.extract_notes.outputs.title }}"
+          gh release create "${TAG}" \
+            --title "${TITLE}" \
+            --notes-file release-notes.txt \
+            --latest
+
+      # Optional Project Deploy Hook (e.g. npm publish, cloud deploy)
+      # Uncomment and configure according to your project delivery target:
+      # - name: Deploy Package / Application
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      #   run: |
+      #     npm publish --access public

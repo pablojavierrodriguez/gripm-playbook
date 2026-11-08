@@ -1,5 +1,5 @@
-# Backlog: @gripm/playbook
-> Consolidado generado el 2026-11-04 por gripm
+# Backlog: gripm-playbook
+> Consolidado generado el 2026-11-08 por gripm
 
 ## Resumen de Estados
 
@@ -29,7 +29,7 @@ Playbook init currently offers adapters only for Antigravity, Cursor, and Claude
 
 ---
 
-### 🚀 Ready for Deploy (4)
+### 🚀 Ready for Deploy (6)
 
 #### [PLAY-057] Erradicacion definitiva de copia de scripts en consumidores y comandos CLI agnosticos en skills
 - **Prioridad**: `high` | **Tipo**: `bug`
@@ -128,6 +128,65 @@ Al ejecutar `gate-qa` con una ruta de tarea temporal, la resolucion de raiz pued
 - [x] #3 Una prueba CLI con un ancestro que contiene `.agents/` y una supresión fuera del directorio de la tarea devuelve el resultado esperado para la tarea aislada, sin `ENOBUFS`.
 - [x] #4 Los casos existentes de resolución por ID, paquetes consumidores y `--root` conservan su comportamiento.
 - [x] #5 `npm run check:all` termina con código 0.
+
+---
+
+#### [PLAY-063] Skill canónica release-management y protocolo formal de entrega en Playbook
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+El flujo ágil de entrega en Playbook define formalmente: `draft` ➔ `doing` ➔ `review` ➔ `ready` ➔ `Release Management` ➔ `done`. Sin embargo, Playbook cuenta con skills para PM, UX, Dev y QA, pero carecía de una skill canónica para `release-management`. Esto provocó que proyectos consumidores (como DOM) crearan skills ad-hoc o que Gripm dispersara sus reglas en AGENTS.md.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Crear la skill canónica `.agents/skills/release-management/SKILL.md` en `@gripm/playbook`.
+  2. Definir el protocolo universal de release en 6 fases:
+     - Fase 0: Auditoría pre-corte (`git log main..dev`, diff stat, cero ramas sucias).
+     - Fase 1: Quality Gate previo (Pirámide de Verificación completa pasando en verde).
+     - Fase 2: Determinación objetiva SemVer 2.0 (Major, Minor, Patch).
+     - Fase 3: Consolidación de notas 100% User-Facing (cero IDs internos `DEV-XXX`/`SPEC-XXX`, regla Anti-Em-Dash `-`).
+     - Fase 4: Protocolo Git canónico (`dev` ➔ `main` ➔ `dev`) con confirmación verbal explícita para commit y push.
+     - Fase 5: Invocación del Deploy Hook del proyecto (npm publish, script de hosting, o deploy cloud) que justifica la transición de estado.
+     - Fase 6: Reconciliación post-deploy en Backlog (`ready` ➔ `done` con `releasedAt: vX.Y.Z`).
+  3. Actualizar `TEAM_PLAYBOOK.md` y `STATE_MACHINE.md` para referenciar formalmente a `release-management` como el rol/skill ejecutor de la transición `ready` ➔ `done`.
+  4. Incluir `release-management` en el manifiesto de sincronización (`.playbook-manifest.json`, `selection.mjs`) para que se distribuya a los proyectos consumidores vía `playbook sync` / `playbook init`.
+- **Out-of-Scope:**
+  - Comandos de despliegue específicos de proyectos individuales (cada consumidor define su propio hook).
+
+**Criterios de Aceptación:**
+- [x] #1 .agents/skills/release-management/SKILL.md existe en @gripm/playbook con las 6 fases universales y guardrails de calidad documentados.
+- [x] #2 TEAM_PLAYBOOK.md y STATE_MACHINE.md documentan formalmente la skill release-management como dueña de la transición ready -> done.
+- [x] #3 .playbook-manifest.json y los scripts de distribución (selection.mjs, init.mjs) incluyen la skill release-management.
+- [x] #4 Los checks de calidad del playbook (npm run check:all) pasan en verde (0 errores de lint, tests y LOC).
+
+---
+
+#### [PLAY-064] Utilidad agnóstica de extracción de release notes y plantilla CI de release idempotente
+- **Prioridad**: `medium` | **Tipo**: `feature`
+
+### Problem Statement
+Los workflows de CI/CD de proyectos que usan Playbook suelen sufrir de fragilidad en la fase de release: scripts inline de bash/node para extraer notas, acoplamiento donde un fallo en GitHub Release impide reintentos, y falta de marcadores `--latest`.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Crear el script utilitario agnóstico `scripts/extract-release-notes.mjs` distribuible vía Playbook:
+     - Capaz de extraer notas y título tanto desde `backlog/releases.json` (formato Gripm Board) como desde `docs/RELEASE_NOTES.md` (formato Markdown plano).
+     - Genera `release-title.txt` y `release-notes.txt` de forma limpia y testeable localmente.
+     - Aplica validación Anti-Em-Dash (reemplazando o alertando ante caracteres unicode em-dash o en-dash).
+  2. Proveer una receta o plantilla canónica de GitHub Actions (`templates/ci-release-job.yml` o en documentación) que demuestre:
+     - Desacople idempotente de estados (`tag_exists` y `release_exists` evaluados independientemente).
+     - Flag `--latest` en `gh release create`.
+     - Concurrency seguro (`cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`).
+  3. Tests unitarios en `tests/` para `extract-release-notes.mjs`.
+- **Out-of-Scope:**
+  - Modificar la infraestructura de CI de proyectos externos de forma automática.
+
+**Criterios de Aceptación:**
+- [x] #1 scripts/extract-release-notes.mjs extrae título y cuerpo correctamente desde backlog/releases.json y docs/RELEASE_NOTES.md.
+- [x] #2 El script genera release-title.txt y release-notes.txt normalizando CRLF y respetando la regla Anti-Em-Dash.
+- [x] #3 Tests unitarios en tests/ cubren ambos formatos de extracción y fallbacks.
+- [x] #4 La plantilla de CI con los guardrails de idempotencia y --latest queda documentada en el Playbook.
+- [x] #5 npm run check:all pasa con código 0.
 
 ---
 

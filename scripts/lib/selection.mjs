@@ -19,6 +19,7 @@ export const DEFAULT_CORE_SKILLS = [
   'principal-engineer',
   'qa-auditor',
   'code-level-ux-auditor',
+  'release-management',
 ];
 
 export const VALID_SCRIPTS = [
@@ -87,6 +88,7 @@ export const SKILL_LABELS = {
   'product-designer': 'product-designer     - UI/UX design, design system, tokens, touch',
   'market-researcher': 'market-researcher    - Market benchmarks, competitive analysis',
   'code-level-ux-auditor': 'code-level-ux-auditor- Static UX auditing, a11y, layout collision',
+  'release-management': 'release-management   - 6-phase release protocol, SemVer, deploy, ready -> done',
 };
 
 export const SCRIPT_LABELS = {
