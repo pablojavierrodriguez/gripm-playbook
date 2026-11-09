@@ -2,8 +2,8 @@ import { format } from 'date-fns';
 import { Reorder } from 'framer-motion';
 
 /**
- * Fixture that must trigger every one of the 15 catalogued signatures.
- * Each rule reports at most once per file, so this file yields 15 findings.
+ * Fixture that must trigger every one of the 17 catalogued signatures.
+ * Each rule reports at most once per file, so this file yields 17 findings.
  */
 export function Violations({ date, amount }) {
   return (
@@ -27,6 +27,10 @@ export function Violations({ date, amount }) {
       <b>{(amount).toLocaleString()}</b>
       <span>Release — Notes</span>
       <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+      <button onClick={() => window.confirm('Delete?')}>Delete</button>
+      <Modal>
+        <div className="backdrop-blur bg-white/95">Translucent modal</div>
+      </Modal>
     </div>
   );
 }

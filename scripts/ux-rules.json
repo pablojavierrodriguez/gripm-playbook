@@ -254,6 +254,84 @@
         ]
       },
       "message": "Viewport zoom lock detected (maximum-scale=1 or user-scalable=no/0). Allow mobile pinch-to-zoom for accessibility."
+    },
+    {
+      "id": "UX-016",
+      "title": "Blocking native dialog in UI code",
+      "severity": "WARNING",
+      "signature": "window.confirm(), window.alert(), window.prompt() or bare confirm/alert/prompt dialogs in UI code.",
+      "impact": "Synchronously freezes the browser event loop, blocking animations, background tasks and layout, breaking PWA immersion and failing WCAG accessibility.",
+      "fix": "Replace with non-blocking accessible dialogs (e.g. Radix UI AlertDialog, Headless UI Dialog, or custom modal component in a portal).",
+      "check": {
+        "line": [
+          "window.confirm(",
+          "window.alert(",
+          "window.prompt(",
+          "confirm(",
+          "alert(",
+          "prompt("
+        ],
+        "alsoContent": [
+          "window.confirm(",
+          "window.alert(",
+          "window.prompt(",
+          "confirm(",
+          "alert(",
+          "prompt("
+        ],
+        "unlessLine": [
+          "//",
+          "/*",
+          "*",
+          "confirmPassword",
+          "confirmEmail",
+          "showAlert",
+          "dismissAlert",
+          "setAlert",
+          "AlertTitle",
+          "AlertDescription",
+          "AlertAction",
+          "AlertCancel",
+          "alert-",
+          "alert.",
+          "systemPrompt",
+          "userPrompt",
+          "agentPrompt",
+          "promptTokens"
+        ]
+      },
+      "message": "Blocking native dialog in UI code. Replace with accessible non-blocking AlertDialog or modal portal."
+    },
+    {
+      "id": "UX-017",
+      "title": "Mobile modal backdrop-blur compositor collision",
+      "severity": "WARNING",
+      "signature": "backdrop-blur combined with reduced opacity background (bg-*/95, bg-*/90, bg-opacity-) inside modal or sheet surface.",
+      "impact": "Breaks GPU hardware layer composition on iOS Safari (WebKit) and Android Chromium, causing the modal to render fully translucent or flickering with black artifacts.",
+      "fix": "Separate the blurred backdrop scrim (fixed inset-0 bg-black/50 backdrop-blur-sm) from the modal content container (relative bg-background with 100% opacity).",
+      "check": {
+        "line": [
+          "backdrop-blur"
+        ],
+        "alsoLine": [
+          "/95",
+          "/90",
+          "/85",
+          "/80",
+          "/75",
+          "bg-opacity-"
+        ],
+        "withinComponent": [
+          "Dialog",
+          "Modal",
+          "Sheet",
+          "Drawer",
+          "Popover",
+          "DialogContent",
+          "SheetContent"
+        ]
+      },
+      "message": "backdrop-blur combined with reduced opacity background in modal surface breaks GPU compositing. Separate backdrop scrim from opaque content surface."
     }
   ]
 }

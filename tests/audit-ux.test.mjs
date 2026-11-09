@@ -579,7 +579,7 @@ describe('programmatic API (PLAY-005)', () => {
     assert.equal(result.report.findings.length, 1, 'the local rule is reachable by id');
 
     // The canonical catalog is untouched and still complete.
-    assert.equal(ALL_IDS.length, 15);
+    assert.equal(ALL_IDS.length, 17);
     fs.rmSync(temp, { recursive: true, force: true });
   });
 
@@ -957,6 +957,93 @@ describe('UX-015: viewport touch zoom lock', () => {
 
   test('inline suppression works for UX-015', () => {
     const findings = auditSnippet('export const Viewport = () => <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />; // ux-audit-ignore UX-015\n');
+    assert.equal(findings.length, 0);
+  });
+});
+
+describe('UX-016: blocking native dialog in UI code', () => {
+  function auditSnippet(code) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ux-016-'));
+    fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'package.json'), '{"name":"test-ux016"}');
+    fs.writeFileSync(path.join(temp, 'src', 'Component.tsx'), code);
+    try {
+      const { auditProject } = requireCjs(AUDITOR);
+      const report = auditProject({ root: temp, useBaseline: false });
+      return report.findings.filter((f) => f.rule === 'UX-016');
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  }
+
+  test('detects window.confirm in click handler', () => {
+    const findings = auditSnippet('export const Btn = () => <button onClick={() => window.confirm("Are you sure?")}>Delete</button>;\n');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, 'UX-016');
+    assert.equal(findings[0].severity, 'WARNING');
+  });
+
+  test('detects window.alert and prompt in component', () => {
+    const findingsAlert = auditSnippet('export const A = () => <button onClick={() => alert("Done")}>OK</button>;\n');
+    assert.equal(findingsAlert.length, 1);
+    assert.equal(findingsAlert[0].rule, 'UX-016');
+
+    const findingsPrompt = auditSnippet('export const P = () => <button onClick={() => window.prompt("Name:")}>Set</button>;\n');
+    assert.equal(findingsPrompt.length, 1);
+    assert.equal(findingsPrompt[0].rule, 'UX-016');
+  });
+
+  test('clean component with accessible dialog triggers 0 findings', () => {
+    const findings = auditSnippet('export const Clean = () => <button onClick={() => setOpen(true)}>Open Modal</button>;\n');
+    assert.equal(findings.length, 0);
+  });
+
+  test('inline suppression works for UX-016', () => {
+    const findings = auditSnippet('export const S = () => <button onClick={() => window.confirm("Sure?")}>Del</button>; // ux-audit-ignore UX-016\n');
+    assert.equal(findings.length, 0);
+  });
+});
+
+describe('UX-017: mobile modal backdrop-blur compositor collision', () => {
+  function auditSnippet(code) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ux-017-'));
+    fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'package.json'), '{"name":"test-ux017"}');
+    fs.writeFileSync(path.join(temp, 'src', 'Component.tsx'), code);
+    try {
+      const { auditProject } = requireCjs(AUDITOR);
+      const report = auditProject({ root: temp, useBaseline: false });
+      return report.findings.filter((f) => f.rule === 'UX-017');
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  }
+
+  test('detects backdrop-blur combined with reduced opacity background inside Modal', () => {
+    const findings = auditSnippet('export const M = () => <Modal><div className="backdrop-blur bg-white/95">Content</div></Modal>;\n');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, 'UX-017');
+    assert.equal(findings[0].severity, 'WARNING');
+  });
+
+  test('detects backdrop-blur with bg-opacity- in Sheet', () => {
+    const findings = auditSnippet('export const S = () => <Sheet><div className="backdrop-blur bg-slate-900 bg-opacity-90">Sheet</div></Sheet>;\n');
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rule, 'UX-017');
+  });
+
+  test('clean modal with separate solid surface produces 0 findings', () => {
+    const findings = auditSnippet('export const Clean = () => <Modal><div className="bg-background border">Solid Modal</div></Modal>;\n');
+    assert.equal(findings.length, 0);
+  });
+
+  test('backdrop-blur outside modal (e.g. sticky header) produces 0 findings', () => {
+    const findings = auditSnippet('export const H = () => <header className="sticky top-0 backdrop-blur bg-white/95">Nav</header>;\n');
+    assert.equal(findings.length, 0);
+  });
+
+  test('inline suppression works for UX-017', () => {
+    const findings = auditSnippet('export const Suppressed = () => <Modal><div className="backdrop-blur bg-white/95">Content</div></Modal>; // ux-audit-ignore UX-017\n');
     assert.equal(findings.length, 0);
   });
 });
