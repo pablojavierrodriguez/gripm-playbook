@@ -181,13 +181,18 @@ A task that cannot proceed is moved to `status: blocked` with a **non-empty `blo
 1. **Fixed Timebox:** A sprint concludes when its scheduled timebox expires (fixed duration), regardless of whether all planned items are finished. Incomplete items are replanned to the next sprint or returned to the backlog.
 2. **Continuous Productivity:** If all items in a sprint are completed before the timebox expires, the PO expands the sprint scope by pulling in newly refined backlog items to maintain productivity. Sprints rarely conclude prematurely.
 3. **No Autonomous Close or Retro:** The AI agent **NEVER** closes a sprint or executes a retrospective autonomously by deduction. Both actions require explicit, textual instructions from the PO (e.g., *"close the sprint"*, *"run the sprint retro"*).
-4. **Mandatory Retro Outputs:** Update rules in `AGENTS.md`, refine skills, and create backlog tasks for all identified technical debt or process improvements.
+4. **Mandatory Retro Outputs (4-Tier Progressive Disclosure):**
+   - **Mechanical First:** If the issue can be caught statically, write a headless test, linter rule, or static AST signature in `.uxaudit.json`.
+   - **Domain Invariant:** If it is a business or domain rule, record it in `.agents/rules/<domain>.md` or `DOMAIN.md`.
+   - **Role Protocol:** If it refines how an engineering or design role operates, update the corresponding skill in `.agents/skills/`.
+   - **Root Instruction Hygiene:** Never append micro-gotchas into `AGENTS.md` or `CLAUDE.md`. The root file must remain a lean router (~100-150 LOC).
+   - **Technical Debt:** Create backlog tasks (`status: draft`) for identified debt or structural improvements.
 
 ---
 
 ## 🧠 Continuous Learning Protocol (Knowledge Feeder)
 
 At the conclusion of each release or sprint:
-1. **New UI or input discoveries:** Documented into relevant design/form skills.
+1. **New UI or input discoveries:** Documented into relevant design/form skills or `.uxaudit.json`.
 2. **Superior architectural patterns:** Documented as an Architectural Decision Record (ADR).
-3. **No bug or friction is solved twice:** Converted into a permanent project rule in `AGENTS.md`.
+3. **No bug or friction is solved twice:** Converted into a mechanical assertion (test/linter) or documented in `.agents/rules/` or relevant skills, preserving a lean `AGENTS.md` router.

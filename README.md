@@ -103,7 +103,7 @@ Enforced by CI (`npm run validate`) to contain zero references to specific frame
 | [`product-designer`](.agents/skills/product-designer/SKILL.md) | Interface Architecture | Semantic tokens, >= 44x44px touch targets, 7 interactive states, Purpose Test |
 | [`principal-engineer`](.agents/skills/principal-engineer/SKILL.md) | Systems Engineering | Modularity (< 1000 LOC ceiling), minimum viable diff, blast-radius mapping |
 | [`qa-auditor`](.agents/skills/qa-auditor/SKILL.md) | Release Certification | Verification Pyramid execution, blind diff audit, exclusive `review ➔ ready` authority |
-| [`code-level-ux-auditor`](.agents/skills/code-level-ux-auditor/SKILL.md) | Static UX Analysis | 15 declarative AST/source signatures via the zero-dependency `audit-ux` engine |
+| [`code-level-ux-auditor`](.agents/skills/code-level-ux-auditor/SKILL.md) | Static UX Analysis | 17 declarative AST/source signatures via the zero-dependency `audit-ux` engine |
 
 ### Optional Stack Packs
 
@@ -141,7 +141,7 @@ Upgrading the framework never overwrites human-authored instructions or local sk
 <details>
 <summary><strong>Static UX Auditor & Custom AST Rules (<code>.uxaudit.json</code>)</strong></summary>
 
-The static UX engine scans source files against 15 built-in signatures (`UX-001` through `UX-015`, covering decimal comma blockers, sub-44px touch targets, fixed bottom occlusion, missing icon button labels, layout jank, and viewport zoom locks).
+The static UX engine scans source files against 17 built-in signatures (`UX-001` through `UX-017`, covering decimal comma blockers, sub-44px touch targets, fixed bottom occlusion, missing icon button labels, layout jank, viewport zoom locks, blocking dialogs, and mobile modal compositor collisions).
 
 Configure exclusions, disable specific signatures, or attach project-specific rules in `.uxaudit.json`:
 
@@ -192,11 +192,42 @@ Every change is validated in strict order of execution cost:
 2. **Headless Test Suite (`npm test`):** Fast unit and integration tests with zero browser overhead.
 3. **Spec & Backlog Gate (`npm run gate:review`):** Mechanical verification of acceptance criteria and dependencies.
 4. **File Budget & Modularity (`npm run check:loc`):** Guard against monolithic God-Files (< 1000 LOC).
-5. **Static UX Audit (`npm run audit:ux:strict`):** Automated verification of the 15 UX and accessibility signatures.
+5. **Static UX Audit (`npm run audit:ux:strict`):** Automated verification of the 17 UX and accessibility signatures.
 6. **Production Build (`npm run build`):** Clean compilation verification when applicable.
 
 > [!IMPORTANT]
 > Browser automation is reserved strictly for visual CSS or layout diagnosis that cannot be deduced statically. Invoking a browser sub-agent to verify business logic, state transitions, or API contracts is prohibited.
+
+---
+
+## Prompt Bloat Prevention & 4-Tier Progressive Disclosure
+
+A recurring failure mode in repositories adopting agentic governance is **Prompt Bloat**: reacting to every bug, edge case, or post-mortem by appending micro-rules into `AGENTS.md` or `CLAUDE.md`. Over time, the root instruction file balloons into hundreds of lines, polluting the context window, increasing inference latency, and degrading model attention across core invariants.
+
+Gripm Playbook enforces a strict **4-Tier Progressive Disclosure Architecture**:
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│ Tier 1: Lean Root Orchestrator (AGENTS.md / CLAUDE.md): ~100-150 LOC   │
+│ - Entry point routing (pm-orchestrator, modes, Verification Pyramid).  │
+├────────────────────────────────────────────────────────────────────────┤
+│ Tier 2: Mechanical Automation & Linters (0 inference tokens)          │
+│ - audit-ux, check-loc, verify-changes.js, static AST rules, pre-commit.│
+├────────────────────────────────────────────────────────────────────────┤
+│ Tier 3: Domain Rules & Ubiquitous Language (.agents/rules/ & DOMAIN.md)│
+│ - Data schemas, entity state transitions, authorization boundaries.    │
+├────────────────────────────────────────────────────────────────────────┤
+│ Tier 4: Autonomous Role Protocols (.agents/skills/<role>/SKILL.md)     │
+│ - Deep methodology loaded on-demand by subagents in clean contexts.    │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Golden Rule for Retrospectives & Post-Mortems
+When a retrospective identifies a technical gotcha or defect:
+1. **Prefer a mechanical check:** Write a headless test, add a linting rule, or declare a static AST signature in `.uxaudit.json`. Exit codes never suffer context drift.
+2. **If domain-specific:** Record the invariant in `.agents/rules/<domain>.md` or `DOMAIN.md`.
+3. **If role-specific:** Update the relevant specialized skill (`principal-engineer`, `product-designer`, etc.).
+4. **Never append micro-gotchas into `AGENTS.md`:** The root file must remain a clean router under ~150 lines.
 
 ---
 
