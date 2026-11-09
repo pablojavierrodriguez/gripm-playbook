@@ -98,6 +98,7 @@ This serves two concrete purposes:
 - Real value versus effort. Effort without delivered value does not enter the sprint.
 - Epics → independent, deliverable vertical slices, never horizontal layers.
 - Technical debt identified in QA or retrospectives converts into a new task with `status: draft`.
+- **Retrospective outputs follow 4-Tier Progressive Disclosure:** Convert technical learnings into mechanical tests/linters, domain rules in `.agents/rules/`, or role skills. Never append micro-gotchas into `AGENTS.md` or `CLAUDE.md`, keeping the root orchestrator under ~150 lines.
 
 ### 3. Sprint Loop Orchestration & Sub-Agent Dispatch (`invoke_subagent`)
 

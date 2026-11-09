@@ -163,6 +163,30 @@ Importing the module does **not** run an audit; only executing it as a binary do
 - **Impact:** Blocks the pinch-to-zoom gesture on mobile devices, degrading accessibility for users with low vision and violating WCAG 1.4.4.
 - **Fix:** Remove `maximum-scale=1` and `user-scalable=no` (or `user-scalable=0`) from the viewport meta to allow touch scaling.
 
+### 16. [UX-016] · WARNING · Blocking native dialog in UI code
+- **Signature:** `window.confirm()`, `window.alert()`, `window.prompt()`, or bare `confirm()`, `alert()`, `prompt()` in UI code.
+- **Impact:** Synchronously freezes the browser event loop, blocking animations, background tasks and layout, breaking PWA immersion and failing WCAG accessibility (focus trapping and screen-reader accessibility).
+- **Fix:** Replace with non-blocking accessible dialogs (e.g. Radix UI `AlertDialog`, Headless UI `Dialog`, or custom modal component in a portal).
+
+### 17. [UX-017] · WARNING · Mobile modal backdrop-blur compositor collision
+- **Signature:** `backdrop-blur` combined with reduced opacity background (`bg-*/95`, `bg-*/90`, `bg-opacity-`) inside modal or sheet surface.
+- **Impact:** Breaks GPU hardware layer composition on iOS Safari (WebKit) and Android Chromium, causing the modal to render fully translucent or flickering with black artifacts.
+- **Fix:** Separate the blurred backdrop scrim (`fixed inset-0 bg-black/50 backdrop-blur-sm`) from the modal content container (`relative bg-background` with 100% opacity).
+
+---
+
+## 📱 Mobile Micro-Ergonomics & Touch Heuristics
+
+### Focus Lifecycle Isolation in Modals
+- **Anti-Pattern:** Autofocus hooks in modals depending on form state or mutating callbacks (e.g. `useEffect(() => { inputRef.current?.focus(); }, [isOpen, formState.isDirty])`).
+- **Symptom:** When the user types the first character, `isDirty` flips to `true`, re-triggering the effect and stealing focus or selecting all text mid-typing.
+- **Rule:** Autofocus effects in modals must depend **strictly and exclusively** on open state (`[open]` or `[isOpen]`), never on form values, dirty state, or un-memoized handlers.
+
+### Virtual Keyboard Collision Prevention
+- **Anti-Pattern:** Capturing PIN, OTP, or numeric amounts with an in-app custom on-screen keypad while leaving the `<input>` open to native OS software keyboard invocation.
+- **Symptom:** The native mobile keyboard pops up over the in-app numpad, obscuring controls and triggering viewport height jumps.
+- **Rule:** When rendering an in-app keypad or virtual touch keyboard, configure target inputs with `inputMode="none"` and `readOnly` (or intercept touch events) to keep the OS keyboard suppressed.
+
 ---
 
 ## ✅ Pre-merge acceptance checklist
@@ -177,6 +201,10 @@ Importing the module does **not** run an audit; only executing it as a binary do
 - [ ] Does every icon-only button have an accessible name?
 - [ ] Do UI text, titles, and metadata use the standard hyphen (` - `) and avoid em-dash (`—`) or en-dash (`–`)?
 - [ ] Does the mobile viewport allow pinch zoom without locking it (no `maximum-scale=1` nor `user-scalable=no`)?
+- [ ] Does the UI avoid synchronous blocking dialogs (`window.confirm`, `alert`, `prompt`) in favor of accessible `AlertDialog` primitives?
+- [ ] In modals and sheets, is `backdrop-blur` isolated to the scrim overlay rather than combined with translucent backgrounds on the modal surface?
+- [ ] Are modal autofocus effects isolated to `[open]`, avoiding re-focus triggers on `isDirty`?
+- [ ] Do custom in-app keypad inputs specify `inputMode="none"` and `readOnly` to prevent native keyboard collision?
 - [ ] Does the manual review catch decorative overload (background gradients and orbs, stacked `backdrop-blur` across several surfaces, uniformly large shadows) that degrades text contrast or flattens visual hierarchy? Look for the cumulative effect on text and surface edges, not the isolated technique: the vice appears through repetition, and a technique justified on one plane becomes noise across three.
 - [ ] Does `npx playbook audit --strict` (or `node scripts/audit-ux-code.cjs --strict`) exit green?
 

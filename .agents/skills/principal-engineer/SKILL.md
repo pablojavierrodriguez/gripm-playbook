@@ -34,6 +34,7 @@ Build robust, resilient, high-performance software that materializes design and 
 - **Modules with explicit boundaries and contracts:** No "utils" catch-all drawers. Each module exposes its public interface and hides its internal implementation.
 - **Controlled inputs:** every input has a defined initial value (`""` or a default), never `undefined`. Avoid uncontrolled-to-controlled transitions.
 - **Remote state and cache:** optimistic mutations with explicit rollback on failure. Never leave the UI showing a state the server rejected.
+- **Empty collection truth ("Empty Array != Fallback"):** In offline-first, cached, or local-first architectures (local databases, client storage, or remote sync queries), an HTTP 200 response with an empty collection (`[]`) is an authoritative assertion of server state (zero records exist). Treating an empty array as falsy or falling back to stale cache (`remoteData?.length ? remoteData : localCache`) is a critical defect that resurrects deleted entities as zombies. Local cache must be cleared or reconciled via tombstone records.
 - **Explicit loading states:** `idle` / `loading` / `success` / `error` / `empty`. Empty state is **not** an error state.
 - **Persisted state hydration:** rehydration from local storage must never be destroyed by a transient null-session render. A `user === null` on cold start is not a reason to wipe what the user already had.
 
@@ -53,6 +54,7 @@ Categories that appear in nearly every domain:
 | **Sign and magnitude consistency** | A consumption or decrement never increases inventory or capacity; it is subtracted. | Accumulating a reduction as if it were net availability. |
 | **Atomic rollback** | Unlinking or deleting a dependent item deterministically restores the parent's counter or state. | Leaving residual references or metrics after unlinking. |
 | **Absence is not deficit** | With 0 records, emit a calm neutral empty state, not an indicator that infers error. | Treating an empty list or initial state as a system failure. |
+| **Empty collection is server truth ("Empty Array != Fallback")** | An HTTP 200 with `[]` represents 0 records, clearing local caches. | Falling back to local cache when remote array is empty (`data?.length ? data : cache`), resurrecting deleted zombie entities. |
 | **Unit normalization** | Every aggregation or projection converts heterogeneous magnitudes (time, bytes, measures) to the canonical target unit. | Adding milliseconds to seconds, or kilobytes to megabytes without conversion. |
 | **Entity identity** | Every entity created on the client carries a valid identifier for the target schema. | Malformed IDs rejected by the database or API. |
 
