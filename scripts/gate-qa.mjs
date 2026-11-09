@@ -328,7 +328,7 @@ export function startMain(argv) {
   process.exit(0);
 }
 
-export function submitMain(argv) {
+export async function submitMain(argv) {
   const target = getPositionalTarget(argv);
   if (!target) {
     printHeader('QA Gate · submit (T1)');
@@ -356,6 +356,17 @@ export function submitMain(argv) {
   collisions.forEach((col) => {
     failures.push(`task id "${col.id}" is declared by two files: ${col.files.join(' and ')}`);
   });
+
+  const isForced = argv.includes('--force');
+  const health = await checkStructuralHealth(projectRoot, {
+    force: isForced,
+    strict: argv.includes('--strict'),
+  });
+  failures.push(...health.failures);
+
+  for (const w of health.warnings) {
+    console.log(`    ${c.yellow('▲')} ${w}`);
+  }
 
   if (failures.length) {
     for (const f of failures) console.log(`    ${c.red('✖')} ${f}`);
@@ -478,6 +489,6 @@ if (invokedDirectly) {
   const args = process.argv.slice(2);
   if (args[0] === 'unblock') unblockMain(args.slice(1));
   else if (args[0] === 'start') startMain(args.slice(1));
-  else if (args[0] === 'submit') submitMain(args.slice(1));
+  else if (args[0] === 'submit') await submitMain(args.slice(1));
   else await main(args);
 }

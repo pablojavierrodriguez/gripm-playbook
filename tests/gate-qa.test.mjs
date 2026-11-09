@@ -783,6 +783,26 @@ describe('mechanical state transitions (T0, T1, T2, T_unblock)', () => {
     assert.equal(fm.status, 'doing');
   });
 
+  test('submit (T1) refuses promotion when modified file exceeds 1000 LOC limit (PLAY-066)', () => {
+    const { file, dir } = makeTask({ status: 'doing', acs: ['- [x] #1 done'] });
+    fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'src', 'Giant.js'), 'const a = 1;\n'.repeat(1050), 'utf8');
+    const { code, stdout } = runGate(['submit', file, '--strict']);
+    assert.equal(code, 1);
+    assert.match(stdout, /SUBMIT REFUSED/);
+    assert.match(stdout, /exceeding the 1000-line hard ceiling/);
+  });
+
+  test('submit (T1) allows bypass with --force on LOC violation', () => {
+    const { file, dir } = makeTask({ status: 'doing', acs: ['- [x] #1 done'] });
+    fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'src', 'Giant.js'), 'const a = 1;\n'.repeat(1050), 'utf8');
+    const { code, stdout } = runGate(['submit', file, '--strict', '--force']);
+    assert.equal(code, 0);
+    assert.match(stdout, /SUBMIT ALLOWED/);
+    assert.match(stdout, /Structural health bypassed/);
+  });
+
   test('unblock (T_unblock) mutates status to doing and removes blocked_reason on disk', () => {
     const { file } = makeTask({ status: 'blocked', extra: 'blocked_reason: "waiting on API"' });
     const { code, stdout } = runGate(['unblock', file]);
