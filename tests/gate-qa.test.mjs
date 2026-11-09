@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { inspectTask, loadTasks, mutateTaskFrontmatter, readFrontmatter, resolvePyramid, syncConsolidatedBacklog } from '../scripts/gate-qa.mjs';
 import { inspectDiffText, isTestOrFixturePath } from '../scripts/lib/anti-slop.mjs';
+import { DEFAULT_STEP_TIMEOUT_MS, runPyramidStep } from '../scripts/lib/pyramid.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GATE = path.join(ROOT, 'scripts', 'gate-qa.mjs');
@@ -556,6 +557,26 @@ describe('pyramid resolution', () => {
     const validateStep = resolvePyramid(dir).find((step) => step.id === 'validate');
     assert.equal(validateStep.available, true);
     assert.equal(validateStep.script, 'typecheck');
+  });
+
+  test('pyramid step runner enforces DEFAULT_STEP_TIMEOUT_MS of 2 minutes', () => {
+    assert.equal(DEFAULT_STEP_TIMEOUT_MS, 120000);
+  });
+
+  test('pyramid step runner aborts on timeout with anti-hanging message', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-timeout-'));
+    fs.writeFileSync(
+      path.join(dir, 'package.json'),
+      JSON.stringify({
+        scripts: {
+          hang: 'node -e "setTimeout(() => {}, 5000)"',
+        },
+      }),
+    );
+    const step = { script: 'hang', available: true };
+    const outcome = runPyramidStep(step, dir, { timeout: 150 });
+    assert.equal(outcome.state, 'failed');
+    assert.match(outcome.detail, /anti-hanging guardrail/i);
   });
 });
 

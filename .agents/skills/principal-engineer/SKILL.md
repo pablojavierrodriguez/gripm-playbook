@@ -152,7 +152,15 @@ const user = payload as TotalUserResponse
 > [!CAUTION]
 > **Lesson recorded in this repository's history:** a fixture passed for the wrong reason (not because the rule under test was satisfied, but because the module isolation swallowed the path it was supposed to verify). Operational rule: when a test passes, verify **why** it passes before declaring it coverage. A test that passes without exercising its objective is a defect with a green check.
 
-### 13. Systematic Debugging Protocol
+### 13. Headless Component Integration & Anti-Hanging Test Discipline
+
+- **Headless Component & Store Integration First:** Every interactive component, modal flow, input masking, and state store dispatch must be verified with headless integration tests (`.test.tsx` using React Testing Library / `@testing-library/react` + JSDOM or Happy-DOM) before submitting a task to review. Jumping straight to browser E2E (Playwright) to verify state updates or button clicks is an anti-pattern that bloats execution time and destabilizes agent workflows.
+- **Anti-Hanging Guardrails in Test Suites:**
+  - Bounded test timeouts: Ensure individual test timeouts never exceed 15 seconds (`testTimeout: 15000` in Vitest/Playwright).
+  - Deterministic execution flags: Always run tests in non-interactive mode (`--run`, `--no-watch`, `CI=true`).
+  - WebServer & Process Hygiene: When integration tests spawn background servers or watchers, configure `reuseExistingServer: true` and verify port readiness with a clean 5-second abort. Teardowns must cleanly unbind listeners, close database handles, and terminate spawned subprocesses to prevent zombie processes.
+
+### 14. Systematic Debugging Protocol
 
 When diagnosing or fixing a defect or test failure, guessing or trying fixes blindly is strictly prohibited. Modifying production code before isolating the exact root cause creates superficial patches that leave underlying defects intact and rot the codebase.
 
@@ -181,14 +189,14 @@ If a fix attempt fails to pass the red test or introduces secondary failures:
 
 ---
 
-### 14. Anti-Slop Linter Reference (Oxlint / AST)
+### 15. Anti-Slop Linter Reference (Oxlint / AST)
 
 For deterministic static analysis rules, `.oxlintrc.json` configuration, and AST evasion detection recipes against AI code slop, see:
 [`references/oxlint-anti-slop.md`](references/oxlint-anti-slop.md)
 
 ---
 
-### 15. Static Repository Diagnostic & Health Assessment
+### 16. Static Repository Diagnostic & Health Assessment
 
 When entering an existing codebase or preparing non-trivial changes, the agent must perform an initial static code diagnostic before writing or refactoring code. Operating blindly without knowing the project baseline leads to compounding structural decay and accidental regressions.
 

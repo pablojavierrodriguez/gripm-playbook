@@ -444,7 +444,9 @@ export async function main(argv) {
       strict: argv.includes('--strict'),
     });
     console.log(`  ${c.bold('Verification pyramid:')}`);
-    const execResult = executePyramid(steps, workRoot);
+    const tIdx = argv.indexOf('--timeout');
+    const timeoutMs = tIdx !== -1 && Number(argv[tIdx + 1]) > 0 ? Number(argv[tIdx + 1]) * 1000 : undefined;
+    const execResult = executePyramid(steps, workRoot, { timeout: timeoutMs });
     pyramidFailed = execResult.pyramidFailed;
     pyramidRan = execResult.pyramidRan;
     for (const { step, outcome } of execResult.outcomes) {

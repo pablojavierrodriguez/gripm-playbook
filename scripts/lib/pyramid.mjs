@@ -8,6 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
+export const DEFAULT_STEP_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes (Anti-Hanging Guardrail)
+
 export function readScripts(root) {
   try {
     return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).scripts || {};
@@ -26,7 +28,7 @@ export function resolvePyramidSteps(root, pyramidSteps = []) {
   });
 }
 
-export function runPyramidStep(step, root) {
+export function runPyramidStep(step, root, options = {}) {
   if (typeof step.runner === 'function') {
     return step.runner(root);
   }
@@ -40,15 +42,24 @@ export function runPyramidStep(step, root) {
         };
   }
 
+  const timeoutMs =
+    typeof options.timeout === 'number' && options.timeout > 0
+      ? options.timeout
+      : (typeof step.timeout === 'number' && step.timeout > 0 ? step.timeout : DEFAULT_STEP_TIMEOUT_MS);
+
   const result = spawnSync('npm', ['run', '--silent', step.script], {
     cwd: root,
     encoding: 'utf8',
     shell: process.platform === 'win32',
-    timeout: 10 * 60 * 1000,
+    timeout: timeoutMs,
   });
 
   if (result.error) {
-    return { state: 'failed', detail: result.error.message };
+    const isTimeout = result.error.code === 'ETIMEDOUT' || /timed? ?out/i.test(result.error.message);
+    const detail = isTimeout
+      ? `step timed out after ${Math.round(timeoutMs / 1000)}s (anti-hanging guardrail). Test runner or server hung.`
+      : result.error.message;
+    return { state: 'failed', detail };
   }
   if (result.status !== 0) {
     const tail = `${result.stdout || ''}${result.stderr || ''}`.trim().split('\n').slice(-4).join('\n      ');
@@ -57,13 +68,13 @@ export function runPyramidStep(step, root) {
   return { state: 'passed', detail: '' };
 }
 
-export function executePyramid(steps, root) {
+export function executePyramid(steps, root, options = {}) {
   const outcomes = [];
   let pyramidFailed = false;
   let pyramidRan = 0;
 
   for (const step of steps) {
-    const outcome = runPyramidStep(step, root);
+    const outcome = runPyramidStep(step, root, options);
     outcomes.push({ step, outcome });
     if (outcome.state === 'skipped') continue;
     pyramidRan += 1;
