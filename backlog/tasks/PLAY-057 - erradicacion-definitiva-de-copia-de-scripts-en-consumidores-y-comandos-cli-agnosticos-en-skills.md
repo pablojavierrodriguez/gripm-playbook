@@ -1,9 +1,9 @@
 ---
 id: PLAY-057
 title: "Erradicacion definitiva de copia de scripts en consumidores y comandos CLI agnosticos en skills"
-status: ready
+status: done
 created_date: '2026-11-02'
-updated_date: '2026-11-02'
+updated_date: '2026-11-10'
 labels:
   - "architecture"
   - "sync"

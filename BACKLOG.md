@@ -1,5 +1,5 @@
-# Backlog: gripm-playbook
-> Consolidado generado el 2026-11-08 por gripm
+# Backlog: @gripm/playbook
+> Consolidado generado el 2026-11-11 por gripm
 
 ## Resumen de Estados
 
@@ -29,168 +29,7 @@ Playbook init currently offers adapters only for Antigravity, Cursor, and Claude
 
 ---
 
-### 🚀 Ready for Deploy (6)
-
-#### [PLAY-057] Erradicacion definitiva de copia de scripts en consumidores y comandos CLI agnosticos en skills
-- **Prioridad**: `high` | **Tipo**: `bug`
-
-### Problem Statement
-A pesar de la arquitectura Zero-Clutter introducida en `PLAY-041`, persiste un defecto estructural en `scripts/sync-playbook.mjs` al calcular `isConsumerPackage`: cuando un repositorio consumidor ejecuta `playbook sync` contra el repositorio remoto de GitHub o mediante `--source <dir>`, `shouldDefaultToLocalBundle` resulta `false` y el sincronizador **vuelve a copiar los 19 scripts internos del framework (`scripts/*.mjs`, `scripts/lib/*.mjs`, `scripts/audit-ux-code.cjs`, `scripts/ux-rules.json`) dentro de la carpeta `scripts/` del consumidor**, generando archivos duplicados y código muerto que no le pertenecen al proyecto.
-
-Adicionalmente, las skills canónicas (`.agents/skills/*/SKILL.md`, `.agents/TEAM_PLAYBOOK.md`, `.agents/STATE_MACHINE.md`) continúan instruyendo al agente a ejecutar rutas locales como `node scripts/gate-qa.mjs <ID>` o `node scripts/audit-ux-code.cjs --strict`, lo cual falla en cualquier consumidor Zero-Clutter donde `scripts/` fue erradicado.
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  1. Forzar `packageMode: true` en `scripts/sync-playbook.mjs` siempre que el repositorio destino (`targetDir`) no sea el propio repositorio fuente de `@gripm/playbook` (`targetDir !== packageBundleRoot` y no contenga `.playbook-manifest.json` con `"name": "@gripm/playbook"`), independientemente de si el sync proviene de paquete local, `--source` o GitHub remoto (salvo cuando el usuario pase explícitamente `--install-scripts`).
-  2. Ejecutar `pruneLegacyScripts` en todo consumidor (remoto o `--source`) para eliminar automáticamente cualquier copia previa de los 19 scripts del Playbook y limpiar sus entradas de `.gripm/playbook-lock.json`.
-  3. Actualizar todas las skills canónicas (`pm-orchestrator`, `principal-engineer`, `qa-auditor`, `code-level-ux-auditor`), `STATE_MACHINE.md` y `TEAM_PLAYBOOK.md` para invocar los binarios CLI del paquete (`npx playbook gate <ID>` / `npm run gate:qa -- <ID>`, `npx playbook audit --strict`, `npx playbook check-loc`, `npx playbook audit-repo`) en lugar de rutas `node scripts/...`.
-- **Out-of-Scope:**
-  - Modificar la lógica interna del parser UX o las reglas de negocio de las compuertas.
-
-**Criterios de Aceptación:**
-- [x] #1 `scripts/sync-playbook.mjs` activa `packageMode: true` (excluyendo `scripts/*` del plan de instalación) para todo repositorio consumidor (`targetDir` distinto de la raíz del repositorio `@gripm/playbook`), tanto en modo paquete local como con `--source` o remoto desde GitHub, salvo que se indique explícitamente `--install-scripts`.
-- [x] #2 Al sincronizar un consumidor que tenía scripts copiados en `.gripm/playbook-lock.json` (como `@gripm/board`), `pruneLegacyScripts` elimina los 19 scripts clonados de `scripts/` y `scripts/lib/` sin dejar archivos huérfanos ni directorios vacíos.
-- [x] #3 Todas las referencias operativas en `.agents/skills/*/SKILL.md`, `.agents/STATE_MACHINE.md` y `.agents/TEAM_PLAYBOOK.md` priorizan los comandos del binario CLI (`npx playbook gate`, `npx playbook audit`, `npx playbook check-loc`, `npx playbook audit-repo`) eliminando la dependencia de archivos `scripts/*.mjs` copiados en el consumidor.
-- [x] #4 `tests/sync.test.mjs` y `tests/package-portability.test.mjs` incluyen casos de prueba que verifican que `runPlaybookSync` con `--source` y remoto sobre un consumidor nunca copia `scripts/` y poda copias legadas existentes.
-- [x] #5 `npm run check:all` (`validate`, `check:loc`, `test`) pasa con código 0.
-
----
-
-#### [PLAY-058] Modularidad total en init y sync: gobernanza opcional, presets de rigor y modo manual
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-### Problem Statement
-El flujo actual de `playbook init` y `playbook sync` (`PLAY-051`) permite elegir skills de `.agents/skills/` y plantillas de `docs/`, pero sigue imponiendo de forma rígida:
-1. La instalación obligatoria de `.agents/TEAM_PLAYBOOK.md`, `.agents/STATE_MACHINE.md` y `.agents/rules/git-workflow.md` incluso si el usuario solo desea instalar una skill puntual (ej. `code-level-ux-auditor` o `principal-engineer`).
-2. Un único nivel de rigor en la auditoría estática (`ux-rules.json` y `gate-qa.mjs`) donde preferencias estilísticas y editoriales (`UX-011` escala tipográfica, `UX-014` anti-em-dash) bloquean al mismo nivel que defectos críticos de accesibilidad o roturas de teclados móviles.
-3. Falta de una opción explícita en la personalización para usuarios avanzados que deseen operar las transiciones de forma manual versus el modo automatizado por defecto.
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  1. Extender `scripts/lib/selection.mjs`, `scripts/lib/sync-classifier.mjs` (`planFiles`), `scripts/init.mjs` y `scripts/sync-playbook.mjs` con la dimensión `rules` (`team-playbook`, `state-machine`, `git-workflow`) seleccionable en modo `custom` y mediante flag `--rules <list|all|none>`, con auto-poda si se desmarca.
-  2. Incorporar soporte de **Presets de Rigor** (`preset: "pragmatic" | "strict" | "dogmatic"`) y **Modo de Automatización** (`automation: "automated" | "manual-override"`) en `.gripm/config.json` y `.gripm/.uxaudit.json`:
-     - `pragmatic`: Activa por defecto solo reglas deterministas críticas de ingeniería y accesibilidad (excluyendo bloqueos estilísticos como `UX-011`, `UX-012`, `UX-013`, `UX-014`).
-     - `strict`: Activa el catálogo completo de ergonomía, LOC (< 1000) y anti-slop.
-  3. Soportar flags CLI no interactivas (`--preset <pragmatic|strict>`, `--rules <list>`) para integración directa desde `@gripm/board` sin doble interrogatorio.
-- **Out-of-Scope:**
-  - Crear reglas nuevas en `ux-rules.json`.
-
-**Criterios de Aceptación:**
-- [x] #1 `scripts/lib/selection.mjs` y `planFiles` en `scripts/lib/sync-classifier.mjs` soportan la selección granular de artefactos de gobernanza (`team-playbook`, `state-machine`, `git-workflow`) vía modo interactivo `custom` y flag `--rules <lista|all|none>`, persistiendo la elección en `.gripm/playbook-lock.json` y podando archivos desmarcados.
-- [x] #2 `scripts/audit-ux-code.cjs` y `scripts/gate-qa.mjs` respetan el preset configurado en `.gripm/config.json` o `.gripm/.uxaudit.json` (`pragmatic` vs `strict`), evitando bloqueos por reglas estilísticas (`UX-011`, `UX-014`) cuando el proyecto opera en perfil `pragmatic`.
-- [x] #3 `scripts/init.mjs` permite configurar el nivel de rigor (`pragmatic` vs `strict`) y el modo de operación (100% automatizado con excepciones humanas vs manual), exponiendo flags no interactivas (`--preset`, `--rules`) para consumo programático desde `gripm --init`.
-- [x] #4 Suite de pruebas en `tests/selection.test.mjs` y `tests/audit-ux.test.mjs` validando el filtrado de `rules`, la auto-poda y el comportamiento de los presets `pragmatic` y `strict`.
-- [x] #5 `npm run check:all` pasa con código 0.
-
----
-
-#### [PLAY-059] Descomposicion modular de scripts/audit-ux-code.cjs bajo el techo de 1000 LOC
-- **Prioridad**: `high` | **Tipo**: `refactor`
-
-### Problem Statement
-El repositorio `@gripm/playbook` establece como regla innegociable que ningún archivo de código fuente debe alcanzar o superar las 1000 líneas de código (`check-loc.mjs`). Sin embargo, `scripts/audit-ux-code.cjs` cuenta actualmente con **1.441 líneas**, concentrando en un único archivo monolítico el CLI parser, el cargador de catálogos y baselines, el motor heurístico de unidades JSX/AST y el formateador de reportes.
-
-Para predicar con el ejemplo y mantener un Health Score de **100/100** con `check:loc:strict` en verde, es obligatorio descomponer `scripts/audit-ux-code.cjs` en módulos cohesivos.
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  1. Extraer la lógica de parseo de unidades JSX, expresiones e internacionalización (`collectUnits`, `stripExpressions`, `findTagEnd`, jerarquía de componentes) a `scripts/lib/ux-jsx-parser.cjs`.
-  2. Extraer la carga de configuración, catálogos de reglas (canónicas y locales), compilación de globs `exclude` y gestión de snapshots `audit-ux-baseline.json` a `scripts/lib/ux-catalog.cjs`.
-  3. Mantener intacta la interfaz pública programática (`const { auditProject } = require('./audit-ux-code.cjs')`) y todos los flags de CLI.
-  4. Actualizar `.playbook-manifest.json` y `FALLBACK_CORE_FILES` si corresponde para empaquetar los submódulos en el tarball de npm.
-- **Out-of-Scope:**
-  - Alterar la semántica de detección de las reglas `UX-001` a `UX-015`.
-
-**Criterios de Aceptación:**
-- [x] #1 `scripts/audit-ux-code.cjs` y cada uno de sus submódulos extraídos (`scripts/lib/ux-*.cjs`) se mantienen estrictamente por debajo de las 650 líneas de código (cumpliendo con creces el techo de < 1000 LOC).
-- [x] #2 `node scripts/check-loc.mjs --strict` y `node scripts/audit-engine.mjs --strict` sobre el repositorio `@gripm/playbook` reportan **0 violaciones de LOC** y un **Health Score de 100/100**.
-- [x] #3 La API exportada (`auditProject`, `loadRules`, etc.) y el comportamiento CLI de `scripts/audit-ux-code.cjs` conservan 100% de retrocompatibilidad.
-- [x] #4 `npm test` (incluyendo los 13 archivos de test y todas las fixtures de `audit-ux.test.mjs`) y `npm run validate` pasan con código 0.
-
----
-
-#### [PLAY-060] Evitar que gate-qa adopte .agents globales como raiz de proyecto
-- **Prioridad**: `high` | **Tipo**: `bug`
-
-Al ejecutar `gate-qa` con una ruta de tarea temporal, la resolucion de raiz puede ascender hasta el perfil del usuario e interpretar su `.agents/` global como raiz del proyecto. `checkStructuralHealth` entonces inspecciona archivos ajenos al repositorio, supera el limite de salida de `spawnSync` (`ENOBUFS`) y hace fallar pruebas e2e.
-
-### Alcance
-- Tratar `.agents/` solo como marcador de proyecto cuando contiene artefactos canónicos de gobernanza; reconocer también marcadores inequívocos como `.git`, `package.json`, `.playbook-manifest.json`, `AGENTS.md` o `backlog/tasks/`.
-- Si una ruta explícita de tarea no tiene una raíz de proyecto reconocible en sus ancestros, usar el directorio de esa tarea como raíz de fallback.
-- Añadir una regresión CLI que demuestre que artefactos en un ancestro con `.agents/` no contaminan la inspección de la tarea aislada.
-
-### Fuera de alcance
-- Cambiar reglas del auditor, la pirámide de verificación o el gate de certificación.
-
-**Criterios de Aceptación:**
-- [x] #1 La resolución de una ruta explícita reconoce raíces con marcadores de proyecto verificables y no considera suficiente un `.agents/` genérico de un ancestro.
-- [x] #2 Si no existe un marcador de proyecto, `gate-qa` usa el directorio de la tarea como raíz y no inspecciona artefactos de sus directorios padre.
-- [x] #3 Una prueba CLI con un ancestro que contiene `.agents/` y una supresión fuera del directorio de la tarea devuelve el resultado esperado para la tarea aislada, sin `ENOBUFS`.
-- [x] #4 Los casos existentes de resolución por ID, paquetes consumidores y `--root` conservan su comportamiento.
-- [x] #5 `npm run check:all` termina con código 0.
-
----
-
-#### [PLAY-063] Skill canónica release-management y protocolo formal de entrega en Playbook
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-### Problem Statement
-El flujo ágil de entrega en Playbook define formalmente: `draft` ➔ `doing` ➔ `review` ➔ `ready` ➔ `Release Management` ➔ `done`. Sin embargo, Playbook cuenta con skills para PM, UX, Dev y QA, pero carecía de una skill canónica para `release-management`. Esto provocó que proyectos consumidores (como DOM) crearan skills ad-hoc o que Gripm dispersara sus reglas en AGENTS.md.
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  1. Crear la skill canónica `.agents/skills/release-management/SKILL.md` en `@gripm/playbook`.
-  2. Definir el protocolo universal de release en 6 fases:
-     - Fase 0: Auditoría pre-corte (`git log main..dev`, diff stat, cero ramas sucias).
-     - Fase 1: Quality Gate previo (Pirámide de Verificación completa pasando en verde).
-     - Fase 2: Determinación objetiva SemVer 2.0 (Major, Minor, Patch).
-     - Fase 3: Consolidación de notas 100% User-Facing (cero IDs internos `DEV-XXX`/`SPEC-XXX`, regla Anti-Em-Dash `-`).
-     - Fase 4: Protocolo Git canónico (`dev` ➔ `main` ➔ `dev`) con confirmación verbal explícita para commit y push.
-     - Fase 5: Invocación del Deploy Hook del proyecto (npm publish, script de hosting, o deploy cloud) que justifica la transición de estado.
-     - Fase 6: Reconciliación post-deploy en Backlog (`ready` ➔ `done` con `releasedAt: vX.Y.Z`).
-  3. Actualizar `TEAM_PLAYBOOK.md` y `STATE_MACHINE.md` para referenciar formalmente a `release-management` como el rol/skill ejecutor de la transición `ready` ➔ `done`.
-  4. Incluir `release-management` en el manifiesto de sincronización (`.playbook-manifest.json`, `selection.mjs`) para que se distribuya a los proyectos consumidores vía `playbook sync` / `playbook init`.
-- **Out-of-Scope:**
-  - Comandos de despliegue específicos de proyectos individuales (cada consumidor define su propio hook).
-
-**Criterios de Aceptación:**
-- [x] #1 .agents/skills/release-management/SKILL.md existe en @gripm/playbook con las 6 fases universales y guardrails de calidad documentados.
-- [x] #2 TEAM_PLAYBOOK.md y STATE_MACHINE.md documentan formalmente la skill release-management como dueña de la transición ready -> done.
-- [x] #3 .playbook-manifest.json y los scripts de distribución (selection.mjs, init.mjs) incluyen la skill release-management.
-- [x] #4 Los checks de calidad del playbook (npm run check:all) pasan en verde (0 errores de lint, tests y LOC).
-
----
-
-#### [PLAY-064] Utilidad agnóstica de extracción de release notes y plantilla CI de release idempotente
-- **Prioridad**: `medium` | **Tipo**: `feature`
-
-### Problem Statement
-Los workflows de CI/CD de proyectos que usan Playbook suelen sufrir de fragilidad en la fase de release: scripts inline de bash/node para extraer notas, acoplamiento donde un fallo en GitHub Release impide reintentos, y falta de marcadores `--latest`.
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  1. Crear el script utilitario agnóstico `scripts/extract-release-notes.mjs` distribuible vía Playbook:
-     - Capaz de extraer notas y título tanto desde `backlog/releases.json` (formato Gripm Board) como desde `docs/RELEASE_NOTES.md` (formato Markdown plano).
-     - Genera `release-title.txt` y `release-notes.txt` de forma limpia y testeable localmente.
-     - Aplica validación Anti-Em-Dash (reemplazando o alertando ante caracteres unicode em-dash o en-dash).
-  2. Proveer una receta o plantilla canónica de GitHub Actions (`templates/ci-release-job.yml` o en documentación) que demuestre:
-     - Desacople idempotente de estados (`tag_exists` y `release_exists` evaluados independientemente).
-     - Flag `--latest` en `gh release create`.
-     - Concurrency seguro (`cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`).
-  3. Tests unitarios en `tests/` para `extract-release-notes.mjs`.
-- **Out-of-Scope:**
-  - Modificar la infraestructura de CI de proyectos externos de forma automática.
-
-**Criterios de Aceptación:**
-- [x] #1 scripts/extract-release-notes.mjs extrae título y cuerpo correctamente desde backlog/releases.json y docs/RELEASE_NOTES.md.
-- [x] #2 El script genera release-title.txt y release-notes.txt normalizando CRLF y respetando la regla Anti-Em-Dash.
-- [x] #3 Tests unitarios en tests/ cubren ambos formatos de extracción y fallbacks.
-- [x] #4 La plantilla de CI con los guardrails de idempotencia y --latest queda documentada en el Playbook.
-- [x] #5 npm run check:all pasa con código 0.
-
----
-
-### ✅ Done / Deployed (54)
+### ✅ Done / Deployed (65)
 
 #### [PLAY-001] Anatomía de unidad en el motor de reglas: text, ownContent y scopeText
 - **Prioridad**: `high` | **Tipo**: `bug`
@@ -1349,6 +1188,106 @@ Garantizar:
 
 ---
 
+#### [PLAY-057] Erradicacion definitiva de copia de scripts en consumidores y comandos CLI agnosticos en skills
+- **Prioridad**: `high` | **Tipo**: `bug`
+
+### Problem Statement
+A pesar de la arquitectura Zero-Clutter introducida en `PLAY-041`, persiste un defecto estructural en `scripts/sync-playbook.mjs` al calcular `isConsumerPackage`: cuando un repositorio consumidor ejecuta `playbook sync` contra el repositorio remoto de GitHub o mediante `--source <dir>`, `shouldDefaultToLocalBundle` resulta `false` y el sincronizador **vuelve a copiar los 19 scripts internos del framework (`scripts/*.mjs`, `scripts/lib/*.mjs`, `scripts/audit-ux-code.cjs`, `scripts/ux-rules.json`) dentro de la carpeta `scripts/` del consumidor**, generando archivos duplicados y código muerto que no le pertenecen al proyecto.
+
+Adicionalmente, las skills canónicas (`.agents/skills/*/SKILL.md`, `.agents/TEAM_PLAYBOOK.md`, `.agents/STATE_MACHINE.md`) continúan instruyendo al agente a ejecutar rutas locales como `node scripts/gate-qa.mjs <ID>` o `node scripts/audit-ux-code.cjs --strict`, lo cual falla en cualquier consumidor Zero-Clutter donde `scripts/` fue erradicado.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Forzar `packageMode: true` en `scripts/sync-playbook.mjs` siempre que el repositorio destino (`targetDir`) no sea el propio repositorio fuente de `@gripm/playbook` (`targetDir !== packageBundleRoot` y no contenga `.playbook-manifest.json` con `"name": "@gripm/playbook"`), independientemente de si el sync proviene de paquete local, `--source` o GitHub remoto (salvo cuando el usuario pase explícitamente `--install-scripts`).
+  2. Ejecutar `pruneLegacyScripts` en todo consumidor (remoto o `--source`) para eliminar automáticamente cualquier copia previa de los 19 scripts del Playbook y limpiar sus entradas de `.gripm/playbook-lock.json`.
+  3. Actualizar todas las skills canónicas (`pm-orchestrator`, `principal-engineer`, `qa-auditor`, `code-level-ux-auditor`), `STATE_MACHINE.md` y `TEAM_PLAYBOOK.md` para invocar los binarios CLI del paquete (`npx playbook gate <ID>` / `npm run gate:qa -- <ID>`, `npx playbook audit --strict`, `npx playbook check-loc`, `npx playbook audit-repo`) en lugar de rutas `node scripts/...`.
+- **Out-of-Scope:**
+  - Modificar la lógica interna del parser UX o las reglas de negocio de las compuertas.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/sync-playbook.mjs` activa `packageMode: true` (excluyendo `scripts/*` del plan de instalación) para todo repositorio consumidor (`targetDir` distinto de la raíz del repositorio `@gripm/playbook`), tanto en modo paquete local como con `--source` o remoto desde GitHub, salvo que se indique explícitamente `--install-scripts`.
+- [x] #2 Al sincronizar un consumidor que tenía scripts copiados en `.gripm/playbook-lock.json` (como `@gripm/board`), `pruneLegacyScripts` elimina los 19 scripts clonados de `scripts/` y `scripts/lib/` sin dejar archivos huérfanos ni directorios vacíos.
+- [x] #3 Todas las referencias operativas en `.agents/skills/*/SKILL.md`, `.agents/STATE_MACHINE.md` y `.agents/TEAM_PLAYBOOK.md` priorizan los comandos del binario CLI (`npx playbook gate`, `npx playbook audit`, `npx playbook check-loc`, `npx playbook audit-repo`) eliminando la dependencia de archivos `scripts/*.mjs` copiados en el consumidor.
+- [x] #4 `tests/sync.test.mjs` y `tests/package-portability.test.mjs` incluyen casos de prueba que verifican que `runPlaybookSync` con `--source` y remoto sobre un consumidor nunca copia `scripts/` y poda copias legadas existentes.
+- [x] #5 `npm run check:all` (`validate`, `check:loc`, `test`) pasa con código 0.
+
+---
+
+#### [PLAY-058] Modularidad total en init y sync: gobernanza opcional, presets de rigor y modo manual
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+El flujo actual de `playbook init` y `playbook sync` (`PLAY-051`) permite elegir skills de `.agents/skills/` y plantillas de `docs/`, pero sigue imponiendo de forma rígida:
+1. La instalación obligatoria de `.agents/TEAM_PLAYBOOK.md`, `.agents/STATE_MACHINE.md` y `.agents/rules/git-workflow.md` incluso si el usuario solo desea instalar una skill puntual (ej. `code-level-ux-auditor` o `principal-engineer`).
+2. Un único nivel de rigor en la auditoría estática (`ux-rules.json` y `gate-qa.mjs`) donde preferencias estilísticas y editoriales (`UX-011` escala tipográfica, `UX-014` anti-em-dash) bloquean al mismo nivel que defectos críticos de accesibilidad o roturas de teclados móviles.
+3. Falta de una opción explícita en la personalización para usuarios avanzados que deseen operar las transiciones de forma manual versus el modo automatizado por defecto.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Extender `scripts/lib/selection.mjs`, `scripts/lib/sync-classifier.mjs` (`planFiles`), `scripts/init.mjs` y `scripts/sync-playbook.mjs` con la dimensión `rules` (`team-playbook`, `state-machine`, `git-workflow`) seleccionable en modo `custom` y mediante flag `--rules <list|all|none>`, con auto-poda si se desmarca.
+  2. Incorporar soporte de **Presets de Rigor** (`preset: "pragmatic" | "strict" | "dogmatic"`) y **Modo de Automatización** (`automation: "automated" | "manual-override"`) en `.gripm/config.json` y `.gripm/.uxaudit.json`:
+     - `pragmatic`: Activa por defecto solo reglas deterministas críticas de ingeniería y accesibilidad (excluyendo bloqueos estilísticos como `UX-011`, `UX-012`, `UX-013`, `UX-014`).
+     - `strict`: Activa el catálogo completo de ergonomía, LOC (< 1000) y anti-slop.
+  3. Soportar flags CLI no interactivas (`--preset <pragmatic|strict>`, `--rules <list>`) para integración directa desde `@gripm/board` sin doble interrogatorio.
+- **Out-of-Scope:**
+  - Crear reglas nuevas en `ux-rules.json`.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/lib/selection.mjs` y `planFiles` en `scripts/lib/sync-classifier.mjs` soportan la selección granular de artefactos de gobernanza (`team-playbook`, `state-machine`, `git-workflow`) vía modo interactivo `custom` y flag `--rules <lista|all|none>`, persistiendo la elección en `.gripm/playbook-lock.json` y podando archivos desmarcados.
+- [x] #2 `scripts/audit-ux-code.cjs` y `scripts/gate-qa.mjs` respetan el preset configurado en `.gripm/config.json` o `.gripm/.uxaudit.json` (`pragmatic` vs `strict`), evitando bloqueos por reglas estilísticas (`UX-011`, `UX-014`) cuando el proyecto opera en perfil `pragmatic`.
+- [x] #3 `scripts/init.mjs` permite configurar el nivel de rigor (`pragmatic` vs `strict`) y el modo de operación (100% automatizado con excepciones humanas vs manual), exponiendo flags no interactivas (`--preset`, `--rules`) para consumo programático desde `gripm --init`.
+- [x] #4 Suite de pruebas en `tests/selection.test.mjs` y `tests/audit-ux.test.mjs` validando el filtrado de `rules`, la auto-poda y el comportamiento de los presets `pragmatic` y `strict`.
+- [x] #5 `npm run check:all` pasa con código 0.
+
+---
+
+#### [PLAY-059] Descomposicion modular de scripts/audit-ux-code.cjs bajo el techo de 1000 LOC
+- **Prioridad**: `high` | **Tipo**: `refactor`
+
+### Problem Statement
+El repositorio `@gripm/playbook` establece como regla innegociable que ningún archivo de código fuente debe alcanzar o superar las 1000 líneas de código (`check-loc.mjs`). Sin embargo, `scripts/audit-ux-code.cjs` cuenta actualmente con **1.441 líneas**, concentrando en un único archivo monolítico el CLI parser, el cargador de catálogos y baselines, el motor heurístico de unidades JSX/AST y el formateador de reportes.
+
+Para predicar con el ejemplo y mantener un Health Score de **100/100** con `check:loc:strict` en verde, es obligatorio descomponer `scripts/audit-ux-code.cjs` en módulos cohesivos.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Extraer la lógica de parseo de unidades JSX, expresiones e internacionalización (`collectUnits`, `stripExpressions`, `findTagEnd`, jerarquía de componentes) a `scripts/lib/ux-jsx-parser.cjs`.
+  2. Extraer la carga de configuración, catálogos de reglas (canónicas y locales), compilación de globs `exclude` y gestión de snapshots `audit-ux-baseline.json` a `scripts/lib/ux-catalog.cjs`.
+  3. Mantener intacta la interfaz pública programática (`const { auditProject } = require('./audit-ux-code.cjs')`) y todos los flags de CLI.
+  4. Actualizar `.playbook-manifest.json` y `FALLBACK_CORE_FILES` si corresponde para empaquetar los submódulos en el tarball de npm.
+- **Out-of-Scope:**
+  - Alterar la semántica de detección de las reglas `UX-001` a `UX-015`.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/audit-ux-code.cjs` y cada uno de sus submódulos extraídos (`scripts/lib/ux-*.cjs`) se mantienen estrictamente por debajo de las 650 líneas de código (cumpliendo con creces el techo de < 1000 LOC).
+- [x] #2 `node scripts/check-loc.mjs --strict` y `node scripts/audit-engine.mjs --strict` sobre el repositorio `@gripm/playbook` reportan **0 violaciones de LOC** y un **Health Score de 100/100**.
+- [x] #3 La API exportada (`auditProject`, `loadRules`, etc.) y el comportamiento CLI de `scripts/audit-ux-code.cjs` conservan 100% de retrocompatibilidad.
+- [x] #4 `npm test` (incluyendo los 13 archivos de test y todas las fixtures de `audit-ux.test.mjs`) y `npm run validate` pasan con código 0.
+
+---
+
+#### [PLAY-060] Evitar que gate-qa adopte .agents globales como raiz de proyecto
+- **Prioridad**: `high` | **Tipo**: `bug`
+
+Al ejecutar `gate-qa` con una ruta de tarea temporal, la resolucion de raiz puede ascender hasta el perfil del usuario e interpretar su `.agents/` global como raiz del proyecto. `checkStructuralHealth` entonces inspecciona archivos ajenos al repositorio, supera el limite de salida de `spawnSync` (`ENOBUFS`) y hace fallar pruebas e2e.
+
+### Alcance
+- Tratar `.agents/` solo como marcador de proyecto cuando contiene artefactos canónicos de gobernanza; reconocer también marcadores inequívocos como `.git`, `package.json`, `.playbook-manifest.json`, `AGENTS.md` o `backlog/tasks/`.
+- Si una ruta explícita de tarea no tiene una raíz de proyecto reconocible en sus ancestros, usar el directorio de esa tarea como raíz de fallback.
+- Añadir una regresión CLI que demuestre que artefactos en un ancestro con `.agents/` no contaminan la inspección de la tarea aislada.
+
+### Fuera de alcance
+- Cambiar reglas del auditor, la pirámide de verificación o el gate de certificación.
+
+**Criterios de Aceptación:**
+- [x] #1 La resolución de una ruta explícita reconoce raíces con marcadores de proyecto verificables y no considera suficiente un `.agents/` genérico de un ancestro.
+- [x] #2 Si no existe un marcador de proyecto, `gate-qa` usa el directorio de la tarea como raíz y no inspecciona artefactos de sus directorios padre.
+- [x] #3 Una prueba CLI con un ancestro que contiene `.agents/` y una supresión fuera del directorio de la tarea devuelve el resultado esperado para la tarea aislada, sin `ENOBUFS`.
+- [x] #4 Los casos existentes de resolución por ID, paquetes consumidores y `--root` conservan su comportamiento.
+- [x] #5 `npm run check:all` termina con código 0.
+
+---
+
 #### [PLAY-061] Alinear el gate estructural con strict y los cambios de la tarea
 - **Prioridad**: `high` | **Tipo**: `bug`
 
@@ -1375,6 +1314,203 @@ El gate de QA bloquea la certificación de tareas por violaciones de LOC y supre
 - [x] #3 `--strict` bloquea por hallazgos estructurales preexistentes en cualquier parte del repositorio.
 - [x] #4 `--force` conserva el bypass explícito y reporta que los hallazgos se omitieron.
 - [x] #5 Las pruebas enfocadas de gate y `npm run check:all` terminan con código 0.
+
+---
+
+#### [PLAY-063] Skill canónica release-management y protocolo formal de entrega en Playbook
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+El flujo ágil de entrega en Playbook define formalmente: `draft` ➔ `doing` ➔ `review` ➔ `ready` ➔ `Release Management` ➔ `done`. Sin embargo, Playbook cuenta con skills para PM, UX, Dev y QA, pero carecía de una skill canónica para `release-management`. Esto provocó que proyectos consumidores (como DOM) crearan skills ad-hoc o que Gripm dispersara sus reglas en AGENTS.md.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Crear la skill canónica `.agents/skills/release-management/SKILL.md` en `@gripm/playbook`.
+  2. Definir el protocolo universal de release en 6 fases:
+     - Fase 0: Auditoría pre-corte (`git log main..dev`, diff stat, cero ramas sucias).
+     - Fase 1: Quality Gate previo (Pirámide de Verificación completa pasando en verde).
+     - Fase 2: Determinación objetiva SemVer 2.0 (Major, Minor, Patch).
+     - Fase 3: Consolidación de notas 100% User-Facing (cero IDs internos `DEV-XXX`/`SPEC-XXX`, regla Anti-Em-Dash `-`).
+     - Fase 4: Protocolo Git canónico (`dev` ➔ `main` ➔ `dev`) con confirmación verbal explícita para commit y push.
+     - Fase 5: Invocación del Deploy Hook del proyecto (npm publish, script de hosting, o deploy cloud) que justifica la transición de estado.
+     - Fase 6: Reconciliación post-deploy en Backlog (`ready` ➔ `done` con `releasedAt: vX.Y.Z`).
+  3. Actualizar `TEAM_PLAYBOOK.md` y `STATE_MACHINE.md` para referenciar formalmente a `release-management` como el rol/skill ejecutor de la transición `ready` ➔ `done`.
+  4. Incluir `release-management` en el manifiesto de sincronización (`.playbook-manifest.json`, `selection.mjs`) para que se distribuya a los proyectos consumidores vía `playbook sync` / `playbook init`.
+- **Out-of-Scope:**
+  - Comandos de despliegue específicos de proyectos individuales (cada consumidor define su propio hook).
+
+**Criterios de Aceptación:**
+- [x] #1 .agents/skills/release-management/SKILL.md existe en @gripm/playbook con las 6 fases universales y guardrails de calidad documentados.
+- [x] #2 TEAM_PLAYBOOK.md y STATE_MACHINE.md documentan formalmente la skill release-management como dueña de la transición ready -> done.
+- [x] #3 .playbook-manifest.json y los scripts de distribución (selection.mjs, init.mjs) incluyen la skill release-management.
+- [x] #4 Los checks de calidad del playbook (npm run check:all) pasan en verde (0 errores de lint, tests y LOC).
+
+---
+
+#### [PLAY-064] Utilidad agnóstica de extracción de release notes y plantilla CI de release idempotente
+- **Prioridad**: `medium` | **Tipo**: `feature`
+
+### Problem Statement
+Los workflows de CI/CD de proyectos que usan Playbook suelen sufrir de fragilidad en la fase de release: scripts inline de bash/node para extraer notas, acoplamiento donde un fallo en GitHub Release impide reintentos, y falta de marcadores `--latest`.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  1. Crear el script utilitario agnóstico `scripts/extract-release-notes.mjs` distribuible vía Playbook:
+     - Capaz de extraer notas y título tanto desde `backlog/releases.json` (formato Gripm Board) como desde `docs/RELEASE_NOTES.md` (formato Markdown plano).
+     - Genera `release-title.txt` y `release-notes.txt` de forma limpia y testeable localmente.
+     - Aplica validación Anti-Em-Dash (reemplazando o alertando ante caracteres unicode em-dash o en-dash).
+  2. Proveer una receta o plantilla canónica de GitHub Actions (`templates/ci-release-job.yml` o en documentación) que demuestre:
+     - Desacople idempotente de estados (`tag_exists` y `release_exists` evaluados independientemente).
+     - Flag `--latest` en `gh release create`.
+     - Concurrency seguro (`cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`).
+  3. Tests unitarios en `tests/` para `extract-release-notes.mjs`.
+- **Out-of-Scope:**
+  - Modificar la infraestructura de CI de proyectos externos de forma automática.
+
+**Criterios de Aceptación:**
+- [x] #1 scripts/extract-release-notes.mjs extrae título y cuerpo correctamente desde backlog/releases.json y docs/RELEASE_NOTES.md.
+- [x] #2 El script genera release-title.txt y release-notes.txt normalizando CRLF y respetando la regla Anti-Em-Dash.
+- [x] #3 Tests unitarios en tests/ cubren ambos formatos de extracción y fallbacks.
+- [x] #4 La plantilla de CI con los guardrails de idempotencia y --latest queda documentada en el Playbook.
+- [x] #5 npm run check:all pasa con código 0.
+
+---
+
+#### [PLAY-065] Reglas estáticas UX-016 y UX-017 de diálogos bloqueantes y backdrop-blur en modales
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+Los desarrolladores y agentes de IA introducen patrones problemáticos en interfaces web y móviles que degradan la experiencia de usuario o quiebran la composición de GPU:
+1. Diálogos nativos bloqueantes (`window.confirm()`, `window.alert()`, `window.prompt()` o llamadas no cualificadas en UI): congelan el event loop de JavaScript, bloquean animaciones, Service Workers y composición de layout, rompiendo la experiencia de app nativa en PWAs y violando accesibilidad WCAG.
+2. Anti-patrón de `backdrop-blur` con fondos de opacidad reducida (`bg-*/80`, `bg-*/90`, `bg-*/95`, `bg-opacity-`, `bg-black/`, `bg-white/`) en modales, sheets o dialogs: quiebra la separación de capas del compositor de hardware en WebKit (iOS Safari) y Chromium (Android), volviendo el modal translúcido, provocando parpadeos negros o disparando el consumo de memoria GPU.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Agregar la regla `UX-016` ("Blocking native dialog in UI code") en `scripts/ux-rules.json` con severidad `WARNING` (o `ERROR` con `--strict`), excluyendo tests y fixtures.
+  - Agregar la regla `UX-017` ("Mobile modal backdrop-blur compositor collision") en `scripts/ux-rules.json` con severidad `WARNING`, detectando `backdrop-blur` combinado con opacidad reducida en modales/dialogs/sheets.
+  - Actualizar el catálogo canónico en `.agents/skills/code-level-ux-auditor/SKILL.md`.
+  - Crear tests unitarios en `tests/audit-ux.test.mjs` para verificar la detección y los casos de exclusión/falsos positivos.
+- **Out-of-Scope:**
+  - Modificar el parser AST central de JSX (`scripts/lib/ux-jsx-parser.cjs`) salvo que se requiera soporte adicional de matcher.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/ux-rules.json` define la regla `UX-016` que detecta `window.confirm(`, `window.alert(`, `window.prompt(`, `confirm(`, `alert(`, `prompt(` en archivos de UI, sugiriendo AlertDialogs accesibles.
+- [x] #2 `scripts/ux-rules.json` define la regla `UX-017` que detecta combinaciones de `backdrop-blur` con fondos de opacidad reducida (`bg-*/95`, `bg-*/90`, etc.) en modales y sheets móviles.
+- [x] #3 `.agents/skills/code-level-ux-auditor/SKILL.md` documenta formalmente `UX-016` y `UX-017` con firma, impacto y corrección recomendada.
+- [x] #4 `tests/audit-ux.test.mjs` incluye casos de prueba específicos para `UX-016` y `UX-017`, validando detección positiva y ausencia de falsos positivos en código limpio.
+- [x] #5 La suite completa `npm test` en `gripm-playbook` pasa al 100%.
+
+---
+
+#### [PLAY-066] Compuerta preventiva de presupuesto de archivo LOC en gate-qa submit T1
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+Actualmente, `scripts/gate-qa.mjs` en la transición T1 (`submit`, `doing` ➔ `review`) solo verifica frontmatter básico y ACs completos. Los archivos fuente monolíticos (>= 1.000 LOC) o que superan la zona de advertencia de modularidad solo se evalúan en la certificación final T2 (`gate-qa` review ➔ ready). Esto permite que el desarrollador o agente promueva código con deuda modular crítica a `review`, obligando a rechazarlo tardíamente en QA en lugar de frenarlo preventivamente en el submit.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Integrar la verificación de presupuesto de archivos en `scripts/gate-qa.mjs submitMain` sobre los archivos modificados o creados en el diff actual (`git diff HEAD`).
+  - Advertir preventivamente si algún archivo modificado se encuentra en la zona de advertencia (>= 800 LOC).
+  - Rechazar mecánicamente la transición a `review` (exit 1) si algún archivo de código fuente modificado o creado alcanza o supera el techo duro de 1.000 LOC, obligando a modularizar antes de someter a QA.
+  - Soportar bypass explícito vía `--force` reservado para la autoridad del PO.
+  - Tests unitarios en `tests/gate-qa.test.mjs`.
+- **Out-of-Scope:**
+  - Modificar el comportamiento de `check-loc.mjs` standalone o alterar `DEFAULT_MAX_LINES`.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/gate-qa.mjs submit` evalúa los archivos modificados/creados respecto a HEAD mediante el motor de salud estructural / `check-loc`.
+- [x] #2 Si un archivo modificado o creado supera las 1.000 LOC, `gate-qa submit` aborta con código 1 y mensaje explicativo de modularidad requerida.
+- [x] #3 Si un archivo modificado o creado supera 800 LOC pero está bajo 1.000 LOC, emite una advertencia de proximidad al límite sin bloquear la transición.
+- [x] #4 `--force` permite omitir el bloqueo de LOC bajo responsabilidad del PO emitiendo una advertencia formal.
+- [x] #5 Tests en `tests/gate-qa.test.mjs` validan el bloqueo en >= 1.000 LOC y la advertencia en >= 800 LOC.
+- [x] #6 `npm test` pasa sin regresiones.
+
+---
+
+#### [PLAY-067] Ajustes conceptuales en skills foco virtual keyboard y empty array invariant
+- **Prioridad**: `medium` | **Tipo**: `enhancement`
+
+### Problem Statement
+Tres lecciones críticas aprendidas en producción real en arquitecturas móviles y offline-first requieren formalizarse en las skills canónicas del Playbook:
+1. **Robo de foco en modales:** Efectos `useEffect` que gestionan el autofocus inicial dependiendo de `isDirty` o callbacks mutables provocan que al tipear el primer carácter el foco sea devuelto al inicio o seleccione todo el texto.
+2. **Colisión de teclados virtuales:** Vistas o modales con teclados táctiles in-app (numpads de montos, PIN, OTP) que no configuran `inputMode="none"` y `readOnly` provocan que el teclado virtual del SO se superponga y altere el viewport.
+3. **Invariante offline/cloud "Empty Array != Fallback":** En clientes locales o cachés offline (Supabase, Dexie, IndexedDB), cuando el servidor responde HTTP 200 con `[]`, representa el estado canónico de la colección vacía. Tratar `[]` como ausencia de datos resucita registros zombis previamente eliminados.
+4. **Erradicación del antipatrón de retro:** Eliminar de `pm-orchestrator` y `TEAM_PLAYBOOK.md` la orden de "actualizar gotchas en AGENTS.md", sustituyéndola por la política de progressive disclosure en 4 capas.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Actualizar `.agents/skills/code-level-ux-auditor/SKILL.md` con la sección de aislamiento del ciclo de vida del foco y colisión de teclados virtuales.
+  - Actualizar `.agents/skills/principal-engineer/SKILL.md` incorporando la invariante "Empty Array != Fallback" en la sección de estado remoto y caché.
+  - Actualizar `.agents/skills/pm-orchestrator/SKILL.md` y `.agents/TEAM_PLAYBOOK.md` erradicando la orden de agregar gotchas al archivo raíz.
+- **Out-of-Scope:**
+  - Alterar contratos de API de código ejecutable.
+
+**Criterios de Aceptación:**
+- [x] #1 `code-level-ux-auditor/SKILL.md` documenta la regla de aislamiento del ciclo de vida del foco en modales (`[open]` exclusivo).
+- [x] #2 `code-level-ux-auditor/SKILL.md` documenta la recomendación de `inputMode="none"` y `readOnly` para inputs gobernados por teclados táctiles in-app.
+- [x] #3 `principal-engineer/SKILL.md` documenta la invariante "Empty Array != Fallback" para evitar resucitación de zombis en caché.
+- [x] #4 `pm-orchestrator/SKILL.md` y `TEAM_PLAYBOOK.md` reemplazan la instrucción de gotchas en AGENTS.md por la derivación a tests, `.agents/rules/` o skills.
+- [x] #5 `npm run validate` y tests pasan exitosamente.
+
+---
+
+#### [PLAY-068] Guia de adopcion anti-bloat y arquitectura de progressive disclosure en 4 capas
+- **Prioridad**: `medium` | **Tipo**: `enhancement`
+
+### Problem Statement
+Los proyectos que adoptan el Playbook tienden a engordar progresivamente su archivo raíz de instrucciones (`CLAUDE.md` / `AGENTS.md`) con decenas de micro-guardarraíles cada vez que surge un bug o post-mortem. Esto provoca context window bloat, degrada la atención de los modelos y diluye los invariantes principales.
+Es necesario documentar formalmente la **Arquitectura en 4 Capas de Conocimiento Agéntico** (Progressive Disclosure) en el README y la guía de adopción, brindando lineamientos claros para mantener el archivo raíz en ~100-150 líneas.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Agregar sección en `README.md` explicando la Arquitectura en 4 Capas y la gobernanza anti-bloat de prompts.
+  - Actualizar `.agents/TEAM_PLAYBOOK.md` detallando dónde debe residir cada tipo de conocimiento (router raíz, validaciones mecánicas, reglas de negocio en `.agents/rules/`, y protocolos en skills).
+  - Preservar las pruebas de coherencia documental `manifest ⇄ documentation` en verde.
+- **Out-of-Scope:**
+  - Modificar scripts CLI.
+
+**Criterios de Aceptación:**
+- [x] #1 `README.md` incorpora la sección de Gobernanza Anti-Bloat y la pirámide de 4 capas de conocimiento (router, verificaciones mecánicas, reglas de dominio, skills de rol).
+- [x] #2 `.agents/TEAM_PLAYBOOK.md` formaliza los lineamientos de tamaño y responsabilidades para `AGENTS.md` / `CLAUDE.md` (< 150 LOC).
+- [x] #3 `npm run validate` valida la coherencia documental sin errores.
+
+---
+
+#### [PLAY-069] Capa de integracion headless y guardarrail anti-hanging en qa-auditor
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+Durante la ejecución de tareas por agentes autónomos y subagentes en entornos de terminal CLI o CI:
+1. **Salto falso a navegadores reales (Playwright):** Ante cualquier interacción de UI (modales, masking de inputs, selectors, formularios), los agentes tienden a asumir que los unit tests son insuficientes y recurren a suites completas de browser o `browser_subagent`. Esto provoca bloqueos indeterminados en terminales no interactivas (timeouts de 120s, colisiones de webservers locales en puertos ocupados, procesos zombis), quemando turnos y tokens.
+2. **Vacío conceptual entre Unit y Browser Tests:** Es indispensable explicitar que el 95% de la interactividad de UI se certifica de forma determinista y en milisegundos mediante **tests headless de componentes e integración** (`.test.tsx` con React Testing Library / `renderHook` / JSDOM), reservando el browser real exclusivamente para aspectos visuales o de layout no deducibles estáticamente.
+3. **Timeout excesivo en el runner del gate (`scripts/lib/pyramid.mjs`):** El timeout por paso en `spawnSync` está prefijado en 10 minutos (600s), permitiendo que procesos congelados mantengan colgada la sesión del agente.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Actualizar `.agents/skills/qa-auditor/SKILL.md`:
+    - Formalizar el Paso 2 de la Pirámide de Verificación como `Headless tests (Unit & Component Integration)`.
+    - Documentar la directiva operativa de Component Integration Headless (modales, masking, estado y stores deben validarse en headless tests; si pasan, se descarta browser real para estado).
+    - Incorporar el Guardarraíl Anti-Hanging (timeouts <= 15s por test, flags headless/no-watch forzados, prevención de procesos zombis y servidores dev colgados).
+  - Actualizar `.agents/skills/principal-engineer/SKILL.md`:
+    - Incorporar el estándar de integración headless (`.test.tsx`) para componentes interactivos antes de someter a review.
+    - Exigir timeouts acotados y limpieza determinista de procesos/puertos.
+  - Actualizar `scripts/lib/pyramid.mjs`:
+    - Reducir el timeout de seguridad de cada paso de 10 minutos a 2 minutos (`120_000 ms`), con soporte de override vía opciones.
+    - Manejar el error de timeout de forma descriptiva indicando anti-hanging guardrail.
+  - Actualizar `scripts/validate-repo.mjs`:
+    - Incorporar el alias `'headless tests (unit & component integration)': 'test'` en `PYRAMID_ALIASES`.
+  - Crear tests unitarios en `tests/` para verificar el alias de la pirámide y el timeout de `pyramid.mjs`.
+- **Out-of-Scope:**
+  - Cambiar dependencias externas o forzar librerías de testing específicas en proyectos consumidores.
+
+**Criterios de Aceptación:**
+- [x] #1 `.agents/skills/qa-auditor/SKILL.md` actualiza la Pirámide de Verificación formalizando el Paso 2 como `Headless tests (Unit & Component Integration)` y documenta la directiva operativa que prohíbe delegar lógica de interacción/estado a navegadores reales.
+- [x] #2 `.agents/skills/qa-auditor/SKILL.md` documenta las reglas del Guardarraíl Anti-Hanging (timeouts <= 15s por test, flags headless forzados, y prevención de servidores dev zombis).
+- [x] #3 `.agents/skills/principal-engineer/SKILL.md` documenta la exigencia de tests headless de componentes e stores (`.test.tsx` / RTL) para flujos interactivos y la disciplina de timeouts acotados.
+- [x] #4 `scripts/lib/pyramid.mjs` acota el timeout por paso a 2 minutos por defecto (configurable vía options) e identifica con claridad errores de timeout.
+- [x] #5 `scripts/validate-repo.mjs` reconoce `'headless tests (unit & component integration)'` en `PYRAMID_ALIASES` y `npm run validate` pasa con código 0.
+- [x] #6 La suite de tests de `gripm-playbook` (`tests/gate-qa.test.mjs`, `tests/validate-repo.test.mjs`) pasa al 100%.
 
 ---
 

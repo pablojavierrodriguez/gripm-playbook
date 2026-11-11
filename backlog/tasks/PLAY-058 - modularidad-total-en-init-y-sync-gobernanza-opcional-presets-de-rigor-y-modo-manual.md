@@ -1,9 +1,9 @@
 ---
 id: PLAY-058
 title: "Modularidad total en init y sync: gobernanza opcional, presets de rigor y modo manual"
-status: ready
+status: done
 created_date: '2026-11-02'
-updated_date: '2026-11-03'
+updated_date: '2026-11-10'
 labels:
   - "cli"
   - "onboarding"

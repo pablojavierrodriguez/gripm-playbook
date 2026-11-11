@@ -1,10 +1,10 @@
 ---
 id: PLAY-068
 title: "Guia de adopcion anti-bloat y arquitectura de progressive disclosure en 4 capas"
-status: ready
+status: done
 claimed_by: "antigravity:47712f98-dbb2-45cf-8f50-02a1d15f0cf9"
 created_date: '2026-11-09'
-updated_date: '2026-11-09'
+updated_date: '2026-11-10'
 labels: ["docs", "playbook", "governance"]
 dependencies: []
 priority: medium

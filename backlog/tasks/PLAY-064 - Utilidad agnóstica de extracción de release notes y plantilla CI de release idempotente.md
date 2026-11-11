@@ -1,9 +1,9 @@
 ---
 id: PLAY-064
 title: "Utilidad agnóstica de extracción de release notes y plantilla CI de release idempotente"
-status: ready
+status: done
 created_date: '2026-11-08'
-updated_date: '2026-11-08'
+updated_date: '2026-11-10'
 labels: []
 dependencies: []
 priority: medium

@@ -1,10 +1,10 @@
 ---
 id: PLAY-066
 title: "Compuerta preventiva de presupuesto de archivo LOC en gate-qa submit T1"
-status: ready
+status: done
 claimed_by: "antigravity:47712f98-dbb2-45cf-8f50-02a1d15f0cf9"
 created_date: '2026-11-09'
-updated_date: '2026-11-09'
+updated_date: '2026-11-10'
 labels: ["gate", "modularity", "loc"]
 dependencies: []
 priority: high

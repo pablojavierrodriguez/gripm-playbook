@@ -1,9 +1,9 @@
 ---
 id: PLAY-065
 title: "Reglas estáticas UX-016 y UX-017 de diálogos bloqueantes y backdrop-blur en modales"
-status: ready
+status: done
 created_date: '2026-11-09'
-updated_date: '2026-11-09'
+updated_date: '2026-11-10'
 labels: ["ux", "linter", "rules"]
 dependencies: []
 priority: high

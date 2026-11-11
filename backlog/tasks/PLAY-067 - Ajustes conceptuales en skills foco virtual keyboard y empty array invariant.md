@@ -1,10 +1,10 @@
 ---
 id: PLAY-067
 title: "Ajustes conceptuales en skills foco virtual keyboard y empty array invariant"
-status: ready
+status: done
 claimed_by: "antigravity:47712f98-dbb2-45cf-8f50-02a1d15f0cf9"
 created_date: '2026-11-09'
-updated_date: '2026-11-09'
+updated_date: '2026-11-10'
 labels: ["skills", "ux", "architecture"]
 dependencies: []
 priority: medium

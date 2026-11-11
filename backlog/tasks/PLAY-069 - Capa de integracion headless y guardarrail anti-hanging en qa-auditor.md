@@ -1,9 +1,9 @@
 ---
 id: PLAY-069
 title: "Capa de integracion headless y guardarrail anti-hanging en qa-auditor"
-status: ready
+status: done
 created_date: '2026-11-09'
-updated_date: '2026-11-09'
+updated_date: '2026-11-10'
 labels: ["qa", "testing", "skills", "pyramid"]
 dependencies: []
 priority: high

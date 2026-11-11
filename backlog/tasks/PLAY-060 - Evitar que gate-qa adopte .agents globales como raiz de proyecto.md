@@ -1,9 +1,9 @@
 ---
 id: PLAY-060
 title: "Evitar que gate-qa adopte .agents globales como raiz de proyecto"
-status: ready
+status: done
 created_date: '2026-11-03'
-updated_date: '2026-11-03'
+updated_date: '2026-11-10'
 labels:
   - "cli"
   - "qa"

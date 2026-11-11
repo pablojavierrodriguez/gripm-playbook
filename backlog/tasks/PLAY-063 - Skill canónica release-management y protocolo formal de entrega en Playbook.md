@@ -1,9 +1,9 @@
 ---
 id: PLAY-063
 title: "Skill canónica release-management y protocolo formal de entrega en Playbook"
-status: ready
+status: done
 created_date: '2026-11-08'
-updated_date: '2026-11-08'
+updated_date: '2026-11-10'
 labels: []
 dependencies: []
 priority: high
