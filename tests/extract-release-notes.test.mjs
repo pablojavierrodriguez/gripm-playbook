@@ -48,11 +48,16 @@ describe('extract-release-notes unit tests (PLAY-064)', () => {
       const withEnDash = 'Range 10 \u2013 20 items';
       assert.equal(sanitizeAntiEmDash(withEmDash), 'Title - Subtitle and feature - more details');
       assert.equal(sanitizeAntiEmDash(withEnDash), 'Range 10 - 20 items');
+
+      // Preserves markdown bullet lists across newlines without collapsing lines
+      const markdownList = '### Section\n\n- item 1\n- item 2';
+      assert.equal(sanitizeAntiEmDash(markdownList), '### Section\n\n- item 1\n- item 2');
     });
 
     test('formatReleaseTitle ensures standard prefix and hyphenation', () => {
       assert.equal(formatReleaseTitle('Performance Boost', '1.2.0'), 'v1.2.0 - Performance Boost');
       assert.equal(formatReleaseTitle('v1.2.0 - Performance Boost', '1.2.0'), 'v1.2.0 - Performance Boost');
+      assert.equal(formatReleaseTitle('[1.2.0] - Performance Boost', '1.2.0'), 'v1.2.0 - Performance Boost');
       assert.equal(formatReleaseTitle('', '1.2.0'), 'v1.2.0');
     });
   });

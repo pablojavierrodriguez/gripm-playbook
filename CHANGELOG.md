@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.10.0] - 2026-11-10 - Release Management Protocol, UX Quality Rules, and Progressive Disclosure
+
+`PLAY-063` · `PLAY-064` · `PLAY-065` · `PLAY-066` · `PLAY-067` · `PLAY-068` · `PLAY-069`
+
+### Added
+
+- **Canonical Release Management Protocol & Delivery Skill** (`PLAY-063`). Standardized the universal 6-phase release lifecycle, objective SemVer 2.0 evaluation, customer-centric release notes formatting, and post-deploy backlog reconciliation (`ready` ➔ `done`).
+- **Agnostic Release Notes Extractor and Reusable CI Template** (`PLAY-064`). Implemented `scripts/extract-release-notes.mjs` with Anti-Em-Dash normalization and multi-format support (`releases.json`, `RELEASE_NOTES.md`, `CHANGELOG.md`), alongside `templates/ci-release-template.yml` providing decoupled, idempotent publish workflows for npm and GitHub Releases.
+- **Static UX Rules for Blocking Dialogs & Modal Blur** (`PLAY-065`). Introduced `UX-016` (detects native blocking dialogs such as `alert`, `confirm`, `prompt` in UI code) and `UX-017` (enforces `backdrop-blur` and proper modal focus containment) in the static UX audit engine.
+- **Preventive File Budget Ceilings in Early State Transitions** (`PLAY-066`). Integrated file line-count budget checks (< 1000 LOC ceiling, >= 500 LOC warning) into `gate-qa submit T1`, catching modularity regressions early during the transition to review.
+- **Headless Component Integration & Anti-Hanging Guardrails in QA** (`PLAY-069`). Enforced execution timeouts (2-minute default) with explicit error diagnostics across Verification Pyramid steps in `gate-qa`, eliminating silent test suite stalls.
+
+### Changed
+
+- **Progressive Disclosure & Anti-Bloat Architecture** (`PLAY-068`). Established a 4-tier progressive disclosure guideline for `AGENTS.md`, decoupling domain rules, security policies, and specialized skills to keep root agent instructions lightweight (< 150 LOC) and prevent LLM prompt bloat.
+- **Ergonomic Directives in Canonical Agent Skills** (`PLAY-067`). Updated `principal-engineer`, `product-designer`, and `qa-auditor` skills with explicit directives for modal focus isolation, virtual keyboard mobile handling, and the empty array initialization invariant (`[]` instead of `undefined`).
+
+---
+
 ## [2.9.1] - 2026-11-04
 
 `PLAY-061`

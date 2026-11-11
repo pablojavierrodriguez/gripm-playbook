@@ -38,6 +38,8 @@ pnpm-debug.log*
 # the audit trail that tells the sync which files carry local modifications.
 .playbook-backups/
 *.tgz
+release-title.txt
+release-notes.txt
 
 # Auditor scratch
 # Neither .uxaudit.json nor audit-ux-baseline.json is ignored on purpose: in a

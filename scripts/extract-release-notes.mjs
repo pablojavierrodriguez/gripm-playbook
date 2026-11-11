@@ -48,9 +48,10 @@ export function normalizeLineEndings(text) {
 export function sanitizeAntiEmDash(text) {
   if (!text) return '';
   return String(text)
-    .replace(/[\u2014\u2013]/g, ' - ')
-    .replace(/\s{2,}-\s{2,}/g, ' - ')
-    .replace(/\s+-\s+/g, ' - ');
+    .replace(/^(\s*)[\u2014\u2013]\s*/gm, '$1- ')
+    .replace(/[ \t]*[\u2014\u2013][ \t]*/g, ' - ')
+    .replace(/[ \t]{2,}-[ \t]{2,}/g, ' - ')
+    .replace(/[ \t]+-[ \t]+/g, ' - ');
 }
 
 /**
@@ -58,7 +59,12 @@ export function sanitizeAntiEmDash(text) {
  */
 export function formatReleaseTitle(rawTitle, version) {
   const normVer = normalizeVersion(version);
-  const clean = sanitizeAntiEmDash(rawTitle || '').trim();
+  let clean = sanitizeAntiEmDash(rawTitle || '').trim();
+
+  // Strip leading brackets if present, e.g. [2.10.0] or [v2.10.0]
+  if (clean.startsWith('[')) {
+    clean = clean.replace(/^\[[vV]?[^\]]+\]\s*(?:-\s*)?/, '').trim();
+  }
 
   if (!clean) {
     return normVer ? `v${normVer}` : 'Release';
