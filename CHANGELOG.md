@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.11.0] - 2026-11-14 - Mobile Occlusion Guardrails, Physical Hit-Testing, and Scoped Backlog Integrity
+
+`PLAY-070` · `PLAY-071` · `PLAY-072` · `PLAY-073`
+
+### Added
+
+- **Static Mobile Occlusion & Stacking Context Rules (`UX-018`, `UX-019`, `UX-020`)** (`PLAY-070`). Added static detection for unportaled fixed overlays trapped in animated stacking contexts, sticky page footers lacking BottomNav offset compensation, and sticky bottom CTAs inside scrollable sheets, with `unlessFileContent` parser support.
+- **Physical Mobile Hit-Testing Verifier (`assertPhysicallyClickable`)** (`PLAY-071`). Added `scripts/lib/physical-hit-test.mjs` validating 375x812 viewport bounds, `::before`/`::after` padding-box coverage, and `elementFromPoint` reachability, along with safe Bottom Sheet focus defaults.
+- **BottomNav Critical Action Reachability Matrix** (`PLAY-072`). Enforced information architecture reachability checks across `pm-orchestrator`, `product-designer`, `qa-auditor`, and `mobile-ux-design` skills so primary mobile actions remain accessible from `BottomNav`.
+
+### Fixed
+
+- **Scoped Duplicate Task ID Detection in `gate-qa`** (`PLAY-073`). Unified duplicate ID classification across `gate-qa` and `task-inspection` to scope blocking checks to active sprints and `--strict` mode while reporting historical duplicates as non-blocking warnings.
+
+---
+
 ## [2.10.0] - 2026-11-10 - Release Management Protocol, UX Quality Rules, and Progressive Disclosure
 
 `PLAY-063` · `PLAY-064` · `PLAY-065` · `PLAY-066` · `PLAY-067` · `PLAY-068` · `PLAY-069`
