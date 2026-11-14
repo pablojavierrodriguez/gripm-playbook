@@ -22,10 +22,10 @@ npx @gripm/playbook init
 ```text
   gripm · Playbook Onboarding
   ✔ Detected stack: react (Next.js + Tailwind + Zod)
-  ✔ Installed 6 core skills + 3 react stack skills (.agents/)
-  ✔ Installed mechanical gates (gate-qa, audit-ux, check-loc)
+  ✔ Installed 7 core skills + 3 react stack skills (.agents/)
+  ✔ Configured package CLI gates (playbook gate, audit, audit-repo, check-loc)
   ✔ Configured native harness adapters (AGENTS.md, CLAUDE.md, .cursor/rules/)
-  ✔ Recorded sha256 baseline in .playbook-lock.json
+  ✔ Recorded sha256 baseline in .gripm/playbook-lock.json
 ```
 
 Keep an existing installation up to date without overwriting local customizations:
@@ -83,7 +83,7 @@ Every work item lives as a plain Markdown file in [`backlog/tasks/`](backlog/tas
 
 - **Canonical statuses:** `ideas`, `draft`, `blocked`, `doing`, `review`, `ready`, `done`, `dismissed`. The backlog is a planning container, never a status value.
 - **Refinement Gate (R1):** Ambiguities, edge cases, empty states, fallbacks, and negative scope are resolved before an item enters `doing`.
-- **Explicit Impediment Tracking:** Moving to `blocked` or `dismissed` requires a non-empty `blocked_reason` or `dismissed_reason`. Unblocking (`gate-qa unblock <ID>`) mechanically verifies that all upstream `dependencies` are `done`.
+- **Explicit Impediment Tracking:** Moving to `blocked` or `dismissed` requires a non-empty `blocked_reason` or `dismissed_reason`. Unblocking (`npx playbook gate unblock <ID>`) mechanically verifies that all upstream `dependencies` are `done`.
 - **Decoupled Releases & Anti-State-Lie Invariant:** Sprints and releases are independent. Releases assemble delivered value from any available `ready` items. An item transitions to `done` exclusively after a verified physical deployment from `main`.
 
 ---
@@ -104,6 +104,7 @@ Enforced by CI (`npm run validate`) to contain zero references to specific frame
 | [`principal-engineer`](.agents/skills/principal-engineer/SKILL.md) | Systems Engineering | Modularity (< 1000 LOC ceiling), minimum viable diff, blast-radius mapping |
 | [`qa-auditor`](.agents/skills/qa-auditor/SKILL.md) | Release Certification | Verification Pyramid execution, blind diff audit, exclusive `review ➔ ready` authority |
 | [`code-level-ux-auditor`](.agents/skills/code-level-ux-auditor/SKILL.md) | Static UX Analysis | 17 declarative AST/source signatures via the zero-dependency `audit-ux` engine |
+| [`release-management`](.agents/skills/release-management/SKILL.md) | Release Lifecycle | 6-phase release protocol, SemVer 2.0 calculation, user-facing notes, `ready ➔ done` reconciliation |
 
 ### Optional Stack Packs
 
@@ -117,15 +118,19 @@ Installed automatically during `init` or on demand via `npx @gripm/playbook sync
 
 ## CLI & Mechanical Gates
 
-All tools run on Node.js (`>= 18`) with zero external runtime dependencies:
+All tools run on Node.js (`>= 18`) with zero external runtime dependencies. Consumer repositories invoke commands directly through `@gripm/playbook` binaries (Zero-Clutter architecture - no copied `scripts/` files in your repo):
 
 | Command | Purpose |
 | :--- | :--- |
 | `npx @gripm/playbook init` | Interactive onboarding wizard, stack detector, and multi-harness adapter generator |
 | `npx @gripm/playbook sync` | Non-destructive updater with sha256 customization tracking and rollback backups |
-| `node scripts/gate-qa.mjs <ID>` | Mechanical transition gate (`start`, `submit`, `unblock`, and `review ➔ ready` certification) |
-| `node scripts/audit-ux-code.cjs` | Static UX auditor (`--strict`, `--format json`, `--rule UX-NNN`, `--update-baseline`) |
-| `node scripts/check-loc.mjs` | Modularity monitor flagging files approaching the 500 LOC warning or 1000 LOC ceiling |
+| `npx playbook gate <ID>` | Mechanical transition gate (`start`, `submit` with preventive LOC check, `unblock`, and `review ➔ ready` certification) |
+| `npx playbook audit` | Static UX & accessibility auditor (`--strict`, `--format json`, `--rule UX-NNN`, `--update-baseline`) |
+| `npx playbook audit-repo` | Multi-stack repository health & anti-slop diagnostic engine (`--strict`, `--format json`, `--quiet`) |
+| `npx playbook check-loc` | Modularity monitor flagging files approaching the 500 LOC warning or 1000 LOC ceiling |
+| `npx playbook commit-msg` | Conventional Commits validator enforcing imperative English commit titles and bodies |
+| `npx playbook extract-notes` | Agnostic release notes extractor (`CHANGELOG.md` / `releases.json`) with Anti-Em-Dash sanitization |
+| `npx playbook review` | CI gate verifying that every task currently in `review` satisfies the executable QA gate |
 
 <details>
 <summary><strong>Non-Destructive Sync & Customization Protection</strong></summary>
@@ -133,9 +138,9 @@ All tools run on Node.js (`>= 18`) with zero external runtime dependencies:
 Upgrading the framework never overwrites human-authored instructions or local skill adaptations:
 
 - **`AGENTS.md` is sacred:** Never overwritten during `sync`, and preserved even when running `init --force`.
-- **Cryptographic lockfile (`.playbook-lock.json`):** Every installed file is fingerprinted with `sha256`. Locally modified files are automatically classified under `customizations` and protected on every subsequent sync.
-- **Reversible updates:** Whenever a canonical file is updated, its previous revision is archived under `.playbook-backups/<ref>/`.
-- **Key flags:** `--dry-run`, `--tag <ref>`, `--stack <name>`, `--adopt` (record current disk state as baseline), `--force`.
+- **Cryptographic lockfile (`.gripm/playbook-lock.json`):** Every installed file is fingerprinted with `sha256`. Locally modified files are automatically classified under `customizations` and protected on every subsequent sync.
+- **Reversible updates:** Whenever a canonical file is updated, its previous revision is archived under `.gripm/backups/<ref>/`.
+- **Key flags:** `--dry-run`, `--tag <ref>`, `--stack <name>`, `--adopt` (record current disk state as baseline), `--force`, `--preset <name>`.
 </details>
 
 <details>
@@ -186,13 +191,13 @@ Gripm Playbook governs any language toolchain through lightweight proxy scripts 
 
 ## The Verification Pyramid
 
-Every change is validated in strict order of execution cost:
+Every change is validated in strict order of execution cost, with a 2-minute anti-hanging timeout enforced per pyramid step:
 
 1. **Static & Type Integrity (`npm run validate`):** Typechecking, link validation, and manifest parity.
-2. **Headless Test Suite (`npm test`):** Fast unit and integration tests with zero browser overhead.
-3. **Spec & Backlog Gate (`npm run gate:review`):** Mechanical verification of acceptance criteria and dependencies.
-4. **File Budget & Modularity (`npm run check:loc`):** Guard against monolithic God-Files (< 1000 LOC).
-5. **Static UX Audit (`npm run audit:ux:strict`):** Automated verification of the 17 UX and accessibility signatures.
+2. **Headless Test Suite (`npm test`):** Fast unit and component integration tests with zero browser overhead.
+3. **Spec & Backlog Gate (`npx playbook review`):** Mechanical verification of acceptance criteria and dependencies (plus preventive LOC budget checks on `submit`).
+4. **File Budget & Modularity (`npx playbook check-loc`):** Guard against monolithic God-Files (< 1000 LOC).
+5. **Static UX Audit (`npx playbook audit --strict`):** Automated verification of the 17 UX and accessibility signatures.
 6. **Production Build (`npm run build`):** Clean compilation verification when applicable.
 
 > [!IMPORTANT]
@@ -236,6 +241,7 @@ When a retrospective identifies a technical gotcha or defect:
 - **[Team Playbook & Role Matrix](.agents/TEAM_PLAYBOOK.md)** - Handoff contracts, sub-agent dispatch rules, and parallel `git worktree` recipes.
 - **[Delivery State Machine](.agents/STATE_MACHINE.md)** - Canonical status vocabulary, transition guards, and production invariants.
 - **[Git Workflow & Concurrency](.agents/rules/git-workflow.md)** - Commit discipline, peer discovery (`claimed_by`), and release ceremony.
+- **[CI Release Template](templates/ci-release-template.yml)** - Reusable idempotent GitHub Actions workflow for npm provenance publish and GitHub Releases.
 - **[Backlog Specification](docs/BACKLOG.md)** - Task frontmatter schema and hygiene rules in `backlog/tasks/`.
 - **[Contributing Guide](CONTRIBUTING.md)** - Repository self-validation (`npm run check:all`), test standards, and rule authoring.
 - **[Gripm Visual Board](https://github.com/pablojavierrodriguez/gripm)** - Optional web companion that renders and manages the same `backlog/tasks/*.md` files in real time.
