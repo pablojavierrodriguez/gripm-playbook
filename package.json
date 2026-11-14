@@ -18,6 +18,7 @@
     ".": "./scripts/sync-playbook.mjs",
     "./audit": "./scripts/audit-ux-code.cjs",
     "./audit-engine": "./scripts/audit-engine.mjs",
+    "./hit-test": "./scripts/lib/physical-hit-test.mjs",
     "./gate": "./scripts/gate-qa.mjs",
     "./check-loc": "./scripts/check-loc.mjs",
     "./validate-commit": "./scripts/validate-commit-msg.mjs",

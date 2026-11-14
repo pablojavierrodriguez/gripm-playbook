@@ -96,6 +96,7 @@ export const FALLBACK_CORE_FILES = [
   'scripts/lib/selection.mjs',
   'scripts/lib/ux-catalog.cjs',
   'scripts/lib/ux-jsx-parser.cjs',
+  'scripts/lib/physical-hit-test.mjs',
   'scripts/extract-release-notes.mjs',
   'templates/ci-release-template.yml',
   'docs/sprints/SPRINT_SPEC_TEMPLATE.md',

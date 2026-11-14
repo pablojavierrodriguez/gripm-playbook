@@ -332,6 +332,115 @@
         ]
       },
       "message": "backdrop-blur combined with reduced opacity background in modal surface breaks GPU compositing. Separate backdrop scrim from opaque content surface."
+    },
+    {
+      "id": "UX-018",
+      "title": "Unportaled fixed overlay stacking context trap",
+      "severity": "WARNING",
+      "signature": "Overlay or modal/sheet backdrop using fixed inset-0 with z-30/z-40/z-50/willChange without createPortal or Portal primitive.",
+      "impact": "When rendered inside an ancestor with will-change, transform, filter, or opacity animation wrappers, an unportaled fixed overlay is trapped inside the parent stacking context and physically occluded behind BottomNav or floating chrome even when declaring z-50.",
+      "fix": "Render modal, dialog, and sheet overlays into document.body via createPortal(..., document.body) or a Radix Portal primitive outside animated page wrappers.",
+      "check": {
+        "line": [
+          "fixed inset-0",
+          "inset-0 fixed"
+        ],
+        "alsoLine": [
+          "z-30",
+          "z-40",
+          "z-50",
+          "z-[",
+          "willChange",
+          "will-change"
+        ],
+        "unlessFileContent": [
+          "createPortal(",
+          "<Portal",
+          ".Portal",
+          "DialogPortal",
+          "SheetPortal",
+          "DrawerPortal",
+          "ModalPortal"
+        ]
+      },
+      "message": "fixed inset-0 overlay rendered without createPortal/Portal risks stacking-context trapping behind BottomNav inside animated wrappers. Portal overlays to document.body."
+    },
+    {
+      "id": "UX-019",
+      "title": "Mobile page sticky bottom footer occluded by BottomNav",
+      "severity": "WARNING",
+      "signature": "Page-level sticky bottom-0 action bar without mobile BottomNav vertical compensation (bottom-16 md:bottom-0 z-30).",
+      "impact": "On mobile viewports with a persistent fixed bottom navigation bar, page action footers anchored at sticky bottom-0 sit directly behind BottomNav and become unreachable to taps.",
+      "fix": "Offset the sticky footer above mobile BottomNav using sticky bottom-16 md:bottom-0 z-30 (or calc with bottom chrome height + safe area).",
+      "check": {
+        "line": [
+          "sticky"
+        ],
+        "alsoLine": [
+          "bottom-0"
+        ],
+        "unlessLine": [
+          "bottom-12",
+          "bottom-14",
+          "bottom-16",
+          "bottom-20",
+          "bottom-24",
+          "bottom-["
+        ],
+        "unlessComponent": [
+          "ResponsiveSheet",
+          "Sheet",
+          "Drawer",
+          "Dialog",
+          "Modal",
+          "SheetContent",
+          "DrawerContent",
+          "DialogContent",
+          "SheetFooter",
+          "DrawerFooter",
+          "DialogFooter"
+        ]
+      },
+      "message": "sticky bottom-0 page footer without mobile BottomNav clearance gets occluded behind BottomNav on < 768px. Use bottom-16 md:bottom-0 z-30."
+    },
+    {
+      "id": "UX-020",
+      "title": "Scrollable sheet body sticky footer hides CTA on mobile scroll or keyboard",
+      "severity": "WARNING",
+      "signature": "sticky bottom-0 element placed inside a Sheet, ResponsiveSheet, Drawer, Dialog, or Modal instead of a dedicated non-scrolling footer slot.",
+      "impact": "Sticky CTAs nested inside an overflow-y-auto sheet body jump, clip, or scroll out of the touchable area when the mobile software keyboard resizes the viewport.",
+      "fix": "Pass actions via the component footer slot (e.g. footer={...} or <SheetFooter className=\"shrink-0 bg-background border-t p-4\">) outside the scrollable body container.",
+      "check": {
+        "line": [
+          "sticky"
+        ],
+        "alsoLine": [
+          "bottom-0"
+        ],
+        "withinComponent": [
+          "ResponsiveSheet",
+          "Sheet",
+          "Drawer",
+          "Dialog",
+          "Modal",
+          "SheetContent",
+          "DrawerContent",
+          "DialogContent"
+        ],
+        "unlessLine": [
+          "SheetFooter",
+          "DrawerFooter",
+          "DialogFooter",
+          "ModalFooter"
+        ],
+        "unlessComponent": [
+          "SheetFooter",
+          "DrawerFooter",
+          "DialogFooter",
+          "ModalFooter"
+        ]
+      },
+      "message": "sticky bottom-0 inside Sheet/Dialog body hides or shifts CTAs during mobile scroll and keyboard resize. Move CTAs into an anchored footer slot or <SheetFooter>."
     }
   ]
 }

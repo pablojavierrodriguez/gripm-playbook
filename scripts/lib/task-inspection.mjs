@@ -11,6 +11,74 @@ import { readFrontmatter, readACs } from './frontmatter.mjs';
 import { checkDiffAntiSlop, inspectDiffText } from './anti-slop.mjs';
 
 const GATEABLE_STATUS = 'review';
+const HISTORICAL_STATUSES = new Set(['done', 'dismissed']);
+
+export function loadActiveSprintIds(projectRoot) {
+  const active = new Set();
+  if (!projectRoot) return active;
+  const sprintsPath = path.join(projectRoot, 'backlog', 'sprints.json');
+  if (!fs.existsSync(sprintsPath)) return active;
+  try {
+    const raw = JSON.parse(fs.readFileSync(sprintsPath, 'utf8'));
+    const list = Array.isArray(raw) ? raw : (Array.isArray(raw?.sprints) ? raw.sprints : []);
+    for (const sprint of list) {
+      if (sprint?.id && String(sprint.status || '').toLowerCase() === 'active') {
+        active.add(String(sprint.id));
+      }
+    }
+  } catch {}
+  return active;
+}
+
+export function collectTransitiveDependencies(targetFrontmatter, tasks) {
+  const deps = new Set();
+  const queue = [...(targetFrontmatter?.dependencies || [])];
+  while (queue.length > 0) {
+    const depId = queue.shift();
+    if (!depId || deps.has(depId)) continue;
+    deps.add(depId);
+    const resolved = tasks?.get?.(depId);
+    for (const nested of resolved?.frontmatter?.dependencies || []) {
+      if (nested && !deps.has(nested)) queue.push(nested);
+    }
+  }
+  return deps;
+}
+
+export function classifyCollisions(collisions = [], tasks = new Map(), options = {}) {
+  if (!options || (!options.targetFrontmatter && !options.projectRoot && !options.strict && !options.scoped)) {
+    return { blockingCollisions: collisions, warnings: [] };
+  }
+
+  const targetId = options.targetFrontmatter?.id || null;
+  const depIds = collectTransitiveDependencies(options.targetFrontmatter, tasks);
+  const activeSprintIds = options.projectRoot ? loadActiveSprintIds(options.projectRoot) : new Set();
+  const strict = Boolean(options.strict);
+
+  const blockingCollisions = [];
+  const warnings = [];
+
+  for (const col of collisions) {
+    const statuses = Array.isArray(col.statuses) ? col.statuses : [];
+    const sprintIds = Array.isArray(col.sprintIds) ? col.sprintIds : [];
+    const unreadable = Array.isArray(col.files) && col.files.includes('(unreadable)');
+    const touchesTarget = Boolean(targetId && col.id === targetId);
+    const touchesDep = depIds.has(col.id);
+    const touchesActiveSprint = sprintIds.some((sid) => sid && activeSprintIds.has(String(sid)));
+    const hasNonHistoricalStatus = !statuses.length
+      || statuses.some((st) => !HISTORICAL_STATUSES.has(String(st || '').toLowerCase()));
+
+    if (strict || unreadable || touchesTarget || touchesDep || touchesActiveSprint || hasNonHistoricalStatus) {
+      blockingCollisions.push(col);
+    } else {
+      warnings.push(
+        `historical duplicate task id "${col.id}" in ${col.files.join(' and ')} (statuses: ${statuses.join(', ')}) - ignored outside active scope`,
+      );
+    }
+  }
+
+  return { blockingCollisions, warnings };
+}
 
 export function isSameActor(a, b) {
   if (!a || !b || typeof a !== 'string' || typeof b !== 'string') return false;
@@ -49,10 +117,11 @@ export function resolveActor(argv = [], env = process.env) {
   return null;
 }
 
-export function loadTasks(tasksDir) {
+export function loadTasks(tasksDir, options = null) {
   const tasks = new Map();
   const collisions = [];
-  if (!tasksDir || !fs.existsSync(tasksDir)) return { tasks, collisions };
+  const collisionById = new Map();
+  if (!tasksDir || !fs.existsSync(tasksDir)) return { tasks, collisions, warnings: [] };
 
   for (const entry of fs.readdirSync(tasksDir, { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
@@ -61,21 +130,51 @@ export function loadTasks(tasksDir) {
     try {
       content = fs.readFileSync(full, 'utf8');
     } catch {
-      collisions.push({ id: entry.name, files: [entry.name, '(unreadable)'] });
+      collisions.push({
+        id: entry.name,
+        files: [entry.name, '(unreadable)'],
+        statuses: ['(unreadable)'],
+        sprintIds: [],
+      });
       continue;
     }
     const frontmatter = readFrontmatter(content);
     if (!frontmatter || !frontmatter.id) continue;
 
     const id = frontmatter.id;
+    const statusVal = frontmatter.status ? String(frontmatter.status) : '(missing)';
+    const sprintVal = frontmatter.sprint_id ? String(frontmatter.sprint_id) : null;
+
     if (tasks.has(id)) {
-      collisions.push({ id, files: [tasks.get(id).file, entry.name] });
+      const existing = tasks.get(id);
+      let record = collisionById.get(id);
+      if (!record) {
+        const existingStatus = existing.frontmatter?.status ? String(existing.frontmatter.status) : '(missing)';
+        const existingSprint = existing.frontmatter?.sprint_id ? String(existing.frontmatter.sprint_id) : null;
+        record = {
+          id,
+          files: [existing.file, entry.name],
+          statuses: [existingStatus, statusVal],
+          sprintIds: [existingSprint, sprintVal],
+        };
+        collisionById.set(id, record);
+        collisions.push(record);
+      } else {
+        record.files.push(entry.name);
+        record.statuses.push(statusVal);
+        record.sprintIds.push(sprintVal);
+      }
       continue;
     }
     tasks.set(id, { file: entry.name, content, frontmatter });
   }
 
-  return { tasks, collisions };
+  if (options) {
+    const { blockingCollisions, warnings } = classifyCollisions(collisions, tasks, options);
+    return { tasks, collisions: blockingCollisions, warnings, allCollisions: collisions };
+  }
+
+  return { tasks, collisions, warnings: [] };
 }
 
 export function resolveTaskPath(target, tasksDir) {

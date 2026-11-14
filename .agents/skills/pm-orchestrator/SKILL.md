@@ -73,6 +73,7 @@ Before considering Gate R1 passed and moving to `doing` (`npx playbook gate star
 | **Edge Cases** | How should the system handle empty, boundary, negative, or duplicated inputs? |
 | **Fallbacks** | What does the user see when this dependency fails? Do we present an error, hide the component, or degrade gracefully? |
 | **Empty States** | What is rendered when there is zero data? Is this a genuine product state or an unconsidered case? |
+| **Mobile IA Reachability** | Are all critical entity actions directly reachable from the primary `BottomNav` entry tabs on mobile without dead-end views or hidden secondary/`More` routes? |
 | **Product Trade-offs** | If one approach prioritizes simplicity while another favors completeness, which do we choose and why? |
 | **Negative Scope** | What are we explicitly **not** doing in this item? |
 | **Assumptions** | Which of these points are assumptions made by the agent versus explicit user requirements? |
@@ -106,7 +107,7 @@ The `pm-orchestrator` coordinates from the host thread and **dispatches clean-co
 
 1. Initialize the sprint document (Mode 3, when operating with sprints) or outline the plan in chat (Mode 2), including a repository health diagnostic (`gripm_get_repo_health` via MCP or `npm run audit:repo`) to identify baseline risks.
 2. **Dispatch `market-researcher` Sub-Agent** (when applicable): `TypeName: "research"`, read-only + web search; receives problem statement and domain; reads `.agents/skills/market-researcher/SKILL.md` and returns `[RESEARCH]` brief with >= 3 benchmarks and domain edge-case table.
-3. **Dispatch `product-designer` Sub-Agent** (Modes 2 and 3): `TypeName: "research"` (or `"self"` if generating visual assets); receives brief + ACs + project design tokens; reads `.agents/skills/product-designer/SKILL.md` and returns `[DESIGN SPEC]` covering all 7 states, >= 44×44px touch targets, Purpose Test verdicts, and copy veracity.
+3. **Dispatch `product-designer` Sub-Agent** (Modes 2 and 3): `TypeName: "research"` (or `"self"` if generating visual assets); receives brief + ACs + project design tokens; reads `.agents/skills/product-designer/SKILL.md` and returns `[DESIGN SPEC]` covering all 7 states, >= 44x44px touch targets, a **Critical Action Reachability Matrix** from primary `BottomNav` tabs, Purpose Test verdicts, and copy veracity.
 4. Present the plan to the user for formal approval before writing code.
 5. **Dispatch `principal-engineer` Sub-Agent** (transition `npx playbook gate start <ID> --by "<provider>:<session_or_agent_id>"` or `node scripts/gate-qa.mjs start <ID>` to `doing`): `TypeName: "self"` (full write and command permissions); receives refined task, ACs, Design Spec, and scoped files; reads `.agents/skills/principal-engineer/SKILL.md`, implements in atomic steps (SDD), checks ACs (`- [x]`), delivers Honest Scope & Residual Risk Declaration, and runs `npx playbook gate submit <ID>` (or `node scripts/gate-qa.mjs submit <ID>`) to transition to `status: review`.
 6. **Dispatch `qa-auditor` Sub-Agent in Clean Context Window (MANDATORY for `review` → `ready`)**:
@@ -119,6 +120,7 @@ The `pm-orchestrator` coordinates from the host thread and **dispatches clean-co
 - Static UX audit passing (`npx playbook audit --strict` or `node scripts/audit-ux-code.cjs --strict`, when available).
 - Full compliance with backend authorization invariants declared in `.agents/rules/`.
 - **Validated Zero State:** every view and metric is tested with 0 records. It must emit a serene neutral state, never false alarms interpreting absent data as system errors.
+- **Mobile BottomNav Reachability:** every critical entity action is reachable from the mobile views linked to primary `BottomNav` tabs, never orphaned in an unrelated or overflow (`More`) route.
 - **Modularity & File Budget:** no created or modified source code file reaches or exceeds 1000 lines of code, with cleanly decoupled layers (zero God-Files).
 - **No Forced Seed Data:** all initial setup or wipe routines support starting with an empty canvas without forcing mock data.
 - Explicit sign-off from the clean-context QA sub-agent + `npx playbook gate <ID>` (or `node scripts/gate-qa.mjs <ID>`) with exit code 0.

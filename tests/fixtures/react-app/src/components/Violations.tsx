@@ -2,8 +2,8 @@ import { format } from 'date-fns';
 import { Reorder } from 'framer-motion';
 
 /**
- * Fixture that must trigger every one of the 17 catalogued signatures.
- * Each rule reports at most once per file, so this file yields 17 findings.
+ * Fixture that must trigger every one of the 20 catalogued signatures.
+ * Each rule reports at most once per file, so this file yields 20 findings.
  */
 export function Violations({ date, amount }) {
   return (
@@ -31,6 +31,13 @@ export function Violations({ date, amount }) {
       <Modal>
         <div className="backdrop-blur bg-white/95">Translucent modal</div>
       </Modal>
+      <div className="fixed inset-0 z-50 bg-black/50">Unportaled overlay</div>
+      <div className="sticky bottom-0 z-20 border-t p-4">Page sticky bar</div>
+      <ResponsiveSheet>
+        <div className="overflow-y-auto">
+          <div className="sticky bottom-0 border-t p-4">Sheet sticky footer</div>
+        </div>
+      </ResponsiveSheet>
     </div>
   );
 }

@@ -422,6 +422,7 @@ function lineMatches(rule, unit, lines, unitIndex, content) {
   if ((check.alsoLine || []).length && !anyIn(check.alsoLine)) return false;
   if (anyIn(check.unlessLine || [])) return false;
   if (anyInScope(check.unlessContent || [])) return false;
+  if ((check.unlessFileContent || []).length && content && (check.unlessFileContent || []).some((token) => content.includes(token))) return false;
   if ((check.needsContent || []).length && !anyInScope(check.needsContent)) return false;
   if (check.unlessVisibleText && hasVisibleText(unit)) return false;
   if ((check.withinComponent || []).length && !isWithinComponent(unit, check.withinComponent)) return false;

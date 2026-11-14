@@ -303,3 +303,19 @@ describe('Release Pipeline Consolidation and Anti-Premature-Tagging (PLAY-049)',
   });
 });
 
+describe('Mobile Information Architecture & BottomNav Reachability (PLAY-072)', () => {
+  test('pm-orchestrator, product-designer, qa-auditor and mobile-ux-design enforce Critical Action Reachability from BottomNav', () => {
+    const pm = fs.readFileSync(path.join(ROOT, '.agents', 'skills', 'pm-orchestrator', 'SKILL.md'), 'utf8');
+    const pd = fs.readFileSync(path.join(ROOT, '.agents', 'skills', 'product-designer', 'SKILL.md'), 'utf8');
+    const qa = fs.readFileSync(path.join(ROOT, '.agents', 'skills', 'qa-auditor', 'SKILL.md'), 'utf8');
+    const mob = fs.readFileSync(path.join(ROOT, '.agents', 'stacks', 'mobile', 'skills', 'mobile-ux-design', 'SKILL.md'), 'utf8');
+
+    assert.match(pm, /BottomNav/);
+    assert.match(pm, /Critical Action Reachability Matrix/);
+    assert.match(pd, /Critical Action Reachability Matrix/);
+    assert.match(pd, /BottomNav/);
+    assert.match(qa, /BottomNav Critical Action Reachability/);
+    assert.match(mob, /Arquitectura de Informacion Movil y Alcanzabilidad \(BottomNav\)/);
+  });
+});
+

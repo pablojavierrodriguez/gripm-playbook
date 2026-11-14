@@ -11,7 +11,7 @@ Guía de estándares para garantizar que la aplicación ofrezca una experiencia 
 
 ## 1. Ergonomía Táctil y Touch Targets
 
-- **Tamaño mínimo de toque:** Todo botón, switch, enlace o elemento interactivo debe tener un área táctil mínima de **44×44px** (o padding suficiente que garantice la facilidad de toque).
+- **Tamaño mínimo de toque:** Todo botón, toggle, switch, enlace o elemento interactivo debe tener un área táctil efectiva mínima de **44×44px** verificada físicamente en `375x812` (`assertPhysicallyClickable` de `scripts/lib/physical-hit-test.mjs`: `width >= 44`, `height >= 44`, dentro de `[0..812]` y sin oclusión en `document.elementFromPoint(cx, cy)`). Al expandir controles compactos con `::after` / `::before`, recordar que `inset` calcula sobre el **padding-box** descontando bordes (un control `h-6 border-2` tiene `20px` de padding-box y exige `after:-inset-y-3` para alcanzar `44px`, ya que `after:-inset-y-2.5` queda en `40px`).
 - **Adiós al Hover exclusivo:** En mobile no existe el cursor `hover`. Toda interacción debe responder con feedback táctil inmediato (`active:scale-[0.98]`, `active:bg-muted/40` o transiciones de opacidad).
 - **Patrón `.icon-only-mobile`:**
   En toolbars y cabeceras de pantallas estrechas (`< 640px`), ocultar textos largos y dejar el icono centrado y reconocible:
@@ -36,14 +36,18 @@ Guía de estándares para garantizar que la aplicación ofrezca una experiencia 
 
 ---
 
-## 3. Modales, Sheets y Formularios Móviles
+## 3. Modales, Sheets y Formularios Moviles
 
-- **Drawer / Bottom Sheet:**
-  En mobile, preferir que los formularios y vistas de edición se abran como **Bottom Sheets** (deslizables verticalmente desde la base) en lugar de modales pequeños flotantes.
-- **Acciones fijas en formularios:**
-  Los botones de "Guardar" y "Cancelar" deben ubicarse en un footer fijo (`sticky bottom-0 bg-background/95 backdrop-blur-md border-t p-4`) con ancho mínimo (`min-w-[140px]`) para que el usuario siempre pueda guardar sin tener que hacer scroll hasta el final del formulario.
-- **Prevención de Zoom no deseado:**
-  Todos los `<input>`, `<textarea>` y `<select>` deben tener un `font-size` de al menos `16px` (`text-base` o `text-sm sm:text-xs`) en mobile para evitar que iOS/Android hagan zoom automático al enfocar el campo.
+- **Drawer / Bottom Sheet en Portal:**
+  En mobile, preferir que los formularios y vistas de edicion se abran como **Bottom Sheets** (deslizables verticalmente desde la base) renderizados via `createPortal(..., document.body)` o primitiva Portal dedicada (`UX-018`) para evitar trampas de stacking context cuando existan wrappers con `will-change`, `transform` o `opacity` animada.
+- **Acciones fijas en slot `footer` anclado (nunca `sticky bottom-0` en el body):**
+  Los botones de "Guardar" y "Cancelar" en sheets y modales deben pasarse al slot dedicado `footer` / `<SheetFooter className="shrink-0 bg-background border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">` fuera del contenedor scrolleable (`overflow-y-auto`), con ancho minimo (`min-w-[140px]`). Queda prohibido usar `sticky bottom-0` dentro del cuerpo scrolleable del sheet (`UX-020`) o combinar `bg-background/95 backdrop-blur-md` en superficies del modal (`UX-017`).
+- **Footers sticky a nivel de pagina:**
+  Toda barra de accion de pagina con `sticky bottom-0` debe compensar explicitamente la altura del `BottomNav` en mobile (`sticky bottom-16 md:bottom-0 z-30`, conforme a `UX-019`) para no quedar ocluida bajo la barra inferior de navegacion.
+- **Foco inicial seguro en Bottom Sheets (`< 768px`):**
+  Al abrir un sheet o modal en mobile, enfocar por defecto el contenedor del dialogo (`tabIndex={-1}`) en lugar del primer `<input>`, evitando que el teclado virtual corte el viewport antes de que el usuario lea el contexto o confirme. Permitir foco automatico al primer input unicamente mediante opt-in explicito (`autoFocusFirstField`).
+- **Prevencion de Zoom no deseado:**
+  Todos los `<input>`, `<textarea>` y `<select>` deben tener un `font-size` de al menos `16px` (`text-base` o `text-sm sm:text-xs`) en mobile para evitar que iOS/Android hagan zoom automatico al enfocar el campo.
 
 ---
 
@@ -178,5 +182,12 @@ Para garantizar que ningún elemento quede cortado o inaccesible en teléfonos c
 ### D. Agrupación de Filtros y Switches en Mobile
 - En matrices o listas de switches (como Notificaciones en Perfil), usar anchos compactos (`w-12 sm:w-20` y `gap-2 sm:gap-6`) para que los títulos de categoría no se compriman en líneas partidas antiestéticas.
 - En selectores temporales de Dashboard o barras de categorías (Logs), envolver siempre en `w-full sm:w-auto overflow-x-auto no-scrollbar` con etiquetas responsivas compactas (`sm:hidden` / `hidden sm:inline`).
+
+---
+
+## 10. Arquitectura de Informacion Movil y Alcanzabilidad (BottomNav)
+
+- **Matriz de Alcanzabilidad de Acciones Criticas:** Antes de aprobar cualquier flujo o ficha de entidad movil, completar la matriz cruzando cada pestana primaria del `BottomNav` (y rutas secundarias como `More`) contra las acciones criticas de la entidad.
+- **Prohibicion de vistas muertas por punto de entrada:** Entrar al detalle o gestion de una entidad desde su pestana primaria del `BottomNav` debe exponer todas las acciones criticas del dominio en igualdad de condiciones (evitando el anti-patron de ofrecer solo acciones de ajuste/edicion en un flujo y ocultar el CTA principal en una ruta secundaria bajo `More`).
 
 

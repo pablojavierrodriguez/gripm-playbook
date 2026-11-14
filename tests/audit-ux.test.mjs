@@ -579,7 +579,7 @@ describe('programmatic API (PLAY-005)', () => {
     assert.equal(result.report.findings.length, 1, 'the local rule is reachable by id');
 
     // The canonical catalog is untouched and still complete.
-    assert.equal(ALL_IDS.length, 17);
+    assert.equal(ALL_IDS.length, 20);
     fs.rmSync(temp, { recursive: true, force: true });
   });
 
@@ -1144,5 +1144,100 @@ describe('Audit rigor presets: pragmatic vs strict (PLAY-058)', () => {
     } finally {
       fs.rmSync(temp, { recursive: true, force: true });
     }
+  });
+});
+
+describe('UX-018, UX-019, UX-020: mobile physical occlusion and stacking-context traps (PLAY-070)', () => {
+  const { auditProject } = requireCjs(AUDITOR);
+
+  function auditSnippet(code, preset = 'strict') {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-ux-occlusion-'));
+    fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'package.json'), '{"name":"test-occlusion"}');
+    fs.writeFileSync(path.join(temp, 'src', 'Component.tsx'), code);
+    try {
+      return auditProject({ root: temp, preset, useBaseline: false }).findings;
+    } finally {
+      fs.rmSync(temp, { recursive: true, force: true });
+    }
+  }
+
+  test('UX-018 detects fixed inset-0 overlay without createPortal under strict and pragmatic presets', () => {
+    const buggy = [
+      'export const Sheet = () => (',
+      '  <div style={{ willChange: "opacity" }}>',
+      '    <div className="fixed inset-0 z-50 bg-black/50">Trapped</div>',
+      '  </div>',
+      ');',
+    ].join('\n');
+    for (const preset of ['strict', 'pragmatic']) {
+      const findings = auditSnippet(buggy, preset).filter((f) => f.rule === 'UX-018');
+      assert.equal(findings.length, 1, `UX-018 must fire under ${preset} preset`);
+      assert.equal(findings[0].severity, 'WARNING');
+    }
+
+    const cleanPortal = [
+      'import { createPortal } from "react-dom";',
+      'export const Sheet = () => createPortal(<div className="fixed inset-0 z-50 bg-black/50">Safe</div>, document.body);',
+    ].join('\n');
+    assert.equal(auditSnippet(cleanPortal).filter((f) => f.rule === 'UX-018').length, 0);
+
+    const multilinePortal = [
+      'import { createPortal } from "react-dom";',
+      'export const Modal = () => createPortal(',
+      '  <div',
+      '    className="fixed inset-0 z-50 bg-black/50"',
+      '  >',
+      '    <span>Safe multiline portal</span>',
+      '  </div>,',
+      '  document.body,',
+      ');',
+    ].join('\n');
+    assert.equal(auditSnippet(multilinePortal).filter((f) => f.rule === 'UX-018').length, 0);
+
+    const cleanRadixPortal = 'export const Sheet = () => <DialogPortal><div className="fixed inset-0 z-50" /></DialogPortal>;\n';
+    assert.equal(auditSnippet(cleanRadixPortal).filter((f) => f.rule === 'UX-018').length, 0);
+  });
+
+  test('UX-019 detects page sticky bottom-0 without BottomNav offset and passes bottom-16 md:bottom-0 z-30', () => {
+    const buggyPageBar = 'export const Page = () => <main><div className="sticky bottom-0 z-20 p-4">Save</div></main>;\n';
+    for (const preset of ['strict', 'pragmatic']) {
+      const findings = auditSnippet(buggyPageBar, preset).filter((f) => f.rule === 'UX-019');
+      assert.equal(findings.length, 1, `UX-019 must fire under ${preset} preset`);
+      assert.equal(findings[0].severity, 'WARNING');
+    }
+
+    const compensatedPageBar = 'export const Page = () => <main><div className="sticky bottom-16 md:bottom-0 z-30 p-4">Save</div></main>;\n';
+    assert.equal(auditSnippet(compensatedPageBar).filter((f) => f.rule === 'UX-019').length, 0);
+
+    const calcCompensated = 'export const Page = () => <main><div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 z-30 p-4">Save</div></main>;\n';
+    assert.equal(auditSnippet(calcCompensated).filter((f) => f.rule === 'UX-019').length, 0);
+  });
+
+  test('UX-020 detects sticky bottom-0 inside ResponsiveSheet body and passes anchored footer slot', () => {
+    const buggySheet = [
+      'export const PayModal = () => (',
+      '  <ResponsiveSheet title="Pay">',
+      '    <div className="overflow-y-auto">',
+      '      <div className="sticky bottom-0 border-t p-4">Submit</div>',
+      '    </div>',
+      '  </ResponsiveSheet>',
+      ');',
+    ].join('\n');
+    for (const preset of ['strict', 'pragmatic']) {
+      const findings = auditSnippet(buggySheet, preset);
+      assert.equal(findings.filter((f) => f.rule === 'UX-020').length, 1, `UX-020 must fire under ${preset} preset`);
+      assert.equal(findings.filter((f) => f.rule === 'UX-019').length, 0, 'UX-019 must not double-report inside ResponsiveSheet');
+    }
+
+    const anchoredSheet = [
+      'export const PayModal = () => (',
+      '  <ResponsiveSheet title="Pay" footer={<button className="min-w-[140px]">Pay</button>}>',
+      '    <div className="overflow-y-auto"><p>Form</p></div>',
+      '    <SheetFooter className="shrink-0 bg-background border-t p-4">Or footer component</SheetFooter>',
+      '  </ResponsiveSheet>',
+      ');',
+    ].join('\n');
+    assert.equal(auditSnippet(anchoredSheet).filter((f) => f.rule === 'UX-020').length, 0);
   });
 });

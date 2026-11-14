@@ -1079,4 +1079,125 @@ describe('mechanical state transitions (T0, T1, T2, T_unblock)', () => {
     });
   });
 
+  describe('Scoped historical duplicate IDs vs active blockers (PLAY-073)', () => {
+    function setupRepo(files = {}, sprints = null) {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-scoped-dup-'));
+      fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'backlog', 'tasks'), { recursive: true });
+      fs.copyFileSync(GATE, path.join(dir, 'scripts', 'gate-qa.mjs'));
+      fs.cpSync(path.join(ROOT, 'scripts', 'lib'), path.join(dir, 'scripts', 'lib'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"scoped-dup","scripts":{}}');
+      if (sprints) {
+        fs.writeFileSync(path.join(dir, 'backlog', 'sprints.json'), JSON.stringify(sprints, null, 2));
+      }
+      for (const [rel, spec] of Object.entries(files)) {
+        const full = path.join(dir, 'backlog', 'tasks', rel);
+        if (typeof spec === 'string') {
+          fs.writeFileSync(full, spec, 'utf8');
+        } else {
+          fs.copyFileSync(spec.file, full);
+        }
+      }
+      return dir;
+    }
+
+    function runGateCli(dir, args) {
+      try {
+        const stdout = execFileSync(process.execPath, [path.join(dir, 'scripts', 'gate-qa.mjs'), ...args], {
+          cwd: dir,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        return { code: 0, stdout };
+      } catch (err) {
+        return { code: err.status, stdout: `${err.stdout || ''}${err.stderr || ''}` };
+      }
+    }
+
+    test('historical done/dismissed duplicates outside active scope emit warnings without blocking new tasks', () => {
+      const dir = setupRepo({
+        'OLD-001 - First.md': makeTask({ id: 'OLD-001', status: 'done' }),
+        'OLD-001 - Second.md': makeTask({ id: 'OLD-001', status: 'dismissed' }),
+        'DEV-900 - Valid review.md': makeTask({ id: 'DEV-900', status: 'review' }),
+        'DEV-901 - Valid draft.md': makeTask({ id: 'DEV-901', status: 'draft' }),
+      });
+      try {
+        const mainRes = runGateCli(dir, ['DEV-900', '--no-run']);
+        assert.equal(mainRes.code, 2, `Expected exit 2 (clean inspection-only), got ${mainRes.code}: ${mainRes.stdout}`);
+        assert.match(mainRes.stdout, /historical duplicate task id "OLD-001"/);
+        assert.match(mainRes.stdout, /acceptance criteria complete/);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    test('start and submit ignore unrelated historical done duplicates unless --strict is passed', () => {
+      const dir = setupRepo({
+        'OLD-001 - First.md': makeTask({ id: 'OLD-001', status: 'done' }),
+        'OLD-001 - Second.md': makeTask({ id: 'OLD-001', status: 'done' }),
+        'DEV-901 - Valid draft.md': makeTask({ id: 'DEV-901', status: 'draft' }),
+      });
+      try {
+        const strictStart = runGateCli(dir, ['start', 'DEV-901', '--by', 'antigravity:dev', '--strict']);
+        assert.equal(strictStart.code, 1);
+        assert.match(strictStart.stdout, /declared by two files/);
+
+        const okStart = runGateCli(dir, ['start', 'DEV-901', '--by', 'antigravity:dev']);
+        assert.equal(okStart.code, 0, okStart.stdout);
+        assert.match(okStart.stdout, /historical duplicate task id "OLD-001"/);
+
+        const okSubmit = runGateCli(dir, ['submit', 'DEV-901', '--by', 'antigravity:dev']);
+        assert.equal(okSubmit.code, 0, okSubmit.stdout);
+        assert.match(okSubmit.stdout, /historical duplicate task id "OLD-001"/);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    test('duplicate ID blocks if active status, active sprint, or transitive dependency is affected', () => {
+      const dirDep = setupRepo({
+        'DEV-001 - Leaf A.md': makeTask({ id: 'DEV-001', status: 'done' }),
+        'DEV-001 - Leaf B.md': makeTask({ id: 'DEV-001', status: 'done' }),
+        'DEV-002 - Mid.md': makeTask({ id: 'DEV-002', status: 'done', dependencies: ['DEV-001'] }),
+        'DEV-003 - Top.md': makeTask({ id: 'DEV-003', status: 'review', dependencies: ['DEV-002'] }),
+      });
+      try {
+        const res = runGateCli(dirDep, ['DEV-003', '--no-run']);
+        assert.equal(res.code, 1);
+        assert.match(res.stdout, /task id "DEV-001" is declared by two files/);
+      } finally {
+        fs.rmSync(dirDep, { recursive: true, force: true });
+      }
+
+      const dirSprint = setupRepo(
+        {
+          'DEV-010 - One.md': makeTask({ id: 'DEV-010', status: 'done', extra: 'sprint_id: SPRINT-01' }),
+          'DEV-010 - Two.md': makeTask({ id: 'DEV-010', status: 'done', extra: 'sprint_id: SPRINT-01' }),
+          'DEV-020 - Current.md': makeTask({ id: 'DEV-020', status: 'review' }),
+        },
+        [{ id: 'SPRINT-01', status: 'active' }],
+      );
+      try {
+        const res = runGateCli(dirSprint, ['DEV-020', '--no-run']);
+        assert.equal(res.code, 1);
+        assert.match(res.stdout, /task id "DEV-010" is declared by two files/);
+      } finally {
+        fs.rmSync(dirSprint, { recursive: true, force: true });
+      }
+
+      const dirActiveStatus = setupRepo({
+        'DEV-030 - One.md': makeTask({ id: 'DEV-030', status: 'done' }),
+        'DEV-030 - Two.md': makeTask({ id: 'DEV-030', status: 'doing' }),
+        'DEV-040 - Other.md': makeTask({ id: 'DEV-040', status: 'review' }),
+      });
+      try {
+        const res = runGateCli(dirActiveStatus, ['DEV-040', '--no-run']);
+        assert.equal(res.code, 1);
+        assert.match(res.stdout, /task id "DEV-030" is declared by two files/);
+      } finally {
+        fs.rmSync(dirActiveStatus, { recursive: true, force: true });
+      }
+    });
+  });
+
 });

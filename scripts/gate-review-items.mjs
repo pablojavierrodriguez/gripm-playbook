@@ -74,20 +74,24 @@ function main() {
   console.log(`Gating ${reviewItems.length} item(s) in review...\n`);
 
   let failed = 0;
+  const extraFlags = process.argv.includes('--strict') ? ['--strict'] : [];
   for (const { name, file } of reviewItems) {
-    const result = spawnSync(process.execPath, [GATE, file, '--no-run', '--root', ROOT], {
+    const result = spawnSync(process.execPath, [GATE, file, '--no-run', '--root', ROOT, ...extraFlags], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, GRIPM_ROOT: ROOT },
     });
     const code = result.status;
+    const detail = `${result.stdout || ''}${result.stderr || ''}`;
 
     if (code === 2) {
       console.log(`  ok    ${name}`);
+      for (const line of detail.split('\n').filter((l) => l.includes('▲'))) {
+        console.log(`        ${line.trim()}`);
+      }
     } else {
       failed += 1;
       console.log(`  FAIL  ${name} (exit ${code})`);
-      const detail = `${result.stdout || ''}${result.stderr || ''}`;
       for (const line of detail.split('\n').filter((l) => l.includes('✖') || l.includes('❌'))) {
         console.log(`        ${line.trim()}`);
       }

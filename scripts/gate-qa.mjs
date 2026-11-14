@@ -23,6 +23,7 @@ import {
   loadTasks as loadTasksFromDir,
   resolveTaskPath as resolveTaskPathFromDir,
   inspectTask,
+  classifyCollisions,
   resolveActor,
   isSameActor,
   syncConsolidatedBacklog,
@@ -114,10 +115,10 @@ export function getExplicitRoot(argv = []) {
 const ROOT = resolveProjectRoot();
 const TASKS_DIR = path.join(ROOT, 'backlog', 'tasks');
 
-export { readFrontmatter, readACs, mutateTaskFrontmatter, inspectTask, resolveActor, isSameActor, syncConsolidatedBacklog };
+export { readFrontmatter, readACs, mutateTaskFrontmatter, inspectTask, classifyCollisions, resolveActor, isSameActor, syncConsolidatedBacklog };
 
-export function loadTasks(tasksDir) {
-  return loadTasksFromDir(tasksDir || path.join(resolveProjectRoot(), 'backlog', 'tasks'));
+export function loadTasks(tasksDir, options) {
+  return loadTasksFromDir(tasksDir || path.join(resolveProjectRoot(), 'backlog', 'tasks'), options);
 }
 
 export function resolveTaskPath(target, tasksDir) {
@@ -250,11 +251,10 @@ export function unblockMain(argv) {
     process.exit(0);
   }
 
-  const { tasks, collisions } = loadTasks(tasksDir);
+  const { tasks, collisions, warnings: colWarnings = [] } = loadTasks(tasksDir, { targetFrontmatter: frontmatter, projectRoot, strict: argv.includes('--strict'), scoped: true });
+  for (const w of colWarnings) console.log(`    ${c.yellow('▲')} ${w}`);
   const blockers = inspectTask({ content, frontmatter }, tasks).filter((f) => f.startsWith('unblock refused'));
-  for (const collision of collisions) {
-    blockers.push(`task id "${collision.id}" is declared by two files: ${collision.files.join(' and ')}`);
-  }
+  for (const collision of collisions) blockers.push(`task id "${collision.id}" is declared by two files: ${collision.files.join(' and ')}`);
   if (blockers.length) {
     console.log(`  ${c.bold('T_unblock guard:')}`);
     for (const blocker of blockers) console.log(`    ${c.red('✖')} ${blocker}`);
@@ -291,7 +291,7 @@ export function startMain(argv) {
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  const { tasks, collisions } = loadTasks(tasksDir);
+  const { tasks, collisions, warnings: colWarnings = [] } = loadTasks(tasksDir, { targetFrontmatter: frontmatter, projectRoot, strict: argv.includes('--strict'), scoped: true });
   const failures = [];
 
   if (!frontmatter || !frontmatter.id || !frontmatter.id.trim()) {
@@ -311,9 +311,8 @@ export function startMain(argv) {
       failures.push(`dependency "${dep}" is "${resolved.frontmatter.status ?? '(missing)'}" (${resolved.file}) but must be "ready" or "done"`);
     }
   }
-  collisions.forEach((col) => {
-    failures.push(`task id "${col.id}" is declared by two files: ${col.files.join(' and ')}`);
-  });
+  for (const w of colWarnings) console.log(`    ${c.yellow('▲')} ${w}`);
+  collisions.forEach((col) => failures.push(`task id "${col.id}" is declared by two files: ${col.files.join(' and ')}`));
 
   if (failures.length) {
     for (const f of failures) console.log(`    ${c.red('✖')} ${f}`);
@@ -348,14 +347,13 @@ export async function submitMain(argv) {
 
   const content = fs.readFileSync(taskPath, 'utf8');
   const frontmatter = readFrontmatter(content);
-  const { tasks, collisions } = loadTasks(tasksDir);
+  const { tasks, collisions, warnings: colWarnings = [] } = loadTasks(tasksDir, { targetFrontmatter: frontmatter, projectRoot, strict: argv.includes('--strict'), scoped: true });
   const failures = inspectTask({ content, frontmatter: { ...frontmatter, status: 'review' } }, tasks, { projectRoot });
   if (frontmatter?.status !== 'doing') {
     failures.unshift(`status is "${frontmatter?.status ?? '(missing)'}" but T1 only submits items in "doing"`);
   }
-  collisions.forEach((col) => {
-    failures.push(`task id "${col.id}" is declared by two files: ${col.files.join(' and ')}`);
-  });
+  for (const w of colWarnings) console.log(`    ${c.yellow('▲')} ${w}`);
+  collisions.forEach((col) => failures.push(`task id "${col.id}" is declared by two files: ${col.files.join(' and ')}`));
 
   const isForced = argv.includes('--force');
   const health = await checkStructuralHealth(projectRoot, {
@@ -409,7 +407,7 @@ export async function main(argv) {
   const frontmatter = readFrontmatter(content);
   console.log(`  ${c.dim('➜')} Task:    ${path.relative(projectRoot, taskPath)}\n    ID:      ${c.bold(frontmatter?.id ?? '(unreadable)')}\n    Status:  ${frontmatter?.status ?? '(missing)'}\n`);
 
-  const { tasks, collisions } = loadTasks(tasksDir);
+  const { tasks, collisions, warnings: colWarnings = [] } = loadTasks(tasksDir, { targetFrontmatter: frontmatter, projectRoot, strict: argv.includes('--strict'), scoped: true });
   const failures = inspectTask({ content, frontmatter }, tasks, { certifier, projectRoot });
 
   for (const collision of collisions) {
@@ -417,14 +415,11 @@ export async function main(argv) {
   }
 
   const isForced = argv.includes('--force');
-  const health = await checkStructuralHealth(projectRoot, {
-    force: isForced,
-    strict: argv.includes('--strict'),
-  });
+  const health = await checkStructuralHealth(projectRoot, { force: isForced, strict: argv.includes('--strict') });
   failures.push(...health.failures);
 
   console.log(`  ${c.bold('Task inspection:')}`);
-  for (const w of health.warnings) {
+  for (const w of [...colWarnings, ...health.warnings]) {
     console.log(`    ${c.yellow('▲')} ${w}`);
   }
   if (failures.length) {

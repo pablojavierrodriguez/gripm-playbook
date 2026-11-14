@@ -45,7 +45,8 @@ The interface **assists, it does not judge**.
 
 ## 4. Touch Ergonomics
 
-- **Effective touch target >= 44x44px** on any clickable element. Verified with `getBoundingClientRect()`, not with the CSS class.
+- **Effective touch target >= 44x44px** on any clickable element. Verified physically (`assertPhysicallyClickable` / `scripts/lib/physical-hit-test.mjs` at `375x812`: effective bounds, viewport containment, and `document.elementFromPoint(cx, cy)`), not just via CSS class or `toBeVisible()`. When expanding compact controls with `::after` / `::before`, compute expansion from `padding-box` (`border-box` minus borders; e.g., `h-6 border-2` leaves `20px` padding-box and requires `after:-inset-y-3` to reach `44px`, not `after:-inset-y-2.5` = `40px`).
+- **Mobile Bottom Sheet initial focus:** Focus the sheet container (`tabIndex={-1}`) by default on mobile (`< 768px`) so the virtual keyboard does not cut the viewport before confirmation; enable input autofocus only with explicit opt-in (`autoFocusFirstField`).
 - Primary actions within thumb reach on mobile: bottom sheets and bottom action bars.
 - **Never more than 2 visible actions per row** in lists and cards. Secondary ones go into a menu with a comfortable target.
 - Numeric inputs: keyboard declared by data type (`inputMode="decimal"`, `inputMode="tel"`), parsed by locale. Never `type="number"` for numeric values with commas or decimals.
@@ -59,6 +60,7 @@ The interface **assists, it does not judge**.
 - Every scrollable container with **sufficient clearance against the fixed bottom UI** (`pb-32` + `env(safe-area-inset-bottom)`), not `pb-16`.
 - No horizontal overflow at 375px/390px. Tested, not assumed.
 - Responsive density: fewer columns on mobile, more vertical scroll. Never a 6-column table at 375px.
+- **Critical Action Reachability Matrix (BottomNav IA):** Before designing an entity view or detail sheet, enumerate a reachability table mapping every primary navigation entry point (`BottomNav` tabs vs secondary/`More` overflow routes) against every critical user action for that entity. Accessing an entity from any primary tab must expose its core primary action directly - never stranding users on a partial view ("Edit" / "Adjust") whose critical CTA only exists under another `More` submenu.
 
 ---
 
@@ -134,6 +136,7 @@ Specification in the `[DESIGN SPEC]` section of the sprint spec:
 
 - Tokens and visual hierarchy defined.
 - Touch targets declared.
+- **Critical Action Reachability Matrix** (`BottomNav` primary tabs × critical entity actions) resolved when designing multi-entry mobile entity flows.
 - Micro-interactions and sensory feedback specified.
 - All 7 states from section 6 resolved, with token name where applicable.
 - Tokens as **semantic variables**, never hardcoded hex in the component.
