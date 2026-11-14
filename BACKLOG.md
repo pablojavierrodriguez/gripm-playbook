@@ -1,5 +1,5 @@
 # Backlog: @gripm/playbook
-> Consolidado generado el 2026-11-11 por gripm
+> Consolidado generado el 2026-11-14 por gripm
 
 ## Resumen de Estados
 
@@ -26,6 +26,343 @@ Playbook init currently offers adapters only for Antigravity, Cursor, and Claude
 - [ ] #3 After refinement, `playbook init` can list and select VS Code Copilot and OpenCode using native adapters without duplicating governance content.
 - [ ] #4 After refinement, `playbook init` can explicitly install no harness adapters without silently falling back to Antigravity.
 - [ ] #5 Tests cover each new adapter and the explicit no-harness behavior; `npm run check:all` passes.
+
+---
+
+### 🚀 Ready for Deploy (4)
+
+#### [PLAY-070] Reglas estaticas UX-018 UX-019 y UX-020 contra oclusion movil y trampas de stacking context
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+Auditorias reales de produccion en DOM movil detectaron tres puntos ciegos estructurales donde las 17 firmas actuales (`UX-001`..`UX-017`) reportaban `0 errors, 0 warnings`, pero los controles quedaban fisicamente ocluidos detras de capas de navegacion o fuera de vista:
+1. **Trampa de stacking context por animaciones / ausencia de Portal (`UX-018`):** Un overlay o modal/sheet (`fixed inset-0` con `z-30`/`z-40`/`z-50`/`z-[...]` o `willChange`) renderizado sin `createPortal(..., document.body)` o primitiva de Portal queda encerrado en el stacking context de wrappers padres con `will-change`, `transform` o `opacity` animados, terminando tapado por `BottomNav` aunque declare `z-50`.
+2. **Footers de pagina con `sticky bottom-0` sin compensar `BottomNav` (`UX-019`):** Barras de accion a nivel de vista con `sticky bottom-0` sin offset movil (`bottom-16 md:bottom-0`, `bottom-14`, `bottom-[...]`) quedan fisicamente tapadas detras del `BottomNav` en `< 768px`.
+3. **Botones `sticky bottom-0` dentro del cuerpo scrolleable de Sheets/Modales (`UX-020`):** Declarar `sticky bottom-0` dentro de `<ResponsiveSheet>`, `<Sheet>`, `<Drawer>`, `<Dialog>` o `<Modal>` (en lugar de un slot `footer` anclado / `<SheetFooter>`) provoca que los CTAs desaparezcan al hacer scroll interno o al desplegar el teclado virtual movil. Ademas, `mobile-ux-design/SKILL.md` prescribia un patron antiguo con `sticky bottom-0 bg-background/95 backdrop-blur-md` que contradecia `UX-017` y `UX-020`.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Incorporar soporte de `unlessFileContent` en `scripts/lib/ux-jsx-parser.cjs` para evaluar guardas a nivel de archivo (ej. `createPortal(` o primitivas Portal fuera del JSX del overlay).
+  - Incorporar `UX-018`, `UX-019` y `UX-020` con severidad `WARNING` en `scripts/ux-rules.json`, activas en ambos presets (`pragmatic` y `strict`, sin agregarlas a `PRAGMATIC_EXCLUDED_RULES`).
+  - Documentar las tres reglas y actualizar el checklist pre-merge en `.agents/skills/code-level-ux-auditor/SKILL.md` manteniendo paridad exacta de titulo y severidad.
+  - Corregir la seccion 3 de `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` exigiendo Portal para modales/sheets, slot `footer` / `<SheetFooter>` solido anclado en lugar de `sticky bottom-0` + `backdrop-blur`, y compensacion `bottom-16 md:bottom-0 z-30` en footers sticky de pagina.
+  - Agregar triggers representativos en `tests/fixtures/react-app/src/components/Violations.tsx` y tests unitarios de deteccion positiva y escapes limpios en `tests/audit-ux.test.mjs`.
+- **Out-of-Scope:**
+  - Verificacion fisica en browser real / hit-testing DOM (cubierto en `PLAY-071`) y matriz de alcanzabilidad de IA movil (cubierto en `PLAY-072`).
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/ux-rules.json` define `UX-018`, `UX-019` y `UX-020` con severidad `WARNING`, activas tanto en preset `pragmatic` como en `strict`.
+- [x] #2 `.agents/skills/code-level-ux-auditor/SKILL.md` documenta los encabezados canonicos `### 18. [UX-018] · WARNING · ...`, `### 19. [UX-019] · WARNING · ...` y `### 20. [UX-020] · WARNING · ...` con paridad verificada por `npm run validate`, y actualiza el checklist pre-merge.
+- [x] #3 `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` reemplaza el patron contradictorio `sticky bottom-0 bg-background/95 backdrop-blur-md` en sheets por slot `footer` / `<SheetFooter>` anclado y exige `createPortal`/Portal en overlays y compensacion `bottom-16 md:bottom-0 z-30` en footers sticky de vista.
+- [x] #4 `tests/fixtures/react-app/src/components/Violations.tsx` dispara las 20 reglas mientras `Clean.tsx` mantiene 0 hallazgos.
+- [x] #5 `tests/audit-ux.test.mjs` verifica casos positivos y de escape valido para `UX-018`, `UX-019` y `UX-020`, y `npm test` + `npm run validate` pasan con codigo 0.
+
+---
+
+#### [PLAY-071] Verificador fisico de hit-testing movil assertPhysicallyClickable y foco seguro en Bottom Sheets
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+La auditoria de produccion en DOM movil revelo dos fallos que escapan tanto a linters estaticos como a `jsdom` o `expect(locator).toBeVisible()`:
+1. **Ceguera ante oclusion fisica en `375x812` y targets con pseudo-elementos (`::after` / `::before`):** `toBeVisible()` solo evalua estilos y opacidad, sin detectar si otro elemento (como `BottomNav`, banners o FAB) intercepta los toques en `(cx, cy)` ni si el control sobresale de `812px` de alto util. Ademas, controles compactos que expanden su hit-target con `::after` (ej. un toggle `h-6 border-2`) ven reducida su padding-box a `20px` por el borde de `4px`, por lo que `after:-inset-y-2.5` alcanza solo `40px` y recien `after:-inset-y-3` logra `>= 44px`.
+2. **Auto-foco indiscriminado al abrir Bottom Sheets en movil (`< 768px`):** Enfocar automaticamente el primer `<input>` al montar un sheet levanta el teclado virtual de inmediato y recorta el viewport util a la mitad antes de que el usuario pueda leer el contenido o confirmar acciones.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Implementar y exportar `scripts/lib/physical-hit-test.mjs` (y export `./hit-test` en `package.json`, registrado en `.playbook-manifest.json` y `FALLBACK_CORE_FILES` de `scripts/sync-playbook.mjs`) con `computeEffectiveHitBox`, `evaluatePhysicalClickability`, `assertPhysicallyClickable` y `assertLocatorPhysicallyClickable`.
+  - Contemplar bounding box efectiva con `::after` / `::before` descontando los bordes (`padding-box`), verificando `width >= 44 && height >= 44`, `box.y >= 0 && box.y + box.height <= viewportHeight` y propiedad de `document.elementFromPoint(cx, cy)` (el elemento o un descendiente suyo).
+  - Actualizar `.agents/skills/qa-auditor/SKILL.md` (conteo de 20 reglas estaticas en Step 5, y obligatoriedad de `assertPhysicallyClickable` en Step 6 / Touch Ergonomics sobre `375x812`).
+  - Actualizar `.agents/skills/code-level-ux-auditor/SKILL.md`, `.agents/skills/product-designer/SKILL.md` y `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` con hit-testing fisico, calculo de padding-box en pseudo-elementos y politica de foco seguro en Bottom Sheets (`tabIndex={-1}` al contenedor por defecto en `< 768px`, opt-in explicito via `autoFocusFirstField`).
+  - Agregar tests unitarios en `tests/physical-hit-test.test.mjs` cubriendo oclusion, overflow vertical (`> 812px`), target `< 44px`, pseudo-element `h-6 border-2` con `after:-inset-y-2.5` (40px fail) vs `after:-inset-y-3` (44px pass) y Locator async.
+- **Out-of-Scope:**
+  - Integrar un browser real (Playwright) como dependencia del paquete `@gripm/playbook`.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/lib/physical-hit-test.mjs` exporta `computeEffectiveHitBox`, `evaluatePhysicalClickability`, `assertPhysicallyClickable` y `assertLocatorPhysicallyClickable` verificando `effectiveBox` (`>= 44x44px` incluyendo `::after`/`::before` sobre `padding-box`), limites del viewport (`375x812` por defecto) y pertenencia de `document.elementFromPoint(cx, cy)`.
+- [x] #2 `scripts/lib/physical-hit-test.mjs` queda registrado en `.playbook-manifest.json`, `FALLBACK_CORE_FILES` de `scripts/sync-playbook.mjs` y `exports["./hit-test"]` de `package.json`, pasando `npm run validate`.
+- [x] #3 `.agents/skills/qa-auditor/SKILL.md` actualiza el conteo de firmas estaticas en Step 5 a 20 y exige `assertPhysicallyClickable` en `375x812` bajo Step 6 y Touch Ergonomics.
+- [x] #4 `.agents/skills/code-level-ux-auditor/SKILL.md`, `.agents/skills/product-designer/SKILL.md` y `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` documentan la matematica de padding-box en pseudo-elementos `after:-inset-y-*` y la regla de foco inicial seguro en Bottom Sheets (`tabIndex={-1}` por defecto en `< 768px`, opt-in explicito `autoFocusFirstField`).
+- [x] #5 `tests/physical-hit-test.test.mjs` verifica todos los casos de borde (`40px` vs `44px`, oclusion de overlay, corte fuera de `812px`, descendiente valido) y `npm test` pasa con codigo 0.
+
+---
+
+#### [PLAY-072] Matriz de alcanzabilidad de acciones criticas desde BottomNav en arquitectura de informacion movil
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+El playbook actual audita componentes aislados (tamano de toque, contraste, estados), pero carece de una compuerta de **Arquitectura de Informacion Movil (IA)** que garantice la alcanzabilidad real de acciones criticas desde los puntos de entrada de navegacion movil (`BottomNav`). En produccion movil ocurrio que entrar al detalle de una entidad desde la pestana primaria exponia acciones secundarias ("Editar", "Ajustar") pero omitia la accion critica principal, obligando a descubrir una ruta alternativa oculta bajo el menu secundario (`More`).
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Actualizar `.agents/skills/pm-orchestrator/SKILL.md`: incorporar la dimension de alcanzabilidad movil en la tabla R1 Gate, el dispatch hacia `product-designer` y el DoD.
+  - Actualizar `.agents/skills/product-designer/SKILL.md`: exigir una **Matriz de Alcanzabilidad de Acciones Criticas** (`BottomNav` tabs primarios × acciones criticas de entidad) dentro de `[DESIGN SPEC]` para flujos moviles multi-entrada.
+  - Actualizar `.agents/skills/qa-auditor/SKILL.md`: validar durante Step 6 / calidad UX que ninguna accion critica quede huerfana fuera de los flujos accesibles desde las pestanas primarias del `BottomNav`.
+  - Actualizar `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md`: agregar seccion canonica de Arquitectura de Informacion Movil y matriz de alcanzabilidad `BottomNav`.
+  - Mantener el contenido 100% agnostico al dominio (`checkCorePurity` en verde).
+  - Agregar test de regresion en `tests/validate-repo.test.mjs`.
+- **Out-of-Scope:**
+  - Generacion automatica de grafos AST de rutas (auditoria de arquitectura guiada por contrato en spec y QA).
+
+**Criterios de Aceptación:**
+- [x] #1 `.agents/skills/pm-orchestrator/SKILL.md` incluye verificacion de alcanzabilidad movil (`BottomNav`) en la tabla R1 Gate, en el brief de diseno y en el DoD.
+- [x] #2 `.agents/skills/product-designer/SKILL.md` exige declarar la **Critical Action Reachability Matrix** (`BottomNav` tabs × critical entity actions) en `[DESIGN SPEC]`.
+- [x] #3 `.agents/skills/qa-auditor/SKILL.md` y `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` documentan la auditoria de alcanzabilidad de acciones criticas desde todos los entry points reales de navegacion movil.
+- [x] #4 `npm run validate` pasa con `checkCorePurity` en verde y `tests/validate-repo.test.mjs` verifica la presencia de la directiva en las skills.
+
+---
+
+#### [PLAY-073] Unificacion de integridad de backlog y manejo acotado de IDs duplicados historicos en gate-qa
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+En auditorias reales de entrega se detecto una desalineacion critica entre los validadores de backlog:
+- `scripts/lib/task-inspection.mjs` + `scripts/gate-qa.mjs` cargan el 100% de `backlog/tasks/` y abortan toda certificacion si existe cualquier ID duplicado historico en tareas `done`/`dismissed`, bloqueando la certificacion de tareas nuevas validas en el sprint activo.
+- Mientras tanto, `verify-backlog-sync.js` en repositorios consumidores no validaba unicidad de IDs ni diferenciaba colisiones activas de deuda historica, generando falsos verdes frente a colisiones activas y bloqueos totales por deuda archivada.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Enriquecer `loadTasks(tasksDir)` en `scripts/lib/task-inspection.mjs` registrando el estado (`statuses`) de cada copia involucrada en una colision y agregar `classifyCollisions(collisions, tasks, options)` junto con carga de sprints activos desde `backlog/sprints.json`.
+  - Regla unificada de bloqueo vs advertencia:
+    - **Bloquea** si la colision toca el ID objetivo, sus dependencias directas o transitivas, cualquier tarea perteneciente a un sprint con `status === 'active'` en `backlog/sprints.json`, cualquier copia no historica (`status` fuera de `['done', 'dismissed']`), archivos `(unreadable)`, o cuando se pasa `--strict`.
+    - **Advierte (`▲`) sin bloquear** cuando todas las copias colisionantes son puramente historicas (`done` / `dismissed`) fuera del alcance activo y sin `--strict`.
+  - Actualizar `scripts/gate-qa.mjs` (`start`, `unblock`, `submit`, `main` respetando estrictamente el techo `< 500 LOC` y el bucle de mutacion en `main`) y `scripts/gate-review-items.mjs`.
+  - Agregar tests unitarios y CLI en `tests/gate-qa.test.mjs` cubriendo colision historica (`done`/`dismissed` -> warn sin bloqueo), colision activa (`doing`/`sprint active` -> bloqueo), colision en dependencia transitiva (-> bloqueo) y `--strict` (-> bloqueo incluso sobre historicas).
+- **Out-of-Scope:**
+  - Edicion automatica ni borrado destructivo de archivos historicos duplicados en `backlog/tasks/`.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/lib/task-inspection.mjs` expone `classifyCollisions` distinguiendo colisiones bloqueantes (objetivo, dependencias transitivas, sprint activo en `backlog/sprints.json`, estados no historicos, `(unreadable)`, o modo `strict`) de colisiones historicas (`done` / `dismissed`) emitidas como warnings.
+- [x] #2 `scripts/gate-qa.mjs` (`start`, `unblock`, `submit`, `main`) y `scripts/gate-review-items.mjs` aplican la clasificacion acotada e imprimen warnings `▲` cuando existen duplicados puramente historicos sin bloquear tareas validas.
+- [x] #3 `scripts/gate-qa.mjs` acepta `--strict` para forzar bloqueo tambien ante duplicados historicos y conserva intacto su presupuesto `< 500 LOC`.
+- [x] #4 `tests/gate-qa.test.mjs` cubre clasificacion historica vs activa, dependencias transitivas, sprints activos y `--strict`, pasando junto a toda la suite `npm run check:all` con codigo 0.
+
+---
+
+### 📋 Backlog / Draft (10)
+
+#### [PLAY-074] Estructura raiz skills compatible con skills-sh y npx skills add
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+Marketplaces and CLI package managers like `skills.sh` (`vercel-labs/skills`), `LinklyAI/best-skills`, and `awesomeskill.ai` discover and install individual skills from a root `skills/<skill-name>/SKILL.md` directory convention (`npx skills add <owner>/<repo> --skill <name>`). Because `gripm-playbook` stores skills inside `.agents/skills/` and `.agents/stacks/<stack>/skills/`, external users cannot install individual Playbook skills with `npx skills add` without running the full `npx @gripm/playbook init` wizard.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Expose a canonical root `skills/<skill-name>/` layout (or automated build/sync mirror validated by `scripts/validate-repo.mjs`) covering all core and stack skills so `npx skills add pablojavierrodriguez/gripm-playbook` discovers every skill natively.
+  - Update `package.json` `files` and `.playbook-manifest.json` if needed.
+  - Preserve backward compatibility with `.agents/skills/` for `npx @gripm/playbook init` and `sync`.
+- **Out-of-Scope:**
+  - Rewriting the internal prose of each skill (covered in `PLAY-075`).
+
+**Criterios de Aceptación:**
+- [ ] #1 Root directory `skills/<skill-name>/SKILL.md` exposes all core and stack skills for direct discovery by `npx skills add` and `skills.sh` indexers.
+- [ ] #2 `scripts/validate-repo.mjs` enforces parity between `skills/` and `.agents/skills/` (or single-source resolution) so definitions never drift.
+- [ ] #3 Running `npx @gripm/playbook init` and `sync` continues to install `.agents/skills/` without regressions.
+- [ ] #4 Automated tests in `tests/` verify skill discovery layout and `npm run check:all` exits with code 0.
+
+---
+
+#### [PLAY-075] Desacople de skills core para ejecucion Standalone sin requerir backlog-tasks ni gripm-board
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+Currently, `pm-orchestrator`, `principal-engineer`, `qa-auditor`, `product-designer`, `market-researcher`, and `release-management` assume that the host repository uses `backlog/tasks/<ID>.md`, `.agents/STATE_MACHINE.md`, `npx playbook gate <ID>`, and `@gripm/board` MCP tools. When a developer installs a single skill (e.g. `principal-engineer` or `qa-auditor`) into a standard repository that uses GitHub Issues, Linear, Jira, or no tracker at all, the instructions fail or force unwanted file creation.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Refactor all 7 core `SKILL.md` files to operate in two conditional modes:
+    1. **Standalone Mode (Default):** Delivers full engineering, UX, research, or blind-QA value on any repository and git diff without requiring `backlog/tasks/` or state machine transitions.
+    2. **Tracked Mode (Opt-in when `backlog/tasks/` or `.gripm/` is present):** Activates `draft -> doing -> review -> ready -> done` transitions and `npx playbook gate <ID>`.
+  - Update `scripts/gate-qa.mjs` to support a taskless diff/pyramid verification flag (e.g. `npx playbook gate --diff` or `npx playbook verify`) for repositories without `backlog/tasks/`.
+- **Out-of-Scope:**
+  - Removing `gate-qa.mjs` or `STATE_MACHINE.md` for tracked projects.
+
+**Criterios de Aceptación:**
+- [ ] #1 All 7 core `SKILL.md` files explicitly separate Standalone Mode rules (zero dependency on `backlog/tasks/` or `STATE_MACHINE.md`) from Tracked Mode rules.
+- [ ] #2 In Standalone Mode, `qa-auditor` and `principal-engineer` can execute the Verification Pyramid and blind git diff audit without requiring a `TASK-ID` argument.
+- [ ] #3 `scripts/gate-qa.mjs` supports a taskless diff/pyramid verification flag (e.g. `npx playbook gate --diff` or `npx playbook verify`) for repositories without `backlog/tasks/`.
+- [ ] #4 Tests cover taskless verification and standalone skill validation; `npm run check:all` passes.
+
+---
+
+#### [PLAY-076] Purga de sesgos de dogfooding personal y modularizacion de audit-ux en perfiles
+- **Prioridad**: `high` | **Tipo**: `refactor`
+
+### Problem Statement
+`code-level-ux-auditor` and `scripts/ux-rules.json` bundle 20 rules into a single flat catalog where universal web/accessibility bugs (like `UX-010` unnamed icon buttons or `UX-015` viewport zoom locks) are mixed with rules specific to mobile bottom-nav shell architectures (`UX-006` `pb-32`, `UX-018`, `UX-019` `BottomNav`, `UX-020`) and editorial preferences (`UX-014` anti-em-dash). External teams adopting the auditor on desktop web apps, design systems, or non-BottomNav layouts face opinionated rules that feel tailored only to the author's personal apps.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Categorize `scripts/ux-rules.json` signatures into explicit profiles (`web-core`, `mobile-shell`, `editorial-hygiene`) while keeping every `UX-001`..`UX-020` ID intact.
+  - Allow `.uxaudit.json` and `npx playbook audit --profile <name>` to select profiles (defaulting to `web-core` when mobile stack is not active, or `all` in strict full mode).
+  - Review all core `SKILL.md` files to replace project-specific idioms (e.g. LATAM-only defaults, BottomNav assumptions, `gripm` internal conventions) with universal engineering standards.
+- **Out-of-Scope:**
+  - Deleting or renumbering any existing `UX-001`..`UX-020` rule.
+
+**Criterios de Aceptación:**
+- [ ] #1 Each rule in `scripts/ux-rules.json` declares a profile category (`web-core`, `mobile-shell`, or `editorial-hygiene`) while preserving all `UX-001`..`UX-020` IDs and severities.
+- [ ] #2 `scripts/audit-ux-code.cjs` and `.uxaudit.json` support filtering by profile (`--profile web-core | mobile-shell | editorial-hygiene | all`) without breaking existing consumers.
+- [ ] #3 Core `SKILL.md` files are audited and cleaned of personal project biases so examples and rules apply universally across web, backend, CLI, and mobile projects.
+- [ ] #4 Unit tests in `tests/audit-ux.test.mjs` verify profile filtering and backward compatibility; `npm run check:all` exits 0.
+
+---
+
+#### [PLAY-077] Expansion de Stack Packs de alta demanda en el mercado
+- **Prioridad**: `medium` | **Tipo**: `feature`
+
+### Problem Statement
+`.playbook-manifest.json` currently offers only 3 optional stack packs (`react` coupled specifically to RHF + Zod + Radix + Recharts, `mobile`, and `pwa`). Competing repositories like `vercel-labs/agent-skills` and `Gentleman-Skills` attract massive organic traffic because developers search for stack-specific skills such as Next.js App Router, TypeScript strict patterns, Node/Backend APIs, Testing (Vitest/Playwright), and Python/FastAPI.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Create modular, high-signal stack packs and skills under `.agents/stacks/` (and exposed in `skills/`):
+    - `nextjs`: App Router, RSC boundaries, caching/waterfalls, bundle hygiene.
+    - `typescript-strict`: schema boundaries, type narrowing, zero-evasion patterns.
+    - `node-api`: Fastify/Express/NestJS boundary validation, idempotency, error contracts.
+    - `testing`: headless RTL/Vitest + Playwright physical hit-testing and anti-hanging patterns.
+    - `python-api`: FastAPI/Pydantic/pytest strict typing and async safety.
+  - Register auto-detection signals in `scripts/lib/adapters.mjs` and `.playbook-manifest.json`.
+- **Out-of-Scope:**
+  - Installing runtime dependencies in consumer projects.
+
+**Criterios de Aceptación:**
+- [ ] #1 `.playbook-manifest.json` and `scripts/sync-playbook.mjs` include the new stack packs (`nextjs`, `typescript-strict`, `node-api`, `testing`, `python-api`) with complete `STACK.md` and `SKILL.md` files.
+- [ ] #2 `scripts/lib/adapters.mjs` auto-detects the new stacks from `package.json` or repository files (e.g. `pyproject.toml` / `requirements.txt` for `python-api`).
+- [ ] #3 Every new `SKILL.md` complies with frontmatter and link checks in `scripts/validate-repo.mjs`.
+- [ ] #4 Tests in `tests/` verify stack detection and sync installation for all new stack packs; `npm run check:all` passes.
+
+---
+
+#### [PLAY-078] Niveles de adopcion progresiva en init y AGENTS-md lite standard y strict
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+First-time users running `npx @gripm/playbook init` get an `AGENTS.md` and harness rules (`scripts/lib/adapters.mjs`) that immediately enforce maximum ceremony: mandatory `backlog/tasks/` creation for every code change, mandatory 8-question refinement interviews, mandatory English commits regardless of user preference, and strict `dev -> main` branching. This high initial friction causes developers to abandon the tool in favor of lighter alternatives like `gentle-ai`.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Introduce 3 governance tiers in `scripts/init.mjs`, `scripts/lib/selection.mjs`, and `scripts/lib/adapters.mjs`:
+    1. `lite` (Default for standalone installs without `@gripm/board`): Installs skills, slash commands, and headless verification gates (`audit-ux`, `check-loc`, `audit-repo`, blind QA on diff) with zero mandatory `backlog/tasks/` paperwork and configurable commit language.
+    2. `standard` (Default when `@gripm/board` or `backlog/tasks/` is active): Connects tasks in `backlog/tasks/` with pragmatic gates.
+    3. `strict`: Full enterprise governance (`--strict` LOC/UX gates, worktree lease enforcement, `dev -> main` release ceremony).
+  - Ensure `scripts/validate-commit-msg.mjs` respects the configured project language in `lite` and `standard` tiers.
+- **Out-of-Scope:**
+  - Removing strict capabilities for teams that opt into `strict`.
+
+**Criterios de Aceptación:**
+- [ ] #1 `scripts/init.mjs` and `scripts/lib/adapters.mjs` support governance tiers (`lite`, `standard`, `strict`) via interactive prompt and `--tier` / `--preset` flag.
+- [ ] #2 Generated `AGENTS.md`, `CLAUDE.md`, and harness rules in `lite` mode do not mandate creating files in `backlog/tasks/` for every code change.
+- [ ] #3 Commit language rule in adapters and `validate-commit-msg.mjs` respects the project language configured during `init` (allowing Spanish or English when configured in `lite`/`standard` mode).
+- [ ] #4 Onboarding and adapter tests verify rendered files for `lite`, `standard`, and `strict` tiers; `npm run check:all` exits 0.
+
+---
+
+#### [PLAY-079] Abstraccion agnostica de sub-agentes y adaptadores nativos multi-harness
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+`TEAM_PLAYBOOK.md` and `pm-orchestrator/SKILL.md` hardcode Antigravity-specific tool calls (`invoke_subagent(TypeName: "self", Workspace: "share")`, `send_message(Recipient: claimed_by)`), while `scripts/lib/adapters.mjs` only generates a minimal `CLAUDE.md` pointer and `.cursor/rules/*.mdc` without generating native Claude Code sub-agents (`.claude/agents/*.md`), Windsurf rules, GitHub Copilot instructions (`.github/copilot-instructions.md`), or OpenCode configs.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Replace Antigravity-only tool syntax in core skills and `TEAM_PLAYBOOK.md` with a harness-agnostic **Context Isolation Contract** accompanied by a per-harness mapping table (Claude Code `Task` / `.claude/agents/`, Antigravity `invoke_subagent`, Cursor subagents/rules, OpenCode agents, fallback clean-session protocol).
+  - Expand `scripts/lib/adapters.mjs` to generate native sub-agent definitions in `.claude/agents/` (`principal-engineer.md`, `qa-auditor.md`, `product-designer.md`, `market-researcher.md`) and native adapters for `claude`, `cursor`, `copilot`, `windsurf`, `opencode`, `antigravity`, and `none`.
+- **Out-of-Scope:**
+  - Modifying `@gripm/board` CLI flags (covered in `DEV-374`).
+
+**Criterios de Aceptación:**
+- [ ] #1 `TEAM_PLAYBOOK.md` and core `SKILL.md` files express sub-agent dispatch through a harness-agnostic contract with explicit mappings for Claude Code, Cursor, Antigravity, OpenCode, and Copilot.
+- [ ] #2 Selecting the `claude` harness in `init` generates native sub-agent files under `.claude/agents/` with proper YAML frontmatter (`name`, `description`, `tools`).
+- [ ] #3 `scripts/lib/adapters.mjs` supports `antigravity`, `claude`, `cursor`, `copilot`, `windsurf`, `opencode`, and explicit `none`.
+- [ ] #4 Automated tests verify generated adapter files for every supported harness; `npm run check:all` exits 0.
+
+---
+
+#### [PLAY-080] Suite de comandos slash accionables y manifiesto de Plugin para Claude Code
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+Leading repositories like `phuryn/pm-skills` and `obra/superpowers` drive daily engagement through explicit `/slash` commands (`/discover`, `/write-prd`, `/verify`, `/review`) and 1-command plugin installation (`/plugin marketplace add owner/repo`). `gripm-playbook` currently lacks invocable slash commands and a Claude Code plugin marketplace manifest.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Create 6 high-utility, standalone-ready slash commands installable into `.claude/commands/` (and `.agents/workflows/`):
+    - `/discover`: Fast product discovery, benchmark lookup, and edge-case matrix.
+    - `/refine`: Structured requirement refinement and measurable AC generation.
+    - `/audit-ux`: Runs static UX audit (`npx @gripm/playbook audit`) and proposes targeted code fixes.
+    - `/audit-health`: Runs repo health & anti-slop diagnostic (`npx @gripm/playbook audit-repo` + `check-loc`) and identifies God-files or type evasions.
+    - `/qa-blind`: Spawns the isolated clean-context `qa-auditor` sub-agent on the current `git diff` and runs the Verification Pyramid.
+    - `/ship`: Guides SemVer calculation, clean user-facing release notes extraction, and pre-release checks.
+  - Include `.claude-plugin/marketplace.json` (and `plugin.json`) so users can install via `/plugin marketplace add pablojavierrodriguez/gripm-playbook`.
+- **Out-of-Scope:**
+  - Proprietary IDE extensions.
+
+**Criterios de Aceptación:**
+- [ ] #1 Six slash command templates (`/discover`, `/refine`, `/audit-ux`, `/audit-health`, `/qa-blind`, `/ship`) are defined in the repository and installed by `init`/`sync` for supported harnesses.
+- [ ] #2 Repository includes a valid Claude Code plugin manifest enabling installation via `/plugin marketplace add pablojavierrodriguez/gripm-playbook`.
+- [ ] #3 Each command works both in Standalone Mode (without `backlog/tasks/`) and Tracked Mode (with `backlog/tasks/`).
+- [ ] #4 Validation and unit tests verify command files and plugin manifest integrity; `npm run check:all` exits 0.
+
+---
+
+#### [PLAY-081] Kits de Product Discovery y Arquitectura en pm-orchestrator y market-researcher
+- **Prioridad**: `medium` | **Tipo**: `enhancement`
+
+### Problem Statement
+Compared to `phuryn/pm-skills`, our `pm-orchestrator` and `market-researcher` skills focus heavily on internal ticket state transitions (`draft -> doing -> review -> ready`) rather than providing actionable Product Management and Systems Architecture frameworks (such as Lean PRDs, Jobs-to-be-Done, Opportunity Solution Trees, Pre-Mortem risk matrices, and Architecture Decision Records).
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Enrich `pm-orchestrator` and `market-researcher` with reference guides and concise templates (`references/prd-lean-template.md`, `references/opportunity-tree-jtbd.md`, `references/adr-template.md`, `references/pre-mortem-matrix.md`) using Progressive Disclosure so they consume 0 extra tokens until invoked.
+- **Out-of-Scope:**
+  - Turning the playbook into a non-software marketing toolkit.
+
+**Criterios de Aceptación:**
+- [ ] #1 `pm-orchestrator` and `market-researcher` include on-demand reference templates for Lean PRD, JTBD / Opportunity Solution Tree, Pre-Mortem Analysis, and ADR.
+- [ ] #2 `.playbook-manifest.json` and `FALLBACK_CORE_FILES` in `scripts/sync-playbook.mjs` include the new reference files.
+- [ ] #3 Root `SKILL.md` files stay concise (< 220 lines) by referencing the deep templates on demand.
+- [ ] #4 `npm run check:all` validates all links, manifest parity, and LOC budgets with code 0.
+
+---
+
+#### [PLAY-082] Empaquetado portable de audit-ux audit-repo y check-loc para ejecucion desde skills-sh
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+Gripm Playbook's strongest differentiator over pure-prompt repositories (`gentle-ai`, `pm-skills`, `agensi.io`) is its zero-dependency, zero-token deterministic static analysis suite (`audit-ux`, `audit-repo`, `check-loc`). However, when a user installs a single skill via `npx skills add` without adding `@gripm/playbook` to `package.json`, running `npx playbook audit` can fail if the package is not installed locally.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Update all `SKILL.md` command invocations and CLI entry points so agents can invoke `npx -y @gripm/playbook audit`, `npx -y @gripm/playbook audit-repo`, and `npx -y @gripm/playbook check-loc` (zero-install via npm registry) OR bundled skill scripts when installed via `npx skills add`, with fast JSON and human output modes.
+- **Out-of-Scope:**
+  - Requiring global npm installation.
+
+**Criterios de Aceptación:**
+- [ ] #1 `scripts/sync-playbook.mjs` and bin entry points support direct zero-install execution via `npx -y @gripm/playbook <subcommand>` (`audit`, `audit-repo`, `check-loc`, `gate`, `review`).
+- [ ] #2 `code-level-ux-auditor`, `principal-engineer`, and `qa-auditor` `SKILL.md` document zero-install `npx -y @gripm/playbook` commands that work in any repository without prior `init`.
+- [ ] #3 CLI router tests verify all subcommands (`audit`, `audit-repo`, `check-loc`, `gate`, `review`) invoked through the main entry point; `npm run check:all` passes.
+
+---
+
+#### [PLAY-083] Publicacion de llms-txt y optimizacion de metadatos para skills-sh y LinklyAI
+- **Prioridad**: `high` | **Tipo**: `feature`
+
+### Problem Statement
+AI agent directories and ranking engines (`LinklyAI/best-skills` Worth-Installing Score, `skills.sh`, `mcpmarket.com`, `awesomeskill.ai`) evaluate repositories based on `llms.txt` availability, YAML frontmatter trigger clarity (`name` and `description`), one-line install instructions (`npx skills add`), and clear value propositions.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Create a machine-readable `llms.txt` at the root of `gripm-playbook` cataloging all skills, slash commands, deterministic CLI gates, and installation commands.
+  - Optimize the YAML `description` frontmatter of every `SKILL.md` with high-intent trigger keywords.
+  - Update `README.md` to showcase both `npx skills add pablojavierrodriguez/gripm-playbook` (granular skill install) and `npx @gripm/playbook init` (full governance).
+- **Out-of-Scope:**
+  - Paid external marketing campaigns.
+
+**Criterios de Aceptación:**
+- [ ] #1 Root `llms.txt` file is present, included in `package.json` `files`, and documents all skills, slash commands, CLI gates, and installation methods.
+- [ ] #2 Every `SKILL.md` frontmatter `description` is optimized for semantic trigger matching and marketplace discovery without exceeding 300 characters.
+- [ ] #3 `README.md` features clear installation paths for `npx skills add`, Claude Code Plugin Marketplace, and `npx @gripm/playbook init`.
+- [ ] #4 `scripts/validate-repo.mjs` verifies `llms.txt` existence and link validity; `npm run check:all` exits 0.
 
 ---
 
