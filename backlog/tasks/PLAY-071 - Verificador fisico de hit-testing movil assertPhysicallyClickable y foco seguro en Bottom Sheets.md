@@ -1,13 +1,19 @@
 ---
 id: PLAY-071
 title: "Verificador fisico de hit-testing movil assertPhysicallyClickable y foco seguro en Bottom Sheets"
-status: ready
+status: done
 created_date: '2026-11-14'
 updated_date: '2026-11-14'
-labels: ["ux", "qa", "mobile", "hit-testing", "a11y"]
+labels:
+  - "ux"
+  - "qa"
+  - "mobile"
+  - "hit-testing"
+  - "a11y"
 dependencies: []
 priority: high
 type: feature
+milestone: "v2.11.0"
 claimed_by: "antigravity:dev-00a9c7bd"
 ---
 

@@ -1,13 +1,18 @@
 ---
 id: PLAY-073
 title: "Unificacion de integridad de backlog y manejo acotado de IDs duplicados historicos en gate-qa"
-status: ready
+status: done
 created_date: '2026-11-14'
 updated_date: '2026-11-14'
-labels: ["backlog", "gate-qa", "integrity", "sprint-scope"]
+labels:
+  - "backlog"
+  - "gate-qa"
+  - "integrity"
+  - "sprint-scope"
 dependencies: []
 priority: high
 type: feature
+milestone: "v2.11.0"
 claimed_by: "antigravity:dev-00a9c7bd"
 ---
 

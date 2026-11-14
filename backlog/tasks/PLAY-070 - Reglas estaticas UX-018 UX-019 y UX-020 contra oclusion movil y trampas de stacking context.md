@@ -1,13 +1,18 @@
 ---
 id: PLAY-070
 title: "Reglas estaticas UX-018 UX-019 y UX-020 contra oclusion movil y trampas de stacking context"
-status: ready
+status: done
 created_date: '2026-11-14'
 updated_date: '2026-11-14'
-labels: ["ux", "audit", "mobile", "static-analysis"]
+labels:
+  - "ux"
+  - "audit"
+  - "mobile"
+  - "static-analysis"
 dependencies: []
 priority: high
 type: feature
+milestone: "v2.11.0"
 claimed_by: "antigravity:dev-00a9c7bd"
 ---
 

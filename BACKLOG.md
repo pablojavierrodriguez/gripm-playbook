@@ -29,115 +29,6 @@ Playbook init currently offers adapters only for Antigravity, Cursor, and Claude
 
 ---
 
-### 🚀 Ready for Deploy (4)
-
-#### [PLAY-070] Reglas estaticas UX-018 UX-019 y UX-020 contra oclusion movil y trampas de stacking context
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-### Problem Statement
-Auditorias reales de produccion en DOM movil detectaron tres puntos ciegos estructurales donde las 17 firmas actuales (`UX-001`..`UX-017`) reportaban `0 errors, 0 warnings`, pero los controles quedaban fisicamente ocluidos detras de capas de navegacion o fuera de vista:
-1. **Trampa de stacking context por animaciones / ausencia de Portal (`UX-018`):** Un overlay o modal/sheet (`fixed inset-0` con `z-30`/`z-40`/`z-50`/`z-[...]` o `willChange`) renderizado sin `createPortal(..., document.body)` o primitiva de Portal queda encerrado en el stacking context de wrappers padres con `will-change`, `transform` o `opacity` animados, terminando tapado por `BottomNav` aunque declare `z-50`.
-2. **Footers de pagina con `sticky bottom-0` sin compensar `BottomNav` (`UX-019`):** Barras de accion a nivel de vista con `sticky bottom-0` sin offset movil (`bottom-16 md:bottom-0`, `bottom-14`, `bottom-[...]`) quedan fisicamente tapadas detras del `BottomNav` en `< 768px`.
-3. **Botones `sticky bottom-0` dentro del cuerpo scrolleable de Sheets/Modales (`UX-020`):** Declarar `sticky bottom-0` dentro de `<ResponsiveSheet>`, `<Sheet>`, `<Drawer>`, `<Dialog>` o `<Modal>` (en lugar de un slot `footer` anclado / `<SheetFooter>`) provoca que los CTAs desaparezcan al hacer scroll interno o al desplegar el teclado virtual movil. Ademas, `mobile-ux-design/SKILL.md` prescribia un patron antiguo con `sticky bottom-0 bg-background/95 backdrop-blur-md` que contradecia `UX-017` y `UX-020`.
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  - Incorporar soporte de `unlessFileContent` en `scripts/lib/ux-jsx-parser.cjs` para evaluar guardas a nivel de archivo (ej. `createPortal(` o primitivas Portal fuera del JSX del overlay).
-  - Incorporar `UX-018`, `UX-019` y `UX-020` con severidad `WARNING` en `scripts/ux-rules.json`, activas en ambos presets (`pragmatic` y `strict`, sin agregarlas a `PRAGMATIC_EXCLUDED_RULES`).
-  - Documentar las tres reglas y actualizar el checklist pre-merge en `.agents/skills/code-level-ux-auditor/SKILL.md` manteniendo paridad exacta de titulo y severidad.
-  - Corregir la seccion 3 de `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` exigiendo Portal para modales/sheets, slot `footer` / `<SheetFooter>` solido anclado en lugar de `sticky bottom-0` + `backdrop-blur`, y compensacion `bottom-16 md:bottom-0 z-30` en footers sticky de pagina.
-  - Agregar triggers representativos en `tests/fixtures/react-app/src/components/Violations.tsx` y tests unitarios de deteccion positiva y escapes limpios en `tests/audit-ux.test.mjs`.
-- **Out-of-Scope:**
-  - Verificacion fisica en browser real / hit-testing DOM (cubierto en `PLAY-071`) y matriz de alcanzabilidad de IA movil (cubierto en `PLAY-072`).
-
-**Criterios de Aceptación:**
-- [x] #1 `scripts/ux-rules.json` define `UX-018`, `UX-019` y `UX-020` con severidad `WARNING`, activas tanto en preset `pragmatic` como en `strict`.
-- [x] #2 `.agents/skills/code-level-ux-auditor/SKILL.md` documenta los encabezados canonicos `### 18. [UX-018] · WARNING · ...`, `### 19. [UX-019] · WARNING · ...` y `### 20. [UX-020] · WARNING · ...` con paridad verificada por `npm run validate`, y actualiza el checklist pre-merge.
-- [x] #3 `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` reemplaza el patron contradictorio `sticky bottom-0 bg-background/95 backdrop-blur-md` en sheets por slot `footer` / `<SheetFooter>` anclado y exige `createPortal`/Portal en overlays y compensacion `bottom-16 md:bottom-0 z-30` en footers sticky de vista.
-- [x] #4 `tests/fixtures/react-app/src/components/Violations.tsx` dispara las 20 reglas mientras `Clean.tsx` mantiene 0 hallazgos.
-- [x] #5 `tests/audit-ux.test.mjs` verifica casos positivos y de escape valido para `UX-018`, `UX-019` y `UX-020`, y `npm test` + `npm run validate` pasan con codigo 0.
-
----
-
-#### [PLAY-071] Verificador fisico de hit-testing movil assertPhysicallyClickable y foco seguro en Bottom Sheets
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-### Problem Statement
-La auditoria de produccion en DOM movil revelo dos fallos que escapan tanto a linters estaticos como a `jsdom` o `expect(locator).toBeVisible()`:
-1. **Ceguera ante oclusion fisica en `375x812` y targets con pseudo-elementos (`::after` / `::before`):** `toBeVisible()` solo evalua estilos y opacidad, sin detectar si otro elemento (como `BottomNav`, banners o FAB) intercepta los toques en `(cx, cy)` ni si el control sobresale de `812px` de alto util. Ademas, controles compactos que expanden su hit-target con `::after` (ej. un toggle `h-6 border-2`) ven reducida su padding-box a `20px` por el borde de `4px`, por lo que `after:-inset-y-2.5` alcanza solo `40px` y recien `after:-inset-y-3` logra `>= 44px`.
-2. **Auto-foco indiscriminado al abrir Bottom Sheets en movil (`< 768px`):** Enfocar automaticamente el primer `<input>` al montar un sheet levanta el teclado virtual de inmediato y recorta el viewport util a la mitad antes de que el usuario pueda leer el contenido o confirmar acciones.
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  - Implementar y exportar `scripts/lib/physical-hit-test.mjs` (y export `./hit-test` en `package.json`, registrado en `.playbook-manifest.json` y `FALLBACK_CORE_FILES` de `scripts/sync-playbook.mjs`) con `computeEffectiveHitBox`, `evaluatePhysicalClickability`, `assertPhysicallyClickable` y `assertLocatorPhysicallyClickable`.
-  - Contemplar bounding box efectiva con `::after` / `::before` descontando los bordes (`padding-box`), verificando `width >= 44 && height >= 44`, `box.y >= 0 && box.y + box.height <= viewportHeight` y propiedad de `document.elementFromPoint(cx, cy)` (el elemento o un descendiente suyo).
-  - Actualizar `.agents/skills/qa-auditor/SKILL.md` (conteo de 20 reglas estaticas en Step 5, y obligatoriedad de `assertPhysicallyClickable` en Step 6 / Touch Ergonomics sobre `375x812`).
-  - Actualizar `.agents/skills/code-level-ux-auditor/SKILL.md`, `.agents/skills/product-designer/SKILL.md` y `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` con hit-testing fisico, calculo de padding-box en pseudo-elementos y politica de foco seguro en Bottom Sheets (`tabIndex={-1}` al contenedor por defecto en `< 768px`, opt-in explicito via `autoFocusFirstField`).
-  - Agregar tests unitarios en `tests/physical-hit-test.test.mjs` cubriendo oclusion, overflow vertical (`> 812px`), target `< 44px`, pseudo-element `h-6 border-2` con `after:-inset-y-2.5` (40px fail) vs `after:-inset-y-3` (44px pass) y Locator async.
-- **Out-of-Scope:**
-  - Integrar un browser real (Playwright) como dependencia del paquete `@gripm/playbook`.
-
-**Criterios de Aceptación:**
-- [x] #1 `scripts/lib/physical-hit-test.mjs` exporta `computeEffectiveHitBox`, `evaluatePhysicalClickability`, `assertPhysicallyClickable` y `assertLocatorPhysicallyClickable` verificando `effectiveBox` (`>= 44x44px` incluyendo `::after`/`::before` sobre `padding-box`), limites del viewport (`375x812` por defecto) y pertenencia de `document.elementFromPoint(cx, cy)`.
-- [x] #2 `scripts/lib/physical-hit-test.mjs` queda registrado en `.playbook-manifest.json`, `FALLBACK_CORE_FILES` de `scripts/sync-playbook.mjs` y `exports["./hit-test"]` de `package.json`, pasando `npm run validate`.
-- [x] #3 `.agents/skills/qa-auditor/SKILL.md` actualiza el conteo de firmas estaticas en Step 5 a 20 y exige `assertPhysicallyClickable` en `375x812` bajo Step 6 y Touch Ergonomics.
-- [x] #4 `.agents/skills/code-level-ux-auditor/SKILL.md`, `.agents/skills/product-designer/SKILL.md` y `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` documentan la matematica de padding-box en pseudo-elementos `after:-inset-y-*` y la regla de foco inicial seguro en Bottom Sheets (`tabIndex={-1}` por defecto en `< 768px`, opt-in explicito `autoFocusFirstField`).
-- [x] #5 `tests/physical-hit-test.test.mjs` verifica todos los casos de borde (`40px` vs `44px`, oclusion de overlay, corte fuera de `812px`, descendiente valido) y `npm test` pasa con codigo 0.
-
----
-
-#### [PLAY-072] Matriz de alcanzabilidad de acciones criticas desde BottomNav en arquitectura de informacion movil
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-### Problem Statement
-El playbook actual audita componentes aislados (tamano de toque, contraste, estados), pero carece de una compuerta de **Arquitectura de Informacion Movil (IA)** que garantice la alcanzabilidad real de acciones criticas desde los puntos de entrada de navegacion movil (`BottomNav`). En produccion movil ocurrio que entrar al detalle de una entidad desde la pestana primaria exponia acciones secundarias ("Editar", "Ajustar") pero omitia la accion critica principal, obligando a descubrir una ruta alternativa oculta bajo el menu secundario (`More`).
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  - Actualizar `.agents/skills/pm-orchestrator/SKILL.md`: incorporar la dimension de alcanzabilidad movil en la tabla R1 Gate, el dispatch hacia `product-designer` y el DoD.
-  - Actualizar `.agents/skills/product-designer/SKILL.md`: exigir una **Matriz de Alcanzabilidad de Acciones Criticas** (`BottomNav` tabs primarios × acciones criticas de entidad) dentro de `[DESIGN SPEC]` para flujos moviles multi-entrada.
-  - Actualizar `.agents/skills/qa-auditor/SKILL.md`: validar durante Step 6 / calidad UX que ninguna accion critica quede huerfana fuera de los flujos accesibles desde las pestanas primarias del `BottomNav`.
-  - Actualizar `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md`: agregar seccion canonica de Arquitectura de Informacion Movil y matriz de alcanzabilidad `BottomNav`.
-  - Mantener el contenido 100% agnostico al dominio (`checkCorePurity` en verde).
-  - Agregar test de regresion en `tests/validate-repo.test.mjs`.
-- **Out-of-Scope:**
-  - Generacion automatica de grafos AST de rutas (auditoria de arquitectura guiada por contrato en spec y QA).
-
-**Criterios de Aceptación:**
-- [x] #1 `.agents/skills/pm-orchestrator/SKILL.md` incluye verificacion de alcanzabilidad movil (`BottomNav`) en la tabla R1 Gate, en el brief de diseno y en el DoD.
-- [x] #2 `.agents/skills/product-designer/SKILL.md` exige declarar la **Critical Action Reachability Matrix** (`BottomNav` tabs × critical entity actions) en `[DESIGN SPEC]`.
-- [x] #3 `.agents/skills/qa-auditor/SKILL.md` y `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` documentan la auditoria de alcanzabilidad de acciones criticas desde todos los entry points reales de navegacion movil.
-- [x] #4 `npm run validate` pasa con `checkCorePurity` en verde y `tests/validate-repo.test.mjs` verifica la presencia de la directiva en las skills.
-
----
-
-#### [PLAY-073] Unificacion de integridad de backlog y manejo acotado de IDs duplicados historicos en gate-qa
-- **Prioridad**: `high` | **Tipo**: `feature`
-
-### Problem Statement
-En auditorias reales de entrega se detecto una desalineacion critica entre los validadores de backlog:
-- `scripts/lib/task-inspection.mjs` + `scripts/gate-qa.mjs` cargan el 100% de `backlog/tasks/` y abortan toda certificacion si existe cualquier ID duplicado historico en tareas `done`/`dismissed`, bloqueando la certificacion de tareas nuevas validas en el sprint activo.
-- Mientras tanto, `verify-backlog-sync.js` en repositorios consumidores no validaba unicidad de IDs ni diferenciaba colisiones activas de deuda historica, generando falsos verdes frente a colisiones activas y bloqueos totales por deuda archivada.
-
-### Bounded Scope & Decisions (Gate R1)
-- **In-Scope:**
-  - Enriquecer `loadTasks(tasksDir)` en `scripts/lib/task-inspection.mjs` registrando el estado (`statuses`) de cada copia involucrada en una colision y agregar `classifyCollisions(collisions, tasks, options)` junto con carga de sprints activos desde `backlog/sprints.json`.
-  - Regla unificada de bloqueo vs advertencia:
-    - **Bloquea** si la colision toca el ID objetivo, sus dependencias directas o transitivas, cualquier tarea perteneciente a un sprint con `status === 'active'` en `backlog/sprints.json`, cualquier copia no historica (`status` fuera de `['done', 'dismissed']`), archivos `(unreadable)`, o cuando se pasa `--strict`.
-    - **Advierte (`▲`) sin bloquear** cuando todas las copias colisionantes son puramente historicas (`done` / `dismissed`) fuera del alcance activo y sin `--strict`.
-  - Actualizar `scripts/gate-qa.mjs` (`start`, `unblock`, `submit`, `main` respetando estrictamente el techo `< 500 LOC` y el bucle de mutacion en `main`) y `scripts/gate-review-items.mjs`.
-  - Agregar tests unitarios y CLI en `tests/gate-qa.test.mjs` cubriendo colision historica (`done`/`dismissed` -> warn sin bloqueo), colision activa (`doing`/`sprint active` -> bloqueo), colision en dependencia transitiva (-> bloqueo) y `--strict` (-> bloqueo incluso sobre historicas).
-- **Out-of-Scope:**
-  - Edicion automatica ni borrado destructivo de archivos historicos duplicados en `backlog/tasks/`.
-
-**Criterios de Aceptación:**
-- [x] #1 `scripts/lib/task-inspection.mjs` expone `classifyCollisions` distinguiendo colisiones bloqueantes (objetivo, dependencias transitivas, sprint activo en `backlog/sprints.json`, estados no historicos, `(unreadable)`, o modo `strict`) de colisiones historicas (`done` / `dismissed`) emitidas como warnings.
-- [x] #2 `scripts/gate-qa.mjs` (`start`, `unblock`, `submit`, `main`) y `scripts/gate-review-items.mjs` aplican la clasificacion acotada e imprimen warnings `▲` cuando existen duplicados puramente historicos sin bloquear tareas validas.
-- [x] #3 `scripts/gate-qa.mjs` acepta `--strict` para forzar bloqueo tambien ante duplicados historicos y conserva intacto su presupuesto `< 500 LOC`.
-- [x] #4 `tests/gate-qa.test.mjs` cubre clasificacion historica vs activa, dependencias transitivas, sprints activos y `--strict`, pasando junto a toda la suite `npm run check:all` con codigo 0.
-
----
-
 ### 📋 Backlog / Draft (10)
 
 #### [PLAY-074] Estructura raiz skills compatible con skills-sh y npx skills add
@@ -366,7 +257,7 @@ AI agent directories and ranking engines (`LinklyAI/best-skills` Worth-Installin
 
 ---
 
-### ✅ Done / Deployed (65)
+### ✅ Done / Deployed (69)
 
 #### [PLAY-001] Anatomía de unidad en el motor de reglas: text, ownContent y scopeText
 - **Prioridad**: `high` | **Tipo**: `bug`
@@ -1848,6 +1739,117 @@ Durante la ejecución de tareas por agentes autónomos y subagentes en entornos 
 - [x] #4 `scripts/lib/pyramid.mjs` acota el timeout por paso a 2 minutos por defecto (configurable vía options) e identifica con claridad errores de timeout.
 - [x] #5 `scripts/validate-repo.mjs` reconoce `'headless tests (unit & component integration)'` en `PYRAMID_ALIASES` y `npm run validate` pasa con código 0.
 - [x] #6 La suite de tests de `gripm-playbook` (`tests/gate-qa.test.mjs`, `tests/validate-repo.test.mjs`) pasa al 100%.
+
+---
+
+#### [PLAY-070] Reglas estaticas UX-018 UX-019 y UX-020 contra oclusion movil y trampas de stacking context
+- **Prioridad**: `high` | **Tipo**: `feature`
+- **Sprint / Milestone**: v2.11.0
+
+### Problem Statement
+Auditorias reales de produccion en DOM movil detectaron tres puntos ciegos estructurales donde las 17 firmas actuales (`UX-001`..`UX-017`) reportaban `0 errors, 0 warnings`, pero los controles quedaban fisicamente ocluidos detras de capas de navegacion o fuera de vista:
+1. **Trampa de stacking context por animaciones / ausencia de Portal (`UX-018`):** Un overlay o modal/sheet (`fixed inset-0` con `z-30`/`z-40`/`z-50`/`z-[...]` o `willChange`) renderizado sin `createPortal(..., document.body)` o primitiva de Portal queda encerrado en el stacking context de wrappers padres con `will-change`, `transform` o `opacity` animados, terminando tapado por `BottomNav` aunque declare `z-50`.
+2. **Footers de pagina con `sticky bottom-0` sin compensar `BottomNav` (`UX-019`):** Barras de accion a nivel de vista con `sticky bottom-0` sin offset movil (`bottom-16 md:bottom-0`, `bottom-14`, `bottom-[...]`) quedan fisicamente tapadas detras del `BottomNav` en `< 768px`.
+3. **Botones `sticky bottom-0` dentro del cuerpo scrolleable de Sheets/Modales (`UX-020`):** Declarar `sticky bottom-0` dentro de `<ResponsiveSheet>`, `<Sheet>`, `<Drawer>`, `<Dialog>` o `<Modal>` (en lugar de un slot `footer` anclado / `<SheetFooter>`) provoca que los CTAs desaparezcan al hacer scroll interno o al desplegar el teclado virtual movil. Ademas, `mobile-ux-design/SKILL.md` prescribia un patron antiguo con `sticky bottom-0 bg-background/95 backdrop-blur-md` que contradecia `UX-017` y `UX-020`.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Incorporar soporte de `unlessFileContent` en `scripts/lib/ux-jsx-parser.cjs` para evaluar guardas a nivel de archivo (ej. `createPortal(` o primitivas Portal fuera del JSX del overlay).
+  - Incorporar `UX-018`, `UX-019` y `UX-020` con severidad `WARNING` en `scripts/ux-rules.json`, activas en ambos presets (`pragmatic` y `strict`, sin agregarlas a `PRAGMATIC_EXCLUDED_RULES`).
+  - Documentar las tres reglas y actualizar el checklist pre-merge en `.agents/skills/code-level-ux-auditor/SKILL.md` manteniendo paridad exacta de titulo y severidad.
+  - Corregir la seccion 3 de `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` exigiendo Portal para modales/sheets, slot `footer` / `<SheetFooter>` solido anclado en lugar de `sticky bottom-0` + `backdrop-blur`, y compensacion `bottom-16 md:bottom-0 z-30` en footers sticky de pagina.
+  - Agregar triggers representativos en `tests/fixtures/react-app/src/components/Violations.tsx` y tests unitarios de deteccion positiva y escapes limpios en `tests/audit-ux.test.mjs`.
+- **Out-of-Scope:**
+  - Verificacion fisica en browser real / hit-testing DOM (cubierto en `PLAY-071`) y matriz de alcanzabilidad de IA movil (cubierto en `PLAY-072`).
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/ux-rules.json` define `UX-018`, `UX-019` y `UX-020` con severidad `WARNING`, activas tanto en preset `pragmatic` como en `strict`.
+- [x] #2 `.agents/skills/code-level-ux-auditor/SKILL.md` documenta los encabezados canonicos `### 18. [UX-018] · WARNING · ...`, `### 19. [UX-019] · WARNING · ...` y `### 20. [UX-020] · WARNING · ...` con paridad verificada por `npm run validate`, y actualiza el checklist pre-merge.
+- [x] #3 `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` reemplaza el patron contradictorio `sticky bottom-0 bg-background/95 backdrop-blur-md` en sheets por slot `footer` / `<SheetFooter>` anclado y exige `createPortal`/Portal en overlays y compensacion `bottom-16 md:bottom-0 z-30` en footers sticky de vista.
+- [x] #4 `tests/fixtures/react-app/src/components/Violations.tsx` dispara las 20 reglas mientras `Clean.tsx` mantiene 0 hallazgos.
+- [x] #5 `tests/audit-ux.test.mjs` verifica casos positivos y de escape valido para `UX-018`, `UX-019` y `UX-020`, y `npm test` + `npm run validate` pasan con codigo 0.
+
+---
+
+#### [PLAY-071] Verificador fisico de hit-testing movil assertPhysicallyClickable y foco seguro en Bottom Sheets
+- **Prioridad**: `high` | **Tipo**: `feature`
+- **Sprint / Milestone**: v2.11.0
+
+### Problem Statement
+La auditoria de produccion en DOM movil revelo dos fallos que escapan tanto a linters estaticos como a `jsdom` o `expect(locator).toBeVisible()`:
+1. **Ceguera ante oclusion fisica en `375x812` y targets con pseudo-elementos (`::after` / `::before`):** `toBeVisible()` solo evalua estilos y opacidad, sin detectar si otro elemento (como `BottomNav`, banners o FAB) intercepta los toques en `(cx, cy)` ni si el control sobresale de `812px` de alto util. Ademas, controles compactos que expanden su hit-target con `::after` (ej. un toggle `h-6 border-2`) ven reducida su padding-box a `20px` por el borde de `4px`, por lo que `after:-inset-y-2.5` alcanza solo `40px` y recien `after:-inset-y-3` logra `>= 44px`.
+2. **Auto-foco indiscriminado al abrir Bottom Sheets en movil (`< 768px`):** Enfocar automaticamente el primer `<input>` al montar un sheet levanta el teclado virtual de inmediato y recorta el viewport util a la mitad antes de que el usuario pueda leer el contenido o confirmar acciones.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Implementar y exportar `scripts/lib/physical-hit-test.mjs` (y export `./hit-test` en `package.json`, registrado en `.playbook-manifest.json` y `FALLBACK_CORE_FILES` de `scripts/sync-playbook.mjs`) con `computeEffectiveHitBox`, `evaluatePhysicalClickability`, `assertPhysicallyClickable` y `assertLocatorPhysicallyClickable`.
+  - Contemplar bounding box efectiva con `::after` / `::before` descontando los bordes (`padding-box`), verificando `width >= 44 && height >= 44`, `box.y >= 0 && box.y + box.height <= viewportHeight` y propiedad de `document.elementFromPoint(cx, cy)` (el elemento o un descendiente suyo).
+  - Actualizar `.agents/skills/qa-auditor/SKILL.md` (conteo de 20 reglas estaticas en Step 5, y obligatoriedad de `assertPhysicallyClickable` en Step 6 / Touch Ergonomics sobre `375x812`).
+  - Actualizar `.agents/skills/code-level-ux-auditor/SKILL.md`, `.agents/skills/product-designer/SKILL.md` y `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` con hit-testing fisico, calculo de padding-box en pseudo-elementos y politica de foco seguro en Bottom Sheets (`tabIndex={-1}` al contenedor por defecto en `< 768px`, opt-in explicito via `autoFocusFirstField`).
+  - Agregar tests unitarios en `tests/physical-hit-test.test.mjs` cubriendo oclusion, overflow vertical (`> 812px`), target `< 44px`, pseudo-element `h-6 border-2` con `after:-inset-y-2.5` (40px fail) vs `after:-inset-y-3` (44px pass) y Locator async.
+- **Out-of-Scope:**
+  - Integrar un browser real (Playwright) como dependencia del paquete `@gripm/playbook`.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/lib/physical-hit-test.mjs` exporta `computeEffectiveHitBox`, `evaluatePhysicalClickability`, `assertPhysicallyClickable` y `assertLocatorPhysicallyClickable` verificando `effectiveBox` (`>= 44x44px` incluyendo `::after`/`::before` sobre `padding-box`), limites del viewport (`375x812` por defecto) y pertenencia de `document.elementFromPoint(cx, cy)`.
+- [x] #2 `scripts/lib/physical-hit-test.mjs` queda registrado en `.playbook-manifest.json`, `FALLBACK_CORE_FILES` de `scripts/sync-playbook.mjs` y `exports["./hit-test"]` de `package.json`, pasando `npm run validate`.
+- [x] #3 `.agents/skills/qa-auditor/SKILL.md` actualiza el conteo de firmas estaticas en Step 5 a 20 y exige `assertPhysicallyClickable` en `375x812` bajo Step 6 y Touch Ergonomics.
+- [x] #4 `.agents/skills/code-level-ux-auditor/SKILL.md`, `.agents/skills/product-designer/SKILL.md` y `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` documentan la matematica de padding-box en pseudo-elementos `after:-inset-y-*` y la regla de foco inicial seguro en Bottom Sheets (`tabIndex={-1}` por defecto en `< 768px`, opt-in explicito `autoFocusFirstField`).
+- [x] #5 `tests/physical-hit-test.test.mjs` verifica todos los casos de borde (`40px` vs `44px`, oclusion de overlay, corte fuera de `812px`, descendiente valido) y `npm test` pasa con codigo 0.
+
+---
+
+#### [PLAY-072] Matriz de alcanzabilidad de acciones criticas desde BottomNav en arquitectura de informacion movil
+- **Prioridad**: `high` | **Tipo**: `feature`
+- **Sprint / Milestone**: v2.11.0
+
+### Problem Statement
+El playbook actual audita componentes aislados (tamano de toque, contraste, estados), pero carece de una compuerta de **Arquitectura de Informacion Movil (IA)** que garantice la alcanzabilidad real de acciones criticas desde los puntos de entrada de navegacion movil (`BottomNav`). En produccion movil ocurrio que entrar al detalle de una entidad desde la pestana primaria exponia acciones secundarias ("Editar", "Ajustar") pero omitia la accion critica principal, obligando a descubrir una ruta alternativa oculta bajo el menu secundario (`More`).
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Actualizar `.agents/skills/pm-orchestrator/SKILL.md`: incorporar la dimension de alcanzabilidad movil en la tabla R1 Gate, el dispatch hacia `product-designer` y el DoD.
+  - Actualizar `.agents/skills/product-designer/SKILL.md`: exigir una **Matriz de Alcanzabilidad de Acciones Criticas** (`BottomNav` tabs primarios × acciones criticas de entidad) dentro de `[DESIGN SPEC]` para flujos moviles multi-entrada.
+  - Actualizar `.agents/skills/qa-auditor/SKILL.md`: validar durante Step 6 / calidad UX que ninguna accion critica quede huerfana fuera de los flujos accesibles desde las pestanas primarias del `BottomNav`.
+  - Actualizar `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md`: agregar seccion canonica de Arquitectura de Informacion Movil y matriz de alcanzabilidad `BottomNav`.
+  - Mantener el contenido 100% agnostico al dominio (`checkCorePurity` en verde).
+  - Agregar test de regresion en `tests/validate-repo.test.mjs`.
+- **Out-of-Scope:**
+  - Generacion automatica de grafos AST de rutas (auditoria de arquitectura guiada por contrato en spec y QA).
+
+**Criterios de Aceptación:**
+- [x] #1 `.agents/skills/pm-orchestrator/SKILL.md` incluye verificacion de alcanzabilidad movil (`BottomNav`) en la tabla R1 Gate, en el brief de diseno y en el DoD.
+- [x] #2 `.agents/skills/product-designer/SKILL.md` exige declarar la **Critical Action Reachability Matrix** (`BottomNav` tabs × critical entity actions) en `[DESIGN SPEC]`.
+- [x] #3 `.agents/skills/qa-auditor/SKILL.md` y `.agents/stacks/mobile/skills/mobile-ux-design/SKILL.md` documentan la auditoria de alcanzabilidad de acciones criticas desde todos los entry points reales de navegacion movil.
+- [x] #4 `npm run validate` pasa con `checkCorePurity` en verde y `tests/validate-repo.test.mjs` verifica la presencia de la directiva en las skills.
+
+---
+
+#### [PLAY-073] Unificacion de integridad de backlog y manejo acotado de IDs duplicados historicos en gate-qa
+- **Prioridad**: `high` | **Tipo**: `feature`
+- **Sprint / Milestone**: v2.11.0
+
+### Problem Statement
+En auditorias reales de entrega se detecto una desalineacion critica entre los validadores de backlog:
+- `scripts/lib/task-inspection.mjs` + `scripts/gate-qa.mjs` cargan el 100% de `backlog/tasks/` y abortan toda certificacion si existe cualquier ID duplicado historico en tareas `done`/`dismissed`, bloqueando la certificacion de tareas nuevas validas en el sprint activo.
+- Mientras tanto, `verify-backlog-sync.js` en repositorios consumidores no validaba unicidad de IDs ni diferenciaba colisiones activas de deuda historica, generando falsos verdes frente a colisiones activas y bloqueos totales por deuda archivada.
+
+### Bounded Scope & Decisions (Gate R1)
+- **In-Scope:**
+  - Enriquecer `loadTasks(tasksDir)` en `scripts/lib/task-inspection.mjs` registrando el estado (`statuses`) de cada copia involucrada en una colision y agregar `classifyCollisions(collisions, tasks, options)` junto con carga de sprints activos desde `backlog/sprints.json`.
+  - Regla unificada de bloqueo vs advertencia:
+    - **Bloquea** si la colision toca el ID objetivo, sus dependencias directas o transitivas, cualquier tarea perteneciente a un sprint con `status === 'active'` en `backlog/sprints.json`, cualquier copia no historica (`status` fuera de `['done', 'dismissed']`), archivos `(unreadable)`, o cuando se pasa `--strict`.
+    - **Advierte (`▲`) sin bloquear** cuando todas las copias colisionantes son puramente historicas (`done` / `dismissed`) fuera del alcance activo y sin `--strict`.
+  - Actualizar `scripts/gate-qa.mjs` (`start`, `unblock`, `submit`, `main` respetando estrictamente el techo `< 500 LOC` y el bucle de mutacion en `main`) y `scripts/gate-review-items.mjs`.
+  - Agregar tests unitarios y CLI en `tests/gate-qa.test.mjs` cubriendo colision historica (`done`/`dismissed` -> warn sin bloqueo), colision activa (`doing`/`sprint active` -> bloqueo), colision en dependencia transitiva (-> bloqueo) y `--strict` (-> bloqueo incluso sobre historicas).
+- **Out-of-Scope:**
+  - Edicion automatica ni borrado destructivo de archivos historicos duplicados en `backlog/tasks/`.
+
+**Criterios de Aceptación:**
+- [x] #1 `scripts/lib/task-inspection.mjs` expone `classifyCollisions` distinguiendo colisiones bloqueantes (objetivo, dependencias transitivas, sprint activo en `backlog/sprints.json`, estados no historicos, `(unreadable)`, o modo `strict`) de colisiones historicas (`done` / `dismissed`) emitidas como warnings.
+- [x] #2 `scripts/gate-qa.mjs` (`start`, `unblock`, `submit`, `main`) y `scripts/gate-review-items.mjs` aplican la clasificacion acotada e imprimen warnings `▲` cuando existen duplicados puramente historicos sin bloquear tareas validas.
+- [x] #3 `scripts/gate-qa.mjs` acepta `--strict` para forzar bloqueo tambien ante duplicados historicos y conserva intacto su presupuesto `< 500 LOC`.
+- [x] #4 `tests/gate-qa.test.mjs` cubre clasificacion historica vs activa, dependencias transitivas, sprints activos y `--strict`, pasando junto a toda la suite `npm run check:all` con codigo 0.
 
 ---
 

@@ -1,13 +1,19 @@
 ---
 id: PLAY-072
 title: "Matriz de alcanzabilidad de acciones criticas desde BottomNav en arquitectura de informacion movil"
-status: ready
+status: done
 created_date: '2026-11-14'
 updated_date: '2026-11-14'
-labels: ["ux", "ia", "mobile", "product-design", "skills"]
+labels:
+  - "ux"
+  - "ia"
+  - "mobile"
+  - "product-design"
+  - "skills"
 dependencies: []
 priority: high
 type: feature
+milestone: "v2.11.0"
 claimed_by: "antigravity:dev-00a9c7bd"
 ---
 
